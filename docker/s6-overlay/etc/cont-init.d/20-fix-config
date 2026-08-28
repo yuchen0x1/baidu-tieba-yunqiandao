@@ -1,0 +1,13 @@
+#!/usr/bin/with-contenv bash
+
+fix_config() {
+    echo "config.php reads environment variables at runtime; the bundled file is kept as default."
+    echo "DB_HOST=${DB_HOST:-127.0.0.1} DB_USER=${DB_USER:-root} DB_NAME=${DB_NAME:-tiebacloud}"
+    if [ -n "${DB_PASSWD+x}" ]; then
+        echo "DB_PASSWD is set."
+    else
+        echo "DB_PASSWD is not set; falling back to config.php default."
+    fi
+}
+
+fix_config 2>&1 | sed "s#^#[cont-init.d] $(basename $0): \1#g"

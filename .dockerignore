@@ -1,0 +1,8 @@
+.git
+.github
+**/*.md
+.env
+docker/.env
+mysql
+setup/update_cache
+setup/install.lock

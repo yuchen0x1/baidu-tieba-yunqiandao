@@ -1,0 +1,18 @@
+{
+    "name": "yuchen0x1/forum-auto-sign",
+    "description": "百度贴吧云签到系统（遗留维护版）",
+    "type": "project",
+    "license": "AGPL-3.0",
+    "require": {
+        "php": ">=8.2",
+        "ext-curl": "*",
+        "ext-json": "*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.5"
+    },
+    "scripts": {
+        "test": "phpunit",
+        "lint": "php -l lib/class.misc.php"
+    }
+}

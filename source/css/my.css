@@ -1,0 +1,15 @@
+/* Product-specific interaction polish */
+.sidebar-nav a,
+.topbar-action,
+.btn,
+.panel,
+.metric-card,
+.auth-layout {
+  will-change: auto;
+}
+
+.text-muted,
+small,
+small.text-muted {
+  color: var(--color-muted) !important;
+}

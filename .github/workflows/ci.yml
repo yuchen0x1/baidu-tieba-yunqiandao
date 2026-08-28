@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+
+jobs:
+  php-lint:
+    name: PHP syntax check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Lint PHP files
+        run: |
+          docker run --rm -v "$PWD":/app -w /app php:8.4-cli-alpine sh -c \
+            "find . -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 php -l"
+
+  compose:
+    name: Compose validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate compose file
+        env:
+          DB_PASSWD: ci-only
+        run: docker compose -f docker/docker-compose.yml config

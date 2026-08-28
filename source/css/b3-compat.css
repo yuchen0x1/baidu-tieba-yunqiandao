@@ -1,0 +1,199 @@
+/*!
+ * Bootstrap 3 -> Bootstrap 5 Compatibility Layer
+ * Maps B3 class names to B5 equivalents so existing templates work
+ * without immediately rewriting every class.
+ *
+ * This is a migration aid - new templates should use B5 classes directly.
+ */
+
+/* Panels -> Cards */
+.panel { display: block; border: 1px solid var(--color-border); border-radius: var(--radius-md); margin-bottom: var(--space-4); }
+.panel-heading { padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border); background: var(--color-surface); }
+.panel-body { padding: var(--space-4); }
+.panel-footer { padding: var(--space-3) var(--space-4); border-top: 1px solid var(--color-border); background: var(--color-bg); }
+.panel-title { font-size: 1rem; font-weight: 600; margin: 0; }
+.panel-primary { border-color: var(--color-primary); }
+.panel-primary > .panel-heading { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+
+/* Input group addon -> B5 input-group-text */
+.input-group-addon { display: flex; align-items: center; padding: 0.375rem 0.75rem; font-size: 0.875rem; font-weight: 400; line-height: 1.5; color: var(--color-text-secondary); text-align: center; white-space: nowrap; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-bg); }
+.input-group .input-group-addon:first-child { border-right: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.input-group .input-group-addon:last-child { border-left: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.input-group .form-control:not(:first-child) { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.input-group .form-control:not(:last-child) { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.input-group { position: relative; display: flex; flex-wrap: wrap; align-items: stretch; width: 100%; }
+.input-group > .form-control { position: relative; flex: 1 1 auto; width: 1%; min-width: 0; }
+
+/* Glyphicons -> fallback */
+.glyphicon { display: inline-block; font-size: inherit; }
+
+/* Labels -> badges */
+.label { display: inline-block; padding: 0.25em 0.5em; font-size: 0.75em; font-weight: 600; border-radius: var(--radius-sm); color: #fff; }
+.label-default { background: var(--color-text-disabled); }
+.label-primary { background: var(--color-primary); }
+.label-success { background: var(--color-success); }
+.label-info { background: var(--color-info); }
+.label-warning { background: var(--color-warning); }
+.label-danger { background: var(--color-danger); }
+
+/* Badge */
+.badge { display: inline-block; padding: 0.25em 0.5em; font-size: 0.75em; font-weight: 600; border-radius: 12px; background: var(--color-text-disabled); color: #fff; }
+
+/* Alerts */
+.alert { padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.alert-danger { background: #fce8e6; border-color: #f5c6cb; color: var(--color-danger); }
+.alert-warning { background: #fef7e0; border-color: #fde69c; color: var(--color-warning); }
+.alert-info { background: #e8f0fe; border-color: #c6dafc; color: var(--color-info); }
+.alert-success { background: #e6f4ea; border-color: #b8dcc4; color: var(--color-success); }
+
+/* Progress */
+.progress { display: flex; height: 1rem; overflow: hidden; font-size: 0.75rem; background: var(--color-bg); border-radius: var(--radius-sm); border: 1px solid var(--color-border); }
+.progress-bar { display: flex; flex-direction: column; justify-content: center; overflow: hidden; color: #fff; text-align: center; white-space: nowrap; background: var(--color-primary); }
+.progress-bar-success { background: var(--color-success); }
+.progress-bar-info { background: var(--color-info); }
+.progress-bar-warning { background: var(--color-warning); }
+.progress-bar-danger { background: var(--color-danger); }
+
+/* List group */
+.list-group { display: flex; flex-direction: column; padding-left: 0; margin-bottom: 0; border-radius: var(--radius-md); border: 1px solid var(--color-border); overflow: hidden; }
+.list-group-item { position: relative; display: block; padding: var(--space-3) var(--space-4); color: var(--color-text); background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
+.list-group-item:last-child { border-bottom: 0; }
+.list-group-item.active { background: var(--color-sidebar-active-bg); color: var(--color-sidebar-active-text); }
+
+/* Thumbnail / Image helpers */
+.thumbnail { display: block; padding: 4px; margin-bottom: var(--space-4); line-height: 1.42857143; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.img-responsive { max-width: 100%; height: auto; }
+.img-thumbnail { padding: 4px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); max-width: 100%; height: auto; }
+.center-block { display: block; margin-left: auto; margin-right: auto; }
+
+/* Visibility helpers */
+.hidden-print { display: block; }
+@media print { .hidden-print { display: none !important; } }
+.visible-lg, .visible-md { display: block; }
+@media (max-width: 991.98px) { .visible-lg, .visible-md { display: none !important; } }
+@media (max-width: 767.98px) { .visible-md { display: none !important; } }
+.visible-sm, .visible-xs { display: none !important; }
+@media (max-width: 767.98px) { .visible-sm { display: block !important; } }
+@media (max-width: 575.98px) { .visible-xs { display: block !important; } }
+
+/* Media */
+.media { display: flex; align-items: flex-start; }
+.media-body { flex: 1; }
+.media-object { display: block; }
+.media-heading { margin-top: 0; margin-bottom: 5px; font-weight: 600; }
+
+/* Nav */
+.nav-tabs { border-bottom: 1px solid var(--color-border); }
+.nav-stacked { flex-direction: column; }
+
+/* SR only */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+/* Pull / Float */
+.pull-left { float: left !important; }
+.pull-right { float: right !important; }
+
+/* Show */
+.show { display: block !important; }
+
+/* Tab pane */
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+/* Tables */
+.table-striped > tbody > tr:nth-of-type(odd) { background: var(--color-bg); }
+.table-bordered { border: 1px solid var(--color-border); }
+.table-hover > tbody > tr:hover { background: var(--color-sidebar-active-bg); }
+.table-condensed th, .table-condensed td { padding: 0.25rem 0.5rem; }
+
+/* BS5 Card override - map .panel to .card when rewriting */
+.card { border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.card-header { padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border); background: var(--color-surface); }
+.card-body { padding: var(--space-4); }
+
+
+/* Bootstrap 3 Glyphicons @font-face - kept for backward compatibility */
+@font-face {
+  font-family: "Glyphicons Halflings";
+  src: url("../fonts/glyphicons-halflings-regular.eot");
+  src: url("../fonts/glyphicons-halflings-regular.eot?#iefix") format("embedded-opentype"),
+       url("../fonts/glyphicons-halflings-regular.woff2") format("woff2"),
+       url("../fonts/glyphicons-halflings-regular.woff") format("woff"),
+       url("../fonts/glyphicons-halflings-regular.ttf") format("truetype"),
+       url("../fonts/glyphicons-halflings-regular.svg#glyphicons_halflingsregular") format("svg");
+}
+.glyphicon {
+  position: relative;
+  top: 1px;
+  display: inline-block;
+  font-family: "Glyphicons Halflings";
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+.glyphicon-home:before { content: "\e021"; }
+.glyphicon-user:before { content: "\e008"; }
+.glyphicon-link:before { content: "\e144"; }
+.glyphicon-calendar:before { content: "\e109"; }
+.glyphicon-wrench:before { content: "\e136"; }
+.glyphicon-cog:before { content: "\e019"; }
+.glyphicon-stats:before { content: "\e185"; }
+.glyphicon-time:before { content: "\e023"; }
+.glyphicon-th-list:before { content: "\e012"; }
+.glyphicon-th:before { content: "\e011"; }
+.glyphicon-list-alt:before { content: "\e032"; }
+.glyphicon-book:before { content: "\e043"; }
+.glyphicon-play:before { content: "\e072"; }
+.glyphicon-off:before { content: "\e017"; }
+.glyphicon-briefcase:before { content: "\e139"; }
+.glyphicon-tasks:before { content: "\e137"; }
+.glyphicon-shopping-cart:before { content: "\e116"; }
+.glyphicon-eject:before { content: "\e054"; }
+.glyphicon-globe:before { content: "\e135"; }
+.glyphicon-open:before { content: "\e167"; }
+.glyphicon-ban-circle:before { content: "\e090"; }
+.glyphicon-gift:before { content: "\e042"; }
+.glyphicon-plane:before { content: "\e073"; }
+.glyphicon-check:before { content: "\e067"; }
+.glyphicon-screenshot:before { content: "\e088"; }
+.glyphicon-ok-sign:before { content: "\e084"; }
+.glyphicon-remove-sign:before { content: "\e083"; }
+.glyphicon-edit:before { content: "\e065"; }
+.glyphicon-remove:before { content: "\e014"; }
+.glyphicon-ok-circle:before { content: "\e089"; }
+.glyphicon-refresh:before { content: "\e031"; }
+.glyphicon-search:before { content: "\e003"; }
+.glyphicon-remove-circle:before { content: "\e088"; }
+.glyphicon-chevron-down:before { content: "\e114"; }
+.glyphicon-info-sign:before { content: "\e086"; }
+.glyphicon-exclamation-sign:before { content: "\e107"; }
+.glyphicon-ok:before { content: "\e013"; }
+.glyphicon-question-sign:before { content: "\e085"; }
+.glyphicon-plus:before { content: "\e081"; }
+.glyphicon-minus:before { content: "\e221"; }
+.glyphicon-asterisk:before { content: "\e066"; }
+.glyphicon-exclamation-sign:before { content: "\e107"; }
+.glyphicon-eye-open:before { content: "\e105"; }
+.glyphicon-star:before { content: "\e006"; }
+.glyphicon-pencil:before { content: "\e270"; }
+.glyphicon-trash:before { content: "\e020"; }
+.glyphicon-arrow-up:before { content: "\e093"; }
+.glyphicon-arrow-down:before { content: "\e094"; }
+.glyphicon-arrow-left:before { content: "\e091"; }
+.glyphicon-arrow-right:before { content: "\e092"; }
+.glyphicon-upload:before { content: "\e198"; }
+.glyphicon-download:before { content: "\e199"; }
+.glyphicon-fullscreen:before { content: "\e140"; }
+.glyphicon-resize-small:before { content: "\e141"; }
+.glyphicon-adjust:before { content: "\e039"; }
+.glyphicon-certificate:before { content: "\e124"; }
+.glyphicon-signal:before { content: "\e018"; }
+.glyphicon-map-marker:before { content: "\e062"; }
+.glyphicon-repeat:before { content: "\e031"; }
+.glyphicon-flash:before { content: "\e162"; }
+.glyphicon-zoom-in:before { content: "\e015"; }
+.glyphicon-zoom-out:before { content: "\e016"; }
+.glyphicon-file:before { content: "\e022"; }
+.glyphicon-folder-open:before { content: "\e118"; }
