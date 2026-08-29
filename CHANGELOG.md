@@ -1,5 +1,17 @@
 # 更新日志
 
+## 2026-08-29 V5.08 在线更新
+
+### 新功能
+- 系统更新页改为读取当前仓库 GitHub 正式 Release，按版本号检测更新，不再把开发中的 commit 当作稳定版本。
+- 检测到更新时显示版本说明、Release 页面和 Windows 部署包下载入口，并支持管理员在线更新源码。
+- 新增 `api.php?action=update` 版本检查接口和 `windows/check-update.ps1` 独立检查脚本。
+
+### 安全与兼容
+- 在线更新强制 HTTPS 并限制可信 GitHub 下载域名，更新前再次确认最新 tag。
+- 更新时保留 `config.php`、`key.php`、环境变量文件、安装锁和数据库；失败时清理临时文件。
+- 支持 `UPDATE_GITHUB_TOKEN` 提高 GitHub API 速率限制，支持 `SSL_CERT_FILE` / `CURL_CA_BUNDLE` 修复 Windows PHP CA 配置。
+
 ## 2026-08-12 V5.07 安全加固 + 开放 API + 报表
 
 ### 新功能

@@ -6,8 +6,8 @@
  */
 
 define('SYSTEM_FN', '百度贴吧云签到');
-define('SYSTEM_VER', '5.07');
-define('SYSTEM_VER_NOTE', '通知+安全+API+加密');
+define('SYSTEM_VER', '5.08');
+define('SYSTEM_VER_NOTE', '在线更新+通知+安全+API+加密');
 define('SYSTEM_ROOT', dirname(__FILE__));
 define('PLUGIN_ROOT', dirname(__FILE__) . '/plugins/');
 define('SYSTEM_ISCONSOLE', (PHP_SAPI === 'cli') || defined('STDIN'));

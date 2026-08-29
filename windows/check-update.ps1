@@ -1,6 +1,6 @@
 param(
     [string]$Repository = "yuchen0x1/baidu-tieba-yunqiandao",
-    [string]$CurrentVersion = "5.07",
+    [string]$CurrentVersion = "5.08",
     [string]$ApiUrl = ""
 )
 
