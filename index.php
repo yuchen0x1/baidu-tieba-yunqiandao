@@ -4,7 +4,7 @@
  * 贴吧云签到
  * Copyright (c) 2012~2022 Tieba-Cloud-Sign team and its contributors
  *
- * 获取开发文档：https://github.com/yuchen0x1/tieba-cloud-sign/wiki/
+ * 获取开发文档：https://github.com/yuchen0x1/baidu-tieba-yunqiandao/wiki/
  */
 
 require dirname(__FILE__) . '/init.php';

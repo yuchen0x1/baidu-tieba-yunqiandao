@@ -17,6 +17,7 @@ services:
       DB_SSL: ${DB_SSL:-0}
       CSRF: ${CSRF:-true}
       TC_AUTO_CREATE_INSTALL_LOCK: ${TC_AUTO_CREATE_INSTALL_LOCK:-false}
+      UPDATE_GITHUB_TOKEN: ${UPDATE_GITHUB_TOKEN:-}
       HOME: /tmp/caddy
       XDG_CONFIG_HOME: /tmp/caddy/config
       XDG_DATA_HOME: /tmp/caddy/data

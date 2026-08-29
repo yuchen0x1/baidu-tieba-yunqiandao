@@ -125,6 +125,8 @@ docker compose -f docker/docker-compose.yml logs -f db
 | `PUID` / `PGID` | `1000` / `1000` | Compose 保留的容器用户配置变量 |
 | `CSRF` | `true` | Compose 中传给应用的 CSRF 兼容变量 |
 | `TC_AUTO_CREATE_INSTALL_LOCK` | `false` | 容器启动时是否自动创建安装锁 |
+| `SSL_CERT_FILE` / `CURL_CA_BUNDLE` | 空 | Windows PHP 未配置 CA 根证书时，指向可信 CA bundle 文件；不要关闭 HTTPS 证书校验 |
+| `UPDATE_GITHUB_TOKEN` | 空 | 可选的 GitHub 只读 Token，用于提高 API 速率限制或访问受限仓库；不要提交到 Git |
 
 ### 后台配置
 
@@ -135,6 +137,14 @@ docker compose -f docker/docker-compose.yml logs -f db
 - `api_token`：开放 API 的 Bearer Token；为空时 API 返回 503 并视为未启用。
 - `notify_enable`、`notify_channel`、`notify_on_fail`、`notify_on_health` 及各通知渠道凭据。
 - 邮件 SMTP 配置（主机、端口、认证、加密方式、账号和密码）。
+
+### 在线更新
+
+管理员打开“系统更新”页面时，程序会通过 HTTPS 请求当前仓库的 GitHub `latest` 正式 Release，并比较 Release tag 与当前程序版本。检测到更高版本后，页面会显示版本说明、Release 页面、Windows 部署包下载地址和“立即更新”按钮；没有更高版本时会明确显示当前已是最新版本。
+
+在线更新使用 GitHub Release 的源码 ZIP，不会覆盖当前站点的 `config.php`、`key.php`、`.env`、`docker/.env` 或 `setup/install.lock`，也不会修改数据库。更新前会再次获取最新 Release，避免使用过期页面提交；网络不可用或服务器不可写时会保留原程序并提示手动更新。
+
+发布新版本时，请在本仓库创建正式 Release，并使用数字版本 tag（例如 `v5.08`）。Windows 部署包建议命名为包含 `windows` 的 `.zip` 文件，程序会自动将其作为下载入口展示。现有部署还可以运行 `windows/check-update.ps1` 做独立检查。
 
 ## 使用计划任务
 
@@ -172,6 +182,7 @@ Authorization: Bearer <api-token>
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
+| `GET` | `/api.php?action=update` | 获取 GitHub 最新正式版本并判断是否需要更新 |
 | `GET` | `/api.php?action=status` | 签到状态汇总 |
 | `GET` | `/api.php?action=health` | 百度账号健康状态 |
 | `POST` | `/api.php?action=sign` | 立即执行全部签到 |
@@ -228,6 +239,7 @@ composer lint
 ├── templates/              # Web 页面模板
 ├── plugins/                # 插件及插件说明
 ├── setup/                  # 安装、升级、检查和 SQL 模板
+├── lib/class.updater.php   # GitHub Release 在线检查和安全更新
 ├── docker/                 # Dockerfile、Compose 和环境变量示例
 ├── source/                 # CSS、JavaScript、字体和文档素材
 ├── tests/                  # PHPUnit 测试

@@ -2,7 +2,7 @@
 
 /**
  * 贴吧云签到
- * 获取开发文档：https://github.com/yuchen0x1/tieba-cloud-sign/wiki
+ * 获取开发文档：https://github.com/yuchen0x1/baidu-tieba-yunqiandao/wiki
  */
 
 define('SYSTEM_FN', '百度贴吧云签到');
@@ -12,10 +12,13 @@ define('SYSTEM_ROOT', dirname(__FILE__));
 define('PLUGIN_ROOT', dirname(__FILE__) . '/plugins/');
 define('SYSTEM_ISCONSOLE', (PHP_SAPI === 'cli') || defined('STDIN'));
 define('SYSTEM_PAGE', isset($_REQUEST['mod']) ? strip_tags($_REQUEST['mod']) : 'default');
-define('PROJECT_REPOSITORY_NAME', 'tieba-cloud-sign');
-define('PROJECT_GITHUB_URL', 'https://github.com/yuchen0x1/' . PROJECT_REPOSITORY_NAME);
-define('PROJECT_GITEE_URL', 'https://gitee.com/yuchen0x1/' . PROJECT_REPOSITORY_NAME);
-define('PROJECT_GITHUB_API_URL', 'https://api.github.com/repos/yuchen0x1/' . PROJECT_REPOSITORY_NAME);
+define('PROJECT_REPOSITORY_OWNER', 'yuchen0x1');
+define('PROJECT_REPOSITORY_NAME', 'baidu-tieba-yunqiandao');
+define('PROJECT_GITHUB_URL', 'https://github.com/' . PROJECT_REPOSITORY_OWNER . '/' . PROJECT_REPOSITORY_NAME);
+define('PROJECT_GITEE_URL', 'https://gitee.com/' . PROJECT_REPOSITORY_OWNER . '/' . PROJECT_REPOSITORY_NAME);
+define('PROJECT_GITHUB_API_URL', 'https://api.github.com/repos/' . PROJECT_REPOSITORY_OWNER . '/' . PROJECT_REPOSITORY_NAME);
+define('PROJECT_RELEASES_URL', PROJECT_GITHUB_URL . '/releases');
+define('PROJECT_RELEASES_API_URL', PROJECT_GITHUB_API_URL . '/releases/latest');
 define('PROJECT_WIKI_URL', PROJECT_GITHUB_URL . '/wiki');
 define('PROJECT_ISSUES_URL', PROJECT_GITHUB_URL . '/issues');
 define('SUPPORT_URL', PROJECT_WIKI_URL);
@@ -141,10 +144,11 @@ define('SYSTEM_REV', option::get('core_revision'));
 //压缩包链接
 define('UPDATE_SERVER_GITHUB', PROJECT_GITHUB_URL . '/archive/refs/heads/main.zip');
 //压缩包内文件夹名
-define('UPDATE_FNAME_GITHUB', 'tieba-cloud-sign-main');
+define('UPDATE_FNAME_GITHUB', 'baidu-tieba-yunqiandao-main');
 //压缩包解压路径
 define('UPDATE_CACHE', SYSTEM_ROOT . '/setup/update_cache/');
 require SYSTEM_ROOT . '/lib/sfc.functions.php';
+require SYSTEM_ROOT . '/lib/class.updater.php';
 require SYSTEM_ROOT . '/lib/ui.php';
 if (!defined('SYSTEM_NO_PLUGIN')) {
     require SYSTEM_ROOT . '/lib/plugins.php';

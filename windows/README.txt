@@ -21,6 +21,8 @@
 - start-web.bat：启动本地 Web 服务。
 - run-cron.bat：执行一次到期的计划任务。
 - 默认服务地址：http://127.0.0.1:8080
+- 管理员进入“系统更新”即可在线检查 GitHub 最新正式 Release；检测到新版本后可保留配置地更新源码。
+- 若需只检查 Windows 部署包，可运行 `powershell -ExecutionPolicy Bypass -File windows\check-update.ps1`。
 
 安全提示
 - 不要把 BDUSS、STOKEN、数据库密码或通知凭据提交到 Git 或公开渠道。

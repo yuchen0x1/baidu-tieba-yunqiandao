@@ -10,6 +10,7 @@
  *   POST /api.php?action=retry         执行复签
  *   POST /api.php?action=health_check  执行健康检查
  *   GET /api.php?action=logs&limit=50  最近日志
+ *   GET /api.php?action=update       在线版本检查
  */
 
 define('SYSTEM_NO_UI', true);
@@ -37,6 +38,23 @@ $action = isset($_GET['action']) ? trim(strip_tags($_GET['action'])) : '';
 global $m, $i;
 
 switch ($action) {
+    case 'update':
+        try {
+            $release = ProjectUpdater::fetchLatestRelease();
+            $status = ProjectUpdater::buildStatus(SYSTEM_VER, $release);
+            echo json_encode(array('ok' => true, 'data' => array(
+                'current_version' => $status['current_version'],
+                'latest_version' => $status['latest_version'],
+                'update_available' => $status['update_available'],
+                'release' => $release
+            )), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } catch (Throwable $e) {
+            error_log('API 在线更新检查失败：' . $e->getMessage());
+            http_response_code(502);
+            echo json_encode(array('error' => '无法获取最新版本信息'), JSON_UNESCAPED_UNICODE);
+        }
+        break;
+
     case 'status':
         require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
         $stat = SignManager::signSummary();
@@ -119,6 +137,6 @@ switch ($action) {
 
     default:
         http_response_code(400);
-        echo json_encode(array('error' => '未知 action', 'available' => array('status', 'health', 'sign', 'retry', 'health_check', 'logs')), JSON_UNESCAPED_UNICODE);
+        echo json_encode(array('error' => '未知 action', 'available' => array('update', 'status', 'health', 'sign', 'retry', 'health_check', 'logs')), JSON_UNESCAPED_UNICODE);
         break;
 }

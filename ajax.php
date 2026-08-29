@@ -85,104 +85,51 @@ switch (SYSTEM_PAGE) {
         break;
 
     case 'admin:update':
-        $c = new wcurl(PROJECT_GITHUB_API_URL . '/commits?per_page=1', ['User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36']);
-        $data = json_decode($c->exec(), true);
-        if (!isset($data[0]["sha"])) {
-            die('<div class="alert alert-danger"><b>检查更新失败：无法获取最新版本信息。</b></div>');
-        }
-        $c = new wcurl(PROJECT_GITHUB_API_URL . '/commits/' . $data[0]["sha"], ['User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36']);
-        $data = json_decode($c->exec(), true);
-        if (empty($data)) {
-            die('<div class="alert alert-danger"><b>检查更新失败：无法获取最新版本信息。</b></div>');
-        } else {
-            $tip = "";
-            if (isset($_GET['ok'])) {
-                $tip .= '<b>更新成功，下面是最新版本信息。</b><hr/>';
+        try {
+            $release = ProjectUpdater::fetchLatestRelease();
+            $status = ProjectUpdater::buildStatus(SYSTEM_VER, $release);
+            $tip = isset($_GET['ok']) ? '<b>更新成功，下面是最新版本信息。</b><hr/>' : '';
+            $tip .= '<div><b>当前版本：</b>V' . htmlspecialchars($status['current_version'], ENT_QUOTES, 'UTF-8') . '　<b>最新正式版本：</b>V' . htmlspecialchars($status['latest_version'], ENT_QUOTES, 'UTF-8') . '</div>';
+            $tip .= '<div class="text-right"><a href="' . htmlspecialchars($release['release_url'], ENT_QUOTES, 'UTF-8') . '" target="_blank" class="btn btn-default">查看 Release</a> ';
+            if ($release['asset_download_url'] !== '') {
+                $tip .= '<a href="' . htmlspecialchars($release['asset_download_url'], ENT_QUOTES, 'UTF-8') . '" target="_blank" class="btn btn-default">下载 Windows 包</a> ';
             }
-            $tip .= '<div class="text-right"> <div class="label label-primary">commit</div> <a href="' . PROJECT_GITHUB_URL . '/commit/' . htmlspecialchars($data["sha"], ENT_QUOTES, 'UTF-8') . '" target="_blank" class="label label-info">' . htmlspecialchars(substr($data["sha"], 0, 7), ENT_QUOTES, 'UTF-8') . '</a> <div class="label label-warning"><span class="glyphicon glyphicon-time" aria-hidden="true"></span> ' . htmlspecialchars($data["commit"]["committer"]["date"], ENT_QUOTES, 'UTF-8') . '</div> <div class="label label-' . ($data["commit"]["verification"]["verified"] ? 'success' : 'warning') . '">' . ($data["commit"]["verification"]["verified"] ? 'Verified' : 'Not verified') . '</div></div><br /><div>' . nl2br(htmlspecialchars($data["commit"]["message"], ENT_QUOTES, 'UTF-8')) . '</div>';
-            //check update scripts
-            foreach ($data["files"] as $file_info) {
-                if ($file_info["status"] === "added" && strpos($file_info["filename"], 'setup/update') !== false) {
-                    $tip .= '<hr>本提交包含一个升级脚本，更新后请及时执行 <b>' . htmlspecialchars($file_info["filename"], ENT_QUOTES, 'UTF-8') . '</b>';
-                }
+            if ($status['update_available']) {
+                $tip .= '<form action="ajax.php?mod=admin:update:updnow" method="post" style="display:inline;"><input type="hidden" name="csrf_token" value="' . htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') . '"><input type="hidden" name="tag" value="' . htmlspecialchars($release['tag_name'], ENT_QUOTES, 'UTF-8') . '"><button type="submit" class="btn btn-primary" onclick="waitup();">立即更新到 V' . htmlspecialchars($release['version'], ENT_QUOTES, 'UTF-8') . '</button></form>';
+            } else {
+                $tip .= '<span class="label label-success" style="display:inline-block;padding:8px;">当前已是最新版本</span>';
             }
-            echo '<div class="panel panel-default" style="background-color: #F9F9F9;"><div class="panel-body">' . $tip . '<hr/><div class="text-right"><form action="ajax.php?mod=admin:update:updnow" method="post" style="display:inline;"><input type="hidden" name="csrf_token" value="' . htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') . '"><button type="submit" class="btn btn-primary" onclick="waitup();">立即更新</button></form></div></div></div>';
+            $tip .= '</div>';
+            if ($release['body'] !== '') {
+                $tip .= '<hr/><div><b>版本说明：</b><br/>' . nl2br(htmlspecialchars($release['body'], ENT_QUOTES, 'UTF-8')) . '</div>';
+            }
+            if ($release['asset_digest'] !== '') {
+                $tip .= '<hr/><small>Windows 包校验值：' . htmlspecialchars($release['asset_digest'], ENT_QUOTES, 'UTF-8') . '</small>';
+            }
+            echo '<div class="panel panel-default" style="background-color: #F9F9F9;"><div class="panel-body">' . $tip . '</div></div>';
+        } catch (Throwable $e) {
+            error_log('在线更新检查失败：' . $e->getMessage());
+            echo '<div class="alert alert-danger"><b>检查更新失败：</b>暂时无法连接更新服务器，请稍后重试或打开项目 Release 页面手动更新。</div>';
         }
-        $c->close();
         break;
 
     case 'admin:update:updnow':
-        if (!file_exists(UPDATE_CACHE)) {
-            mkdir(UPDATE_CACHE, 0777, true);
-        }
-        $commit_mode = isset($_POST["commit"]) && $_POST["commit"] && SYSTEM_DEV;
-        $floderName = UPDATE_FNAME_GITHUB;
-        //下载zip包
-        //switch (option::get('update_server')){
-        //  //OSCGIT禁止了直接下载
-        //  //CODING仓库都没了
-        //  default:
-        if ($commit_mode) {
-            $commit_id = strtolower(trim($_POST["commit"]));
-            if (preg_match('/^[0-9a-f]{40}$/i', $commit_id) !== 1) {
-                DeleteFile(UPDATE_CACHE);
-                msg('错误 - 更新失败：<br/><br/>无效的 commit id');
+        try {
+            $release = ProjectUpdater::fetchLatestRelease();
+            $requestedTag = isset($_POST['tag']) ? trim((string) $_POST['tag']) : '';
+            if ($requestedTag !== '' && !hash_equals($requestedTag, $release['tag_name'])) {
+                msg('更新版本已变化，请返回页面重新检查更新。');
             }
-            $c = new wcurl(PROJECT_GITHUB_URL . "/archive/{$commit_id}.zip");
-            $floderName = 'tieba-cloud-sign-' . $commit_id;
-        } else {
-            $c = new wcurl(UPDATE_SERVER_GITHUB);
+            $status = ProjectUpdater::buildStatus(SYSTEM_VER, $release);
+            if (!$status['update_available']) {
+                msg('当前已经是最新版本，无需更新。');
+            }
+            ProjectUpdater::installSourceRelease($release);
+            msg('恭喜您，已更新到 V' . htmlspecialchars($release['version'], ENT_QUOTES, 'UTF-8') . '！', SYSTEM_URL . 'index.php?mod=admin:update&ok');
+        } catch (Throwable $e) {
+            error_log('在线更新失败：' . $e->getMessage());
+            msg('更新失败：' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'));
         }
-        //      break;
-        //}
-        $file = $c->exec();
-        $c->close();
-        $zipPath = UPDATE_CACHE . 'update_' . time() . '.zip';
-        if (file_put_contents($zipPath, $file) === false) {
-            DeleteFile(UPDATE_CACHE);
-            msg('错误 - 更新失败：<br/><br/>无法从更新服务器下载更新包');
-        }
-
-
-        //解压缩
-        $z = new zip();
-        $z->open($zipPath);
-        if (!safe_zip_extract($z->getArchive(), UPDATE_CACHE)) {
-            $z->close();
-            DeleteFile(UPDATE_CACHE);
-            msg('错误 - 更新失败：<br/><br/>无法安全解压缩更新包');
-        }
-        $z->close();
-
-        //检查更新文件
-        $floderName = UPDATE_CACHE . $floderName;
-        if (!is_dir($floderName)) {
-            DeleteFile(UPDATE_CACHE);
-            msg('错误 - 更新失败：<br/><br/>无法解压缩更新包');
-        }
-        //删除配置文件
-        if (file_exists($floderName . '/config.php')) {
-            unlink($floderName . '/config.php');
-        }
-        if (file_exists($floderName . '/app.conf')) {
-            unlink($floderName . '/app.conf');
-        }
-        if (file_exists($floderName . '/config.yaml')) {
-            unlink($floderName . '/config.yaml');
-        }
-        //覆盖文件
-        if (CopyAll($floderName, SYSTEM_ROOT) !== true) {
-            DeleteFile(UPDATE_CACHE);
-            msg('错误 - 更新失败：<br/><br/>无法更新文件');
-        }
-        DeleteFile(UPDATE_CACHE);
-        ////获取最新的版本号
-        //$data = json_decode($c->exec(),true);
-        //$c->close();
-        ////修改版本号
-        //option::set('vid',$data['vid']);
-        //暂不支持更新脚本
-        msg('恭喜您，更新成功！', SYSTEM_URL . 'index.php?mod=admin:update&ok');
         break;
 
     // case 'admin:update:changeServer':

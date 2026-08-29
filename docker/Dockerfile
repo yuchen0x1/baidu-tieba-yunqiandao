@@ -7,7 +7,7 @@ ENV LANG=zh_CN.UTF-8 \
 
 LABEL org.opencontainers.image.title="百度贴吧云签到" \
       org.opencontainers.image.description="Tieba Cloud Sign" \
-      org.opencontainers.image.source="https://github.com/yuchen0x1/tieba-cloud-sign"
+      org.opencontainers.image.source="https://github.com/yuchen0x1/baidu-tieba-yunqiandao"
 
 COPY ./ $WORKDIR
 RUN apk add --no-cache \
