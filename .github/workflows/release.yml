@@ -1,0 +1,44 @@
+name: 发布 Windows 部署包
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: 构建并发布 Windows 部署包
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer
+
+      - name: Install package dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Build Windows package
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          package="tieba-cloud-sign-windows-${RELEASE_TAG}.zip"
+          zip -r "$package" . \
+            -x '.git/*' '.github/*' 'tests/*' 'upgrade-report/*' '*.zip'
+          echo "PACKAGE=$package" >> "$GITHUB_ENV"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" "$PACKAGE" \
+            --repo "${{ github.repository }}" \
+            --title "百度贴吧云签到 ${{ github.ref_name }} Windows 部署包" \
+            --generate-notes

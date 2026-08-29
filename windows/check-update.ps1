@@ -7,10 +7,24 @@ param(
 $ErrorActionPreference = "Stop"
 $apiUrl = if ($ApiUrl -ne "") { $ApiUrl } else { "https://api.github.com/repos/$Repository/releases/latest" }
 $headers = @{ "User-Agent" = "Tieba-Cloud-Sign-Updater"; "Accept" = "application/vnd.github+json" }
-if ($env:UPDATE_GITHUB_TOKEN -ne "") {
-    $headers["Authorization"] = "Bearer " + $env:UPDATE_GITHUB_TOKEN
+$token = [string]$env:UPDATE_GITHUB_TOKEN
+if (-not [string]::IsNullOrWhiteSpace($token)) {
+    $headers["Authorization"] = "Bearer " + $token
 }
-$release = Invoke-RestMethod -Uri $apiUrl -Headers $headers -TimeoutSec 15
+try {
+    $release = Invoke-RestMethod -Uri $apiUrl -Headers $headers -TimeoutSec 15
+} catch {
+    $statusCode = 0
+    if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
+        $statusCode = [int]$_.Exception.Response.StatusCode
+    }
+    if ($statusCode -eq 401 -and $headers.ContainsKey("Authorization")) {
+        $headers.Remove("Authorization")
+        $release = Invoke-RestMethod -Uri $apiUrl -Headers $headers -TimeoutSec 15
+    } else {
+        throw
+    }
+}
 $latest = [string]$release.tag_name -replace '^[vV]', ''
 
 if ([version]$latest -gt [version]$CurrentVersion) {
