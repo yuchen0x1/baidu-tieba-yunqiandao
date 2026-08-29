@@ -14,7 +14,7 @@
 
 百度贴吧需要每天逐个贴吧签到，人工操作容易漏签。本项目提供一个可自托管的 Web 站点：用户登录后绑定百度账号并刷新关注贴吧，系统通过计划任务执行签到、失败复签、账号健康检查，并保存签到日志。
 
-本仓库是 [`shirakun/Tieba-Cloud-Sign`](https://github.com/shirakun/Tieba-Cloud-Sign) 的遗留维护版，当前维护内容包括现代 PHP/Docker 运行环境、开放 API、通知、健康检查和安全兼容修复。
+本仓库持续正常更新，维护内容包括现代 PHP/Docker 运行环境、开放 API、通知、健康检查和安全兼容修复。
 
 ## 核心功能
 
@@ -24,7 +24,7 @@
 - BDUSS/STOKEN 健康检查：检查百度账号凭据状态，结果保存到 `baiduid_health`。
 - 开放 API：`api.php` 提供 Bearer Token 认证的状态、健康、签到、复签、健康检查和日志接口。
 - 通知中心：支持 Server 酱、Telegram Bot、通用 Webhook、Bark、PushPlus 和邮件。
-- 插件：仓库内保留灌水、点赞、封禁、删帖、审查、QQ 推送、备份等插件。
+- 插件：仓库内提供灌水、点赞、封禁、删帖、审查、QQ 推送、备份等插件。
 - Docker 部署：本地构建 PHP 8.4 + Caddy Web 镜像，配套 MariaDB 11.4、健康检查和命名卷。
 
 ## 系统要求
@@ -268,10 +268,10 @@ composer lint
 
 ## Docker 发布
 
-仓库包含 GitHub Actions：
+仓库处于正常更新状态，并通过 GitHub Actions 持续检查：
 
 - `.github/workflows/ci.yml`：PHP 语法检查和 Compose 校验。
-- `.github/workflows/build.yml`：手动触发多架构 Docker 镜像构建并推送到 Docker Hub，需要配置 `DOCKERHUB_USERNAME` 和 `DOCKERHUB_PASSWORD` Secrets。
+- `.github/workflows/build.yml`：推送到 `main` 或手动触发多架构 Docker 镜像构建并推送到 Docker Hub，需要配置 `DOCKERHUB_USERNAME` 和 `DOCKERHUB_PASSWORD` Secrets。
 
 ## 许可证与相关链接
 

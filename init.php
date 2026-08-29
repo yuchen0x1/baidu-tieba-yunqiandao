@@ -139,9 +139,9 @@ define('SYSTEM_NAME', option::get('system_name'));
 //版本修订号
 define('SYSTEM_REV', option::get('core_revision'));
 //压缩包链接
-define('UPDATE_SERVER_GITHUB', PROJECT_GITHUB_URL . '/archive/refs/heads/master.zip');
+define('UPDATE_SERVER_GITHUB', PROJECT_GITHUB_URL . '/archive/refs/heads/main.zip');
 //压缩包内文件夹名
-define('UPDATE_FNAME_GITHUB', 'tieba-cloud-sign-master');
+define('UPDATE_FNAME_GITHUB', 'tieba-cloud-sign-main');
 //压缩包解压路径
 define('UPDATE_CACHE', SYSTEM_ROOT . '/setup/update_cache/');
 require SYSTEM_ROOT . '/lib/sfc.functions.php';
