@@ -32,7 +32,12 @@ function install_schema_ready()
         $host = substr($host, 0, $hostSeparator);
     }
     $flags = defined('DB_SSL') && DB_SSL ? MYSQLI_CLIENT_SSL : 0;
-    if (!@$connection->real_connect($host, DB_USER, DB_PASSWD, DB_NAME, $port, null, $flags)) {
+    try {
+        $connected = @$connection->real_connect($host, DB_USER, DB_PASSWD, DB_NAME, $port, null, $flags);
+    } catch (Throwable $exception) {
+        $connected = false;
+    }
+    if (!$connected) {
         return false;
     }
     $connection->set_charset('utf8mb4');
@@ -73,7 +78,8 @@ if ( isset($_GET['step']) && ( empty($csrf['host']) || $csrf['host'] != $_SERVER
 }
 */
 
-    $installStep = isset($_GET['step']) ? (string) strip_tags($_GET['step']) : '0';
+    $rawInstallStep = isset($_GET['step']) ? $_GET['step'] : '0';
+    $installStep = is_scalar($rawInstallStep) ? (string) strip_tags((string) $rawInstallStep) : '0';
     $stepForDisplay = $installStep === '100' ? 2 : max(0, min(5, (int) $installStep));
     echo '<!DOCTYPE html><html lang="zh-CN"><head>';
     echo '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">';
@@ -121,13 +127,13 @@ if ( isset($_GET['step']) && ( empty($csrf['host']) || $csrf['host'] != $_SERVER
       </div>
       <div class="install-content">
 <?php
-if (!isset($_GET['step']) || $_GET['step'] == 0) {
+if ($installStep === '0') {
     echo '<h2>阅读许可协议</h2><p class="install-lead">请先阅读并同意许可协议，确认版权信息和使用约定后继续。</p>';
     echo '<iframe src="../license.html" class="install-license-frame" title="百度贴吧云签到许可协议"></iframe>';
     echo '<br/><br/><input type="button" onclick="if(confirm(\'“我尊重原作者为云签事业付出的心血，在使用该永久免费的云签系统的同时将保护原作者的版权。\r\n保证原作者的名称、链接等版权信息不被删改、淡化或遮挡，如果我没有做到，自愿承担由此引发的所有不良后果”\r\n\r\n同意请确定，不同意请取消\')){location = \'install.php?step=1\';} else {alert(\'请立即删除所有与本程序相关的文件及其延伸产品\');location = \'index.html\';}" class="btn btn-success" value="我接受">&nbsp;&nbsp;&nbsp;';
     echo '<input type="button" onclick=";alert(\'请立即删除所有与本程序相关的文件及其延伸产品\');location = \'index.html\';" class="btn btn-danger" value="我拒绝">';
 } else {
-    switch (strip_tags($_GET['step'])) {
+    switch ($installStep) {
         case '100':
             echo '<h2>手动修改配置</h2><br/>';
             echo '<div class="progress progress-striped">
@@ -245,11 +251,11 @@ define(\'SYSTEM_SALT\',\'\');
             if ($fromConfig) {
                 require SYSTEM_ROOT2 . '/../config.php';
             } else {
-                define('DB_HOST', $_POST['dbhost']);
-                define('DB_USER', $_POST['dbuser']);
-                define('DB_PASSWD', $_POST['dbpw']);
-                define('DB_NAME', $_POST['dbname']);
-                define('DB_PREFIX', $_POST['dbprefix']);
+                define('DB_HOST', isset($_POST['dbhost']) ? trim((string) $_POST['dbhost']) : '');
+                define('DB_USER', isset($_POST['dbuser']) ? trim((string) $_POST['dbuser']) : '');
+                define('DB_PASSWD', isset($_POST['dbpw']) ? (string) $_POST['dbpw'] : '');
+                define('DB_NAME', isset($_POST['dbname']) ? trim((string) $_POST['dbname']) : '');
+                define('DB_PREFIX', isset($_POST['dbprefix']) ? trim((string) $_POST['dbprefix']) : '');
                 define('DB_SSL', !empty($_POST['dbssl']) ? 1 : 0);
             }
             if (!preg_match('/^[A-Za-z0-9_]+$/', DB_NAME) || !preg_match('/^[A-Za-z0-9_]+$/', DB_PREFIX)) {
@@ -380,10 +386,10 @@ define(\'SYSTEM_SALT\', ' . var_export($installCryptoKey, true) . ');';
             echo '恭喜你，安装已经完成<br/><br/>请添加一个计划任务，文件为本程序根目录下的 <b>do.php</b><br/><br/>计划任务运行时间建议为每分钟运行 ( Linux Crontab参考：<b><font color="blue">* * * * *</font></b> )<br/><br/><br/>为保证站点安全，系统已在 /setup 文件夹下放置了 install.lock 文件，如果您的服务器不支持写入，请手动放置一个空的 install.lock 文件到此文件夹下，否则任何人都有权限重新安装您的云签到。<br/><br/><b>请您尊重作者，无论如何都不要删减云签到的版权</b><br/><br/><input type="button" onclick="location = \'../index.php\'" class="btn btn-success" value="进入我的云签到 >>">';
             if ($installReady) {
                 if (@file_put_contents(SYSTEM_ROOT2 . '/install.lock', '1') === false) {
-                    echo '<div class="alert alert-warning">瀹夎宸插畬鎴愶紝浣嗘棤娉曡嚜鍔ㄥ啓鍏?setup/install.lock锛岃鎵嬪姩鍒涘缓涓€涓┖鐨勬枃浠跺悗鍐嶈繘鍏ョ珯鐐广€?</div>';
+                    echo '<div class="alert alert-warning">安装已完成，但无法自动写入 setup/install.lock，请手动创建一个空的文件后再进入站点。</div>';
                 }
             } else {
-                echo '<div class="alert alert-warning">鏁版嵁搴撴湭閫氳繃瀹夎鏍￠獙锛岀郴缁熶笉浼氬啓鍏?install.lock锛岃鍏堝畬鎴愭暟鎹簱瀵煎叆鎴栭噸鏂拌繍琛岃嚜鍔ㄥ畨瑁呫€?</div>';
+                echo '<div class="alert alert-warning">数据库未通过安装校验，系统不会写入 install.lock，请先完成数据库导入或重新运行自动安装。</div>';
             }
             break;
 
