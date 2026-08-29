@@ -2,7 +2,7 @@
     "name": "yuchen0x1/forum-auto-sign",
     "description": "百度贴吧云签到系统，持续正常更新",
     "type": "project",
-    "license": "AGPL-3.0",
+    "license": "AGPL-3.0-only",
     "require": {
         "php": ">=8.2",
         "ext-curl": "*",
