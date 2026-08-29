@@ -1,6 +1,6 @@
 <?php
 define('SYSTEM_FN', '百度贴吧云签到');
-define('SYSTEM_VER', '4.0');
+define('SYSTEM_VER', '5.09');
 define('SYSTEM_ROOT2', dirname(__FILE__));
 define('SYSTEM_ROOT', dirname(__FILE__) . '/..');
 define('SYSTEM_PAGE', isset($_REQUEST['mod']) ? strip_tags($_REQUEST['mod']) : 'default');
@@ -73,37 +73,57 @@ if ( isset($_GET['step']) && ( empty($csrf['host']) || $csrf['host'] != $_SERVER
 }
 */
 
-    echo '<!DOCTYPE html><html><head>';
-    echo '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0">';
+    $installStep = isset($_GET['step']) ? (string) strip_tags($_GET['step']) : '0';
+    $stepForDisplay = $installStep === '100' ? 2 : max(0, min(5, (int) $installStep));
+    echo '<!DOCTYPE html><html lang="zh-CN"><head>';
+    echo '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">';
     echo '<link href="../favicon.ico" rel="shortcut icon"/>';
-    echo '<title>安装向导 - ' . SYSTEM_FN . '</title><meta name="generator" content="God.Kenvix\'s Blog (https://kenvix.com) and StusGame (http://www.stusgame.com)" /></head><body>';
-    echo '<script src="../source/js/jquery.min.js"></script>';
+    echo '<link rel="stylesheet" href="../source/css/tokens.css?v=' . rawurlencode(SYSTEM_VER) . '">';
     echo '<link rel="stylesheet" href="../source/css/bootstrap.min.css">';
+    echo '<link rel="stylesheet" href="install.css?v=' . rawurlencode(SYSTEM_VER) . '">';
+    echo '<title>安装向导 - ' . SYSTEM_FN . '</title><meta name="description" content="百度贴吧云签到安装向导" /></head><body class="install-body">';
+    echo '<script src="../source/js/jquery.min.js"></script>';
     echo '<script src="../source/js/bootstrap.min.js"></script>';
-    echo '<style type="text/css">body { font-family:"微软雅黑","Microsoft YaHei";background: #eee; }</style>';
 ?>
-<div class="navbar navbar-default" role="navigation">
-  <!-- Brand and toggle get grouped for better mobile display -->
-  <div class="navbar-header">
-    <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
-      <span class="sr-only">贴吧云签到</span>
-      <span class="icon-bar"></span>
-      <span class="icon-bar"></span>
-      <span class="icon-bar"></span>
-    </button>
-    <a class="navbar-brand" href="install.php">贴吧云签到安装</a>
-  </div>
-  <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
-    <ul class="nav navbar-nav">
-          <li><a href="http://www.stusgame.com" target="_blank">StusGame</a></li>
-    </ul>
-  </div><!-- /.navbar-collapse -->
-</div>
-<div style="width:90%;margin: 0 auto;overflow: hidden;position: relative;">
+<div class="install-shell">
+  <header class="install-topbar">
+    <a class="install-brand" href="install.php" aria-label="返回安装向导首页">
+      <span class="install-brand-mark" aria-hidden="true">签</span>
+      <span class="install-brand-copy"><strong>百度贴吧云签到</strong><small>安装向导</small></span>
+    </a>
+    <div class="install-topbar-meta">
+      <span class="install-secure"><span class="install-secure-dot" aria-hidden="true"></span>安全安装</span>
+      <a href="index.html">返回管理入口</a>
+    </div>
+  </header>
+  <main class="install-main">
+    <section class="install-intro" aria-labelledby="install-title">
+      <div>
+        <p class="install-kicker">SETUP WIZARD</p>
+        <h1 id="install-title">快速完成站点安装</h1>
+        <p>按照向导完成环境检查、数据库配置和管理员创建，几分钟即可开始使用。</p>
+      </div>
+      <span class="install-version">V<?php echo htmlspecialchars(SYSTEM_VER, ENT_QUOTES, 'UTF-8'); ?> · 稳定安装流程</span>
+    </section>
+    <nav class="install-steps" aria-label="安装进度">
+      <?php
+      $installSteps = array('许可协议', '环境检查', '运行环境', '站点信息', '执行安装', '完成');
+      foreach ($installSteps as $index => $label) {
+          $stepClass = $index < $stepForDisplay ? 'is-complete' : ($index === $stepForDisplay ? 'is-current' : '');
+          echo '<div class="install-step ' . $stepClass . '"><span class="install-step-number">' . ($index < $stepForDisplay ? '✓' : ($index + 1)) . '</span><span>' . $label . '</span></div>';
+      }
+      ?>
+    </nav>
+    <section class="install-card">
+      <div class="install-card-bar">
+        <span class="install-card-eyebrow">当前安装步骤</span>
+        <span class="install-lock-note">安装完成后将自动创建 <code>setup/install.lock</code></span>
+      </div>
+      <div class="install-content">
 <?php
 if (!isset($_GET['step']) || $_GET['step'] == 0) {
-    echo '<h2>阅读许可协议</h2><br/>';
-    echo '<iframe src="../license.html" style="width:100%;height:465px;"></iframe>';
+    echo '<h2>阅读许可协议</h2><p class="install-lead">请先阅读并同意许可协议，确认版权信息和使用约定后继续。</p>';
+    echo '<iframe src="../license.html" class="install-license-frame" title="百度贴吧云签到许可协议"></iframe>';
     echo '<br/><br/><input type="button" onclick="if(confirm(\'“我尊重原作者为云签事业付出的心血，在使用该永久免费的云签系统的同时将保护原作者的版权。\r\n保证原作者的名称、链接等版权信息不被删改、淡化或遮挡，如果我没有做到，自愿承担由此引发的所有不良后果”\r\n\r\n同意请确定，不同意请取消\')){location = \'install.php?step=1\';} else {alert(\'请立即删除所有与本程序相关的文件及其延伸产品\');location = \'index.html\';}" class="btn btn-success" value="我接受">&nbsp;&nbsp;&nbsp;';
     echo '<input type="button" onclick=";alert(\'请立即删除所有与本程序相关的文件及其延伸产品\');location = \'index.html\';" class="btn btn-danger" value="我拒绝">';
 } else {
@@ -150,7 +170,7 @@ define(\'SYSTEM_SALT\',\'\');
             break;
 
         case '1':
-            echo '<h2>准备安装: 功能检查</h2><br/>';
+            echo '<h2>准备安装：功能检查</h2><p class="install-lead">先确认当前服务器满足运行要求，标记为“必须”的项目需要全部可用。</p>';
             echo '<div class="progress progress-striped">
 			  <div class="progress-bar progress-bar-success" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" style="width: 10%">
 			    <span class="sr-only">10%</span>
@@ -162,26 +182,25 @@ define(\'SYSTEM_SALT\',\'\');
             break;
 
         case '2':
-            echo '<h2>准备安装: 设置运行环境</h2><br/>';
+            echo '<h2>准备安装：设置运行环境</h2><p class="install-lead">请选择配置方式。不可写主机可以手动编辑配置文件，再返回继续。</p>';
             echo '<div class="progress progress-striped">
   <div class="progress-bar progress-bar-success" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" style="width: 20%">
     <span class="sr-only">20%</span>
   </div>
 </div>';
-            echo '<h4>你是在应用引擎或者不可写的主机上使用本程序吗？</h4><br/>';
-            echo '<li><a href="install.php?step=3">不，我不是</a></li><br/>';
-            echo '<li><a href="install.php?step=100">是的，我是</a></li>';
+            echo '<h4>你是在应用引擎或者不可写的主机上使用本程序吗？</h4>';
+            echo '<div class="install-choice-grid"><a class="install-choice" href="install.php?step=3"><strong>不是</strong><span>继续填写数据库与站点信息</span><b aria-hidden="true">→</b></a><a class="install-choice" href="install.php?step=100"><strong>是的</strong><span>手动修改 config.php 后继续</span><b aria-hidden="true">→</b></a></div>';
             break;
 
         case '3':
-            echo '<h2>设置所需信息</h2><br/>';
+            echo '<h2>设置所需信息</h2><p class="install-lead">填写数据库连接信息和站点创始人信息，这些内容只用于完成本次安装。</p>';
             echo '<div class="progress progress-striped">
   <div class="progress-bar progress-bar-success" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" style="width: 30%">
     <span class="sr-only">30%</span>
   </div>
 </div>';
             echo '<form action="install.php?step=4" method="post">';
-            echo '<h4>数据库信息</h4>';
+            echo '<h4 class="install-section-title">数据库信息</h4>';
             if (isset($_GET['isbae']) || isset($_GET['bae'])) {
                 echo '<b>提示：</b>如果以下内容有错误，说明您上一步手动修改出现了问题，您可以 <a href="install.php?step=100" class="btn btn-warning btn-xs">返回</a><br/><br/>';
                 @include_once(SYSTEM_ROOT2 . '/../config.php');
@@ -206,7 +225,7 @@ define(\'SYSTEM_SALT\',\'\');
                 echo '<div class="input-group"><span class="input-group-addon">数据库开启SSL</span><select name="dbssl" class="form-control" required="true"><option value="0">否</option><option value="1">是</option></select></div><br/>';
                 echo '</div>';
             }
-            echo '<h4>站点创始人信息</h4><br/>';
+            echo '<h4 class="install-section-title">站点创始人信息</h4>';
             echo '<div class="input-group"><span class="input-group-addon">创始人用户名</span><input type="text" required class="form-control" name="user" placeholder=""></div><br/>';
             echo '<div class="input-group"><span class="input-group-addon">创始人邮箱</span><input type="email" required class="form-control" name="mail" placeholder=""></div><br/>';
             echo '<div class="input-group"><span class="input-group-addon">创始人密码</span><input type="password" required class="form-control" name="pw" placeholder=""></div><br/>';
@@ -352,7 +371,7 @@ define(\'SYSTEM_SALT\', ' . var_export($installCryptoKey, true) . ');';
 
         case '5':
             $installReady = install_schema_ready();
-            echo '<h2>安装完成</h2><br/>';
+            echo '<h2>安装完成</h2><p class="install-lead">站点已经准备就绪，最后确认安全锁文件后即可进入云签到。</p>';
             echo '<div class="progress progress-striped">
   <div class="progress-bar progress-bar-success" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" style="width: 90%">
     <span class="sr-only">90%</span>
@@ -374,4 +393,8 @@ define(\'SYSTEM_SALT\', ' . var_export($installCryptoKey, true) . ');';
     }
 }
 ?>
+      </div>
+    </section>
+  </main>
+  <footer class="install-footer">百度贴吧云签到 · 安装向导 <span>请保留项目版权信息</span></footer>
 </div>
