@@ -1,377 +1,167 @@
 <?php
+
+/**
+ * 贴吧云签到
+ * 获取开发文档：https://github.com/yuchen0x1/baidu-tieba-yunqiandao/wiki
+ */
+
 define('SYSTEM_FN', '百度贴吧云签到');
-define('SYSTEM_VER', '4.0');
-define('SYSTEM_ROOT2', dirname(__FILE__));
-define('SYSTEM_ROOT', dirname(__FILE__) . '/..');
+define('SYSTEM_VER', '5.09');
+define('SYSTEM_VER_NOTE', '安装向导UI+在线更新+通知+安全+API+加密');
+define('SYSTEM_ROOT', dirname(__FILE__));
+define('PLUGIN_ROOT', dirname(__FILE__) . '/plugins/');
+define('SYSTEM_ISCONSOLE', (PHP_SAPI === 'cli') || defined('STDIN'));
 define('SYSTEM_PAGE', isset($_REQUEST['mod']) ? strip_tags($_REQUEST['mod']) : 'default');
+define('PROJECT_REPOSITORY_OWNER', 'yuchen0x1');
+define('PROJECT_REPOSITORY_NAME', 'baidu-tieba-yunqiandao');
+define('PROJECT_GITHUB_URL', 'https://github.com/' . PROJECT_REPOSITORY_OWNER . '/' . PROJECT_REPOSITORY_NAME);
+define('PROJECT_GITEE_URL', 'https://gitee.com/' . PROJECT_REPOSITORY_OWNER . '/' . PROJECT_REPOSITORY_NAME);
+define('PROJECT_GITHUB_API_URL', 'https://api.github.com/repos/' . PROJECT_REPOSITORY_OWNER . '/' . PROJECT_REPOSITORY_NAME);
+define('PROJECT_RELEASES_URL', PROJECT_GITHUB_URL . '/releases');
+define('PROJECT_RELEASES_API_URL', PROJECT_GITHUB_API_URL . '/releases/latest');
+define('PROJECT_WIKI_URL', PROJECT_GITHUB_URL . '/wiki');
+define('PROJECT_ISSUES_URL', PROJECT_GITHUB_URL . '/issues');
+define('SUPPORT_URL', PROJECT_WIKI_URL);
+if (defined('SYSTEM_NO_ERROR')) {
+    error_reporting(0);
+}
+
+if (SYSTEM_ISCONSOLE) {
+    function console_htmltag_delete($v)
+    {
+        $v = str_ireplace(array('</td>','</th>'), ' | ', $v);
+        $v = str_ireplace(array('<br/>','</p>','</tr>','</thead>','</tbody>'), PHP_EOL, $v);
+        $v = str_ireplace(array('&nbsp;'), ' ', $v);
+        return SYSTEM_FN . ' Ver.' . SYSTEM_VER . ' ' . SYSTEM_VER_NOTE . ' - 控制台模式' . PHP_EOL . '==========================================================' . PHP_EOL . strip_tags($v);
+    }
+    ob_start('console_htmltag_delete');
+}
+require SYSTEM_ROOT . '/lib/msg.php';
+
+//如需停止站点运行，请解除注释，即删除开头的 //
+//msg('站点已关闭！请稍后再试，如有疑问请联系站长解决！');
+
+$autoCreateInstallLock = getenv('TC_AUTO_CREATE_INSTALL_LOCK');
+if (
+    !file_exists(SYSTEM_ROOT . '/setup/install.lock')
+    && file_exists(SYSTEM_ROOT . '/setup/install.php')
+    && $autoCreateInstallLock !== false
+    && filter_var($autoCreateInstallLock, FILTER_VALIDATE_BOOLEAN)
+    && file_exists(SYSTEM_ROOT . '/config.php')
+) {
+    // Only lock an already initialized installation. A fresh database must keep
+    // the installer accessible even when the container safeguard is enabled.
+    require_once SYSTEM_ROOT . '/config.php';
+    $lockConnection = class_exists('mysqli') ? @mysqli_init() : false;
+    if ($lockConnection) {
+        $lockHost = DB_HOST;
+        $lockPort = null;
+        $lockHostSeparator = strrpos($lockHost, ':');
+        if ($lockHostSeparator !== false && strpos($lockHost, ']') === false) {
+            $lockPort = (int) substr($lockHost, $lockHostSeparator + 1);
+            $lockHost = substr($lockHost, 0, $lockHostSeparator);
+        }
+        $lockFlags = defined('DB_SSL') && DB_SSL ? MYSQLI_CLIENT_SSL : 0;
+        if (@$lockConnection->real_connect($lockHost, DB_USER, DB_PASSWD, DB_NAME, $lockPort, null, $lockFlags)) {
+            $lockConnection->set_charset('utf8mb4');
+            $lockTablesReady = true;
+            foreach (array('baiduid', 'cron', 'options', 'plugins', 'tieba', 'users', 'users_options', 'baiduid_health', 'cron_log_batch') as $lockTable) {
+                $lockTableName = $lockConnection->real_escape_string(DB_PREFIX . $lockTable);
+                $lockResult = $lockConnection->query(
+                    "SELECT COUNT(*) AS total FROM information_schema.tables " .
+                    "WHERE table_schema = DATABASE() AND table_name = '{$lockTableName}'"
+                );
+                if (!$lockResult) {
+                    $lockTablesReady = false;
+                    break;
+                }
+                $lockRow = $lockResult->fetch_assoc();
+                $lockResult->free();
+                if (empty($lockRow['total'])) {
+                    $lockTablesReady = false;
+                    break;
+                }
+            }
+            if ($lockTablesReady) {
+                $lockAdminTable = '`' . str_replace('`', '``', DB_PREFIX . 'users') . '`';
+                $lockAdminResult = $lockConnection->query(
+                    "SELECT COUNT(*) AS total FROM {$lockAdminTable} WHERE `role` = 'admin'"
+                );
+                $lockTablesReady = $lockAdminResult && !empty(($lockAdminResult->fetch_assoc())['total']);
+                if ($lockAdminResult) {
+                    $lockAdminResult->free();
+                }
+            }
+            if ($lockTablesReady) {
+                @file_put_contents(SYSTEM_ROOT . '/setup/install.lock', '1');
+            }
+        }
+        $lockConnection->close();
+    }
+}
+if (!file_exists(SYSTEM_ROOT . '/setup/install.lock') && file_exists(SYSTEM_ROOT . '/setup/install.php')) {
+    // 不要在安装完成前自动创建锁：安装向导第 5 步完成时会自行写入 install.lock
+    msg('<h2>检测到无 install.lock 文件</h2><ul><li><font size="4">如果您尚未安装本程序，请<a href="./setup/install.php">前往安装</a></font></li><li><font size="4">如果您已经安装本程序，请手动放置一个空的 install.lock 文件到 /setup 文件夹下，<b>为了您站点安全，在您完成它之前我们不会工作。</b></font></li></ul><br/><h4>为什么必须建立 install.lock 文件？</h4>它是云签到的保护文件，如果云签到检测不到它，就会认为站点还没安装，此时任何人都可以安装/重装云签到。<br/><br/>', false, true, false);
+}
+
 header("content-type:text/html; charset=utf-8");
-require SYSTEM_ROOT2 . '/../lib/msg.php';
-include SYSTEM_ROOT2 . '/../lib/class.wcurl.php';
+date_default_timezone_set('Asia/Shanghai');
+// 为 CSRF 令牌提供一次性随机种子（HttpOnly + SameSite=Lax）
+if (!SYSTEM_ISCONSOLE && empty($_COOKIE['tc_csrf']) && !headers_sent()) {
+    try {
+        $csrfCookieValue = bin2hex(random_bytes(16));
+    } catch (Throwable $e) {
+        $csrfCookieValue = md5(uniqid('', true) . microtime());
+    }
+    $isHttps = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off')
+        || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https');
+    setcookie('tc_csrf', $csrfCookieValue, array(
+        'expires' => time() + 31536000,
+        'path' => '/',
+        'secure' => $isHttps,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ));
+    $_COOKIE['tc_csrf'] = $csrfCookieValue;
+}
+if (file_exists(SYSTEM_ROOT . '/key.php')) {
+    include SYSTEM_ROOT . '/key.php';
+}
+require SYSTEM_ROOT . '/lib/class.E.php';
+require SYSTEM_ROOT . '/lib/class.P.php';
+require SYSTEM_ROOT . '/config.php';
+require SYSTEM_ROOT . '/lib/mysql_autoload.php';
+require SYSTEM_ROOT . '/lib/class.loginguard.php';
+require SYSTEM_ROOT . '/lib/class.notify.php';
+require SYSTEM_ROOT . '/lib/class.former.php';
+require SYSTEM_ROOT . '/lib/class.smtp.php';
+require SYSTEM_ROOT . '/lib/class.zip.php';
+require SYSTEM_ROOT . '/lib/reg.php';
+define('SYSTEM_URL', option::get('system_url'));
+define('SYSTEM_NAME', option::get('system_name'));
+//版本修订号
+define('SYSTEM_REV', option::get('core_revision'));
+//压缩包链接
+define('UPDATE_SERVER_GITHUB', PROJECT_GITHUB_URL . '/archive/refs/heads/main.zip');
+//压缩包内文件夹名
+define('UPDATE_FNAME_GITHUB', 'baidu-tieba-yunqiandao-main');
+//压缩包解压路径
+define('UPDATE_CACHE', SYSTEM_ROOT . '/setup/update_cache/');
+require SYSTEM_ROOT . '/lib/sfc.functions.php';
+require SYSTEM_ROOT . '/lib/class.updater.php';
+require SYSTEM_ROOT . '/lib/ui.php';
+if (!defined('SYSTEM_NO_PLUGIN')) {
+    require SYSTEM_ROOT . '/lib/plugins.php';
+require SYSTEM_ROOT . '/lib/class.SignManager.php';
 
-function install_schema_ready()
-{
-    $configFile = SYSTEM_ROOT2 . '/../config.php';
-    if (!file_exists($configFile)) {
-        return false;
-    }
-
-    require_once $configFile;
-    if (!class_exists('mysqli')) {
-        return false;
-    }
-
-    $connection = @mysqli_init();
-    if (!$connection) {
-        return false;
-    }
-    $host = DB_HOST;
-    $port = null;
-    $hostSeparator = strrpos($host, ':');
-    if ($hostSeparator !== false && strpos($host, ']') === false) {
-        $port = (int) substr($host, $hostSeparator + 1);
-        $host = substr($host, 0, $hostSeparator);
-    }
-    $flags = defined('DB_SSL') && DB_SSL ? MYSQLI_CLIENT_SSL : 0;
-    if (!@$connection->real_connect($host, DB_USER, DB_PASSWD, DB_NAME, $port, null, $flags)) {
-        return false;
-    }
-    $connection->set_charset('utf8mb4');
-
-    foreach (array('baiduid', 'cron', 'options', 'plugins', 'tieba', 'users', 'users_options', 'baiduid_health', 'cron_log_batch') as $table) {
-        $tableName = $connection->real_escape_string(DB_PREFIX . $table);
-        $result = $connection->query("SELECT COUNT(*) AS total FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '{$tableName}'");
-        if (!$result) {
-            $connection->close();
-            return false;
-        }
-        $row = $result->fetch_assoc();
-        $result->free();
-        if (empty($row['total'])) {
-            $connection->close();
-            return false;
-        }
-    }
-    $adminTable = '`' . str_replace('`', '``', DB_PREFIX . 'users') . '`';
-    $adminResult = $connection->query("SELECT COUNT(*) AS total FROM {$adminTable} WHERE `role` = 'admin'");
-    if (!$adminResult) {
-        $connection->close();
-        return false;
-    }
-    $adminRow = $adminResult->fetch_assoc();
-    $adminResult->free();
-    $connection->close();
-    return !empty($adminRow['total']);
+// 注册 BDUSS 健康度检查（每天执行一次）
+if (!defined('SYSTEM_DO_NOT_LOGIN')) {
+    @include_once SYSTEM_ROOT . '/lib/class.cron.php';
+    cron::set('system_health_check', 'lib/cron_system_health_check.php', 0, 'BDUSS 健康度检查（自动检测失效的百度账号）', 86400);
 }
 
-if (file_exists(SYSTEM_ROOT2 . '/install.lock')) {
-    msg('错误：安装锁定，请删除以下文件后再安装：<br/><br/>/setup/install.lock<br/><br/>或者点击下面的按钮返回站点取消安装：', '../');
 }
-/*
-$csrf = !empty($_SERVER['HTTP_REFERER']) ? parse_url($_SERVER['HTTP_REFERER']) : '';
-if ( isset($_GET['step']) && ( empty($csrf['host']) || $csrf['host'] != $_SERVER['SERVER_NAME'] ) ) {
-    msg('安装程序检测到来源异常，已被拦截，请按步骤进行安装！点击返回重新操作','index.php');
+if (!defined('SYSTEM_NO_CHECK_LOGIN')) {
+    require SYSTEM_ROOT . '/lib/globals.php';
 }
-*/
 
-    echo '<!DOCTYPE html><html><head>';
-    echo '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0">';
-    echo '<link href="../favicon.ico" rel="shortcut icon"/>';
-    echo '<title>安装向导 - ' . SYSTEM_FN . '</title><meta name="generator" content="God.Kenvix\'s Blog (https://kenvix.com) and StusGame (http://www.stusgame.com)" /></head><body>';
-    echo '<script src="../source/js/jquery.min.js"></script>';
-    echo '<link rel="stylesheet" href="../source/css/bootstrap.min.css">';
-    echo '<script src="../source/js/bootstrap.min.js"></script>';
-    echo '<style type="text/css">body { font-family:"微软雅黑","Microsoft YaHei";background: #eee; }</style>';
-?>
-<div class="navbar navbar-default" role="navigation">
-  <!-- Brand and toggle get grouped for better mobile display -->
-  <div class="navbar-header">
-    <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
-      <span class="sr-only">贴吧云签到</span>
-      <span class="icon-bar"></span>
-      <span class="icon-bar"></span>
-      <span class="icon-bar"></span>
-    </button>
-    <a class="navbar-brand" href="install.php">贴吧云签到安装</a>
-  </div>
-  <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
-    <ul class="nav navbar-nav">
-          <li><a href="http://www.stusgame.com" target="_blank">StusGame</a></li>
-    </ul>
-  </div><!-- /.navbar-collapse -->
-</div>
-<div style="width:90%;margin: 0 auto;overflow: hidden;position: relative;">
-<?php
-if (!isset($_GET['step']) || $_GET['step'] == 0) {
-    echo '<h2>阅读许可协议</h2><br/>';
-    echo '<iframe src="../license.html" style="width:100%;height:465px;"></iframe>';
-    echo '<br/><br/><input type="button" onclick="if(confirm(\'“我尊重原作者为云签事业付出的心血，在使用该永久免费的云签系统的同时将保护原作者的版权。\r\n保证原作者的名称、链接等版权信息不被删改、淡化或遮挡，如果我没有做到，自愿承担由此引发的所有不良后果”\r\n\r\n同意请确定，不同意请取消\')){location = \'install.php?step=1\';} else {alert(\'请立即删除所有与本程序相关的文件及其延伸产品\');location = \'index.html\';}" class="btn btn-success" value="我接受">&nbsp;&nbsp;&nbsp;';
-    echo '<input type="button" onclick=";alert(\'请立即删除所有与本程序相关的文件及其延伸产品\');location = \'index.html\';" class="btn btn-danger" value="我拒绝">';
-} else {
-    switch (strip_tags($_GET['step'])) {
-        case '100':
-            echo '<h2>手动修改配置</h2><br/>';
-            echo '<div class="progress progress-striped">
-  <div class="progress-bar progress-bar-success" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" style="width: 25%">
-    <span class="sr-only">25%</span>
-  </div>
-</div>';
-
-            echo '请按照注释修改 /<b>config.php</b> ，重要位置已经用星号(*)标明<br/><br/><font color="red">警告：</font>切勿使用记事本修改；文件编码应该为 UTF-8 ( 无BOM )';
-            echo '<br/><br/><div class="highlight"><pre><code class="html">
-&lt?php 
-
-//特别警告：禁止使用记事本编辑！
-
-////////////////////////////以下选项只需在使用MySQL时填写////////////////////////////
-//MySQL 数据库地址，普通主机一般为localhost
-define(\'DB_HOST\',\'******\');
-//MySQL 数据库用户名
-define(\'DB_USER\',\'******\');
-//MySQL 数据库密码
-define(\'DB_PASSWD\',\'******\');
-//MySQL 数据库名称
-define(\'DB_NAME\',\'******\');
-//MySQL 启用SSL连接，如需启用请将值改为1
-define(\'DB_SSL\', 0);
-
-////////////////////////////以下选项使用任何数据库都需填写////////////////////////////
-//数据库前缀，建议保持默认
-define(\'DB_PREFIX\',\'tc_\');
-
-///////////////////////////////////////其他设置///////////////////////////////////////
-//停用CSRF防御
-//说明在 https://github.com/yuchen0x1/tieba-cloud-sign/wiki/%E5%85%B3%E4%BA%8E%E4%BA%91%E7%AD%BE%E5%88%B0CSRF%E9%98%B2%E5%BE%A1
-define(\'ANTI_CSRF\',true);
-
-//加密用盐，留空为不使用
-define(\'SYSTEM_SALT\',\'\');
-</code></pre></div>';
-            echo '<br/>修改完成后，请点击下一步<br/><br/><input type="button" onclick="location = \'install.php?step=3&bae\'" class="btn btn-success" value="下一步 >>">';
-            break;
-
-        case '1':
-            echo '<h2>准备安装: 功能检查</h2><br/>';
-            echo '<div class="progress progress-striped">
-			  <div class="progress-bar progress-bar-success" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" style="width: 10%">
-			    <span class="sr-only">10%</span>
-			  </div>
-			</div>';
-            define('DO_NOT_LOAD_UI', true);
-            include SYSTEM_ROOT2 . '/check.php';
-            echo '<input type="button" onclick="location = \'install.php?step=2\'" class="btn btn-success" value="下一步 >>">';
-            break;
-
-        case '2':
-            echo '<h2>准备安装: 设置运行环境</h2><br/>';
-            echo '<div class="progress progress-striped">
-  <div class="progress-bar progress-bar-success" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" style="width: 20%">
-    <span class="sr-only">20%</span>
-  </div>
-</div>';
-            echo '<h4>你是在应用引擎或者不可写的主机上使用本程序吗？</h4><br/>';
-            echo '<li><a href="install.php?step=3">不，我不是</a></li><br/>';
-            echo '<li><a href="install.php?step=100">是的，我是</a></li>';
-            break;
-
-        case '3':
-            echo '<h2>设置所需信息</h2><br/>';
-            echo '<div class="progress progress-striped">
-  <div class="progress-bar progress-bar-success" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" style="width: 30%">
-    <span class="sr-only">30%</span>
-  </div>
-</div>';
-            echo '<form action="install.php?step=4" method="post">';
-            echo '<h4>数据库信息</h4>';
-            if (isset($_GET['isbae']) || isset($_GET['bae'])) {
-                echo '<b>提示：</b>如果以下内容有错误，说明您上一步手动修改出现了问题，您可以 <a href="install.php?step=100" class="btn btn-warning btn-xs">返回</a><br/><br/>';
-                @include_once(SYSTEM_ROOT2 . '/../config.php');
-                echo '<div class="input-group"><span class="input-group-addon">数据库地址</span><input type="text" class="form-control" value="' . htmlspecialchars(DB_HOST, ENT_QUOTES, 'UTF-8') . '" disabled></div><br/>';
-                echo '<div class="input-group"><span class="input-group-addon">数据库用户名</span><input type="text" class="form-control" value="' . htmlspecialchars(DB_USER, ENT_QUOTES, 'UTF-8') . '" disabled></div><br/>';
-                echo '<div class="input-group"><span class="input-group-addon">数据库密码</span><input type="text" class="form-control" value="********" disabled></div><br/>';
-                echo '<div class="input-group"><span class="input-group-addon">数据库名称</span><input type="text" class="form-control" value="' . htmlspecialchars(DB_NAME, ENT_QUOTES, 'UTF-8') . '" disabled></div><br/>';
-                echo '<div class="input-group"><span class="input-group-addon">数据表前缀</span><input type="text" class="form-control" value="' . htmlspecialchars(DB_PREFIX, ENT_QUOTES, 'UTF-8') . '" disabled></div><br/>';
-                echo '<div class="input-group"><span class="input-group-addon">数据库开启SSL</span><select name="dbssl" class="form-control" required="true"><option value="0">否</option><option value="1">是</option></select></div><br/>';
-                echo '<input type="hidden" name="isbae" value="1">';
-                echo '<input type="hidden" name="from_config" value="1">';
-            } else {
-                echo '<br/><b>提示 1：</b>如果您已经手动写好了 config.php ，请选择 [ <b>自动获得数据库配置信息</b> ] 为 <b>是</b><br/>';
-                echo '<b>提示 2：</b>如果程序并未写入数据库 [ 安装完成后进入首页提示 Table XX doesn\'t exist  ] 请选择强制手动导入 SQL<br/><br/>';
-                echo '<input type="checkbox" name="nosql" value="1"> 强制手动导入 SQL<br/><br/>';
-                echo '<div class="input-group"><span class="input-group-addon">自动获得数据库配置信息</span><select name="from_config" class="form-control"  onchange="if(this.value == \'0\') { $(\'#db_config\').show(); } else { $(\'#db_config\').hide(); }"><option value="0">否</option><option value="1">是</option></select></div><br/>';
-                echo '<div id="db_config"><div class="input-group"><span class="input-group-addon">数据库地址</span><input type="text" class="form-control" name="dbhost" value="localhost" placeholder=""></div><br/>';
-                echo '<div class="input-group"><span class="input-group-addon">数据库用户名</span><input type="text" class="form-control" name="dbuser" placeholder=""></div><br/>';
-                echo '<div class="input-group"><span class="input-group-addon">数据库密码</span><input type="text" class="form-control" name="dbpw" placeholder=""></div><br/>';
-                echo '<div class="input-group"><span class="input-group-addon">数据库名称</span><input type="text" class="form-control" name="dbname" placeholder=""></div><br/>';
-                echo '<div class="input-group"><span class="input-group-addon">数据表前缀</span><input type="text" class="form-control" name="dbprefix" value="tc_" placeholder=""></div><br/>';
-                echo '<div class="input-group"><span class="input-group-addon">数据库开启SSL</span><select name="dbssl" class="form-control" required="true"><option value="0">否</option><option value="1">是</option></select></div><br/>';
-                echo '</div>';
-            }
-            echo '<h4>站点创始人信息</h4><br/>';
-            echo '<div class="input-group"><span class="input-group-addon">创始人用户名</span><input type="text" required class="form-control" name="user" placeholder=""></div><br/>';
-            echo '<div class="input-group"><span class="input-group-addon">创始人邮箱</span><input type="email" required class="form-control" name="mail" placeholder=""></div><br/>';
-            echo '<div class="input-group"><span class="input-group-addon">创始人密码</span><input type="password" required class="form-control" name="pw" placeholder=""></div><br/>';
-            //echo '<div class="input-group"><span class="input-group-addon">工具箱执行密码</span><input type="password" required class="form-control" name="toolpw" placeholder=""></div><br/>';
-            echo '<br/><br/><input type="submit" class="btn btn-success" value="下一步 >>"></form>';
-            break;
-
-        case '4':
-            $errorhappen = '';
-            if (isset($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off' && $_SERVER['HTTPS'] !== '') {
-                $http = 'https://';
-            } else {
-                $http = 'http://';
-            }
-            preg_match("/^.*\//", $_SERVER['SCRIPT_NAME'], $sysurl);
-            $fromConfig = !empty($_POST['from_config']);
-            if ($fromConfig) {
-                require SYSTEM_ROOT2 . '/../config.php';
-            } else {
-                define('DB_HOST', $_POST['dbhost']);
-                define('DB_USER', $_POST['dbuser']);
-                define('DB_PASSWD', $_POST['dbpw']);
-                define('DB_NAME', $_POST['dbname']);
-                define('DB_PREFIX', $_POST['dbprefix']);
-                define('DB_SSL', !empty($_POST['dbssl']) ? 1 : 0);
-            }
-            if (!preg_match('/^[A-Za-z0-9_]+$/', DB_NAME) || !preg_match('/^[A-Za-z0-9_]+$/', DB_PREFIX)) {
-                msg('数据库名称或表前缀包含非法字符，只允许使用字母、数字和下划线');
-            }
-            $sql  = str_ireplace('{VAR-PREFIX}', DB_PREFIX, file_get_contents(SYSTEM_ROOT2 . '/install.template.sql'));
-            $sql  = str_ireplace('{VAR-DB}', DB_NAME, $sql);
-            $installCryptoKey = bin2hex(random_bytes(32));
-            $sql  = str_ireplace('{VAR-COOKIE-SALT}', $installCryptoKey, $sql);
-            //$sql  = str_ireplace('{VAR-TOOLPW}', md5(md5(md5($_POST['toolpw']))), $sql);
-            $sql  = str_ireplace('{VAR-SYSTEM-URL}', $http . $_SERVER['HTTP_HOST'] . str_ireplace('setup/', '', $sysurl[0]), $sql);
-            $installUser = isset($_POST['user']) ? trim(strip_tags($_POST['user'])) : '';
-            $installMail = isset($_POST['mail']) ? trim(strip_tags($_POST['mail'])) : '';
-            $installPw = isset($_POST['pw']) ? (string) $_POST['pw'] : '';
-            if (empty($installUser) || empty($installMail) || empty($installPw)) {
-                msg('请正确填写创始人信息');
-            }
-            if (!preg_match('/^[A-Za-z0-9_\x{4e00}-\x{9fa5}]+$/u', $installUser)) {
-                msg('创始人用户名包含非法字符');
-            }
-            if (!filter_var($installMail, FILTER_VALIDATE_EMAIL)) {
-                msg('创始人邮箱格式不正确');
-            }
-            $installUser = addslashes($installUser);
-            $installMail = addslashes($installMail);
-            $sql .= "\n" . "INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . "users` (`name`, `pw`, `email`, `role`) VALUES ('{$installUser}', '" . password_hash($installPw, PASSWORD_BCRYPT, ['cost' => 12]) . "', '{$installMail}', 'admin');";
-            if (!isset($_POST['nosql'])) {
-                require SYSTEM_ROOT . '/lib/mysql_autoload.php';
-                global $m;
-                $testInstall = $m->fetch_row($m->query("SHOW TABLES LIKE '" . DB_PREFIX . "users'"));
-                if (!empty($testInstall[0])) {
-                    if (!empty($_POST['force_user']) && !empty($_POST['force_pw'])) {
-                        $force_user = !empty($_POST['force_user']) ? addslashes($_POST['force_user']) : msg('请输入原站点的管理员用户名');
-                        $force_pw   = !empty($_POST['force_pw'])   ? addslashes($_POST['force_pw'])   : msg('请输入原站点的管理员密码');
-                        $account    = $m->once_fetch_array("SELECT * FROM `" . DB_PREFIX . "users` WHERE `name` = '{$force_user}';");
-                        if (empty($account['role'])) {
-                            msg('原站点的管理员用户名错误，请返回重新输入');
-                        } elseif (!password_verify($force_pw, $account['pw'])) {
-                            msg('原站点的管理员密码错误，请返回重新输入<br/><br/>注：暂时不支持自定义加密方式的用户重装站点');
-                        } elseif ($account['role'] != 'admin') {
-                            msg('权限不足');
-                        }
-                    } else {
-                        echo '<h2>请输入原站点的管理员用户名和密码</h2><br/>';
-                        echo '<div class="progress progress-striped"><div class="progress-bar progress-bar-success" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" style="width: 50%"><span class="sr-only">50%</span></div></div>';
-                        echo '检测到站点已经安装过 ' . SYSTEM_FN . ' 了，如果需要继续安装，请输入待覆盖站点管理员用户名和密码（不是刚才输入的创始人用户名和密码）<br/><br/>如果继续安装，您的站点的数据将会全部恢复到云签到初始状态<br/><br/>';
-                        echo '<form action="install.php?step=4" method="post">';
-                        echo '<div class="input-group"><span class="input-group-addon" id="basic-addon1">用户名</span><input type="text" class="form-control" name="force_user" required></div><br/>';
-                        echo '<div class="input-group"><span class="input-group-addon" id="basic-addon1">密码</span><input type="password" class="form-control" name="force_pw" required></div><br/>';
-                        foreach ($_POST as $key => $value) {
-                            echo '<input type="hidden" name="' . htmlspecialchars($key, ENT_QUOTES, 'UTF-8') . '" value="' . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . '">';
-                        }
-                        echo '<br/><input type="submit" class="btn btn-success" value="下一步 >>"></form>';
-                        die;
-                    }
-                }
-            }
-            if (!isset($_POST['isbae'])) {
-                $write_data = '<?php 
-
-//特别警告：禁止使用记事本编辑！
-
-////////////////////////////以下选项只需在使用MySQL时填写////////////////////////////
-//MySQL 数据库地址，普通主机一般为localhost
-define(\'DB_HOST\', ' . var_export(DB_HOST, true) . ');
-//MySQL 数据库用户名
-define(\'DB_USER\', ' . var_export(DB_USER, true) . ');
-//MySQL 数据库密码
-define(\'DB_PASSWD\', ' . var_export(DB_PASSWD, true) . ');
-//MySQL 数据库名称
-define(\'DB_NAME\', ' . var_export(DB_NAME, true) . ');
-//MySQL 启用SSL连接，如需启用请将值改为1
-define(\'DB_SSL\',' . (int) DB_SSL . ');
-
-////////////////////////////以下选项使用任何数据库都需填写////////////////////////////
-//数据库前缀，建议保持默认
-define(\'DB_PREFIX\', ' . var_export(DB_PREFIX, true) . ');
-
-///////////////////////////////////////其他设置///////////////////////////////////////
-//停用CSRF防御
-//说明在 https://github.com/yuchen0x1/tieba-cloud-sign/wiki/%E5%85%B3%E4%BA%8E%E4%BA%91%E7%AD%BE%E5%88%B0CSRF%E9%98%B2%E5%BE%A1
-define(\'ANTI_CSRF\',true);
-
-//加密用盐
-define(\'SYSTEM_SALT\', ' . var_export($installCryptoKey, true) . ');';
-                if (!$fromConfig && !file_put_contents('../config.php', $write_data)) {
-                    $errorhappen .= '<b>无法写入配置文件 config.php ，请打开本程序根目录的 config.php 并按照注释修改它</b><br/><br/>';
-                }
-            }
-            if (!isset($_POST['nosql'])) {
-                try {
-                    $m->multi_query($sql);
-                } catch (Exception $ex) {
-                    $errorhappen .= htmlspecialchars($ex->getMessage(), ENT_QUOTES, 'UTF-8');
-                    $errorhappen .= '<br/><br/>自动安装失败，请手动复制下列语句到数据库管理软件(例如phpmyadmin)并运行：<br/>请无视其中的注释，直接导入即可<br/><div class="alert alert-success"><pre>' . htmlspecialchars($sql, ENT_QUOTES, 'UTF-8') . '</pre><br/><br/>';
-                }
-            } else {
-                    $errorhappen .= '由于你选择了手动安装，请手动复制下列语句到数据库管理软件(例如phpmyadmin)并运行：<br/>请无视其中的注释，直接导入即可<br/><div class="alert alert-success"><pre>' . htmlspecialchars($sql, ENT_QUOTES, 'UTF-8') . '</pre><br/><br/>';
-            }
-            echo '<script src="stat.js?type=tcs&ver=' . SYSTEM_VER . '"></script>';
-            if (!empty($errorhappen)) {
-                echo '<h2>请手动安装</h2><br/>';
-                echo '<div class="progress progress-striped">
-  <div class="progress-bar progress-bar-success" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" style="width: 60%">
-    <span class="sr-only">60%</span>
-  </div>
-</div>';
-                echo $errorhappen;
-                echo '完成上述操作后，请点击下一步<br/><br/><input type="button" onclick="location = \'install.php?step=5\'" class="btn btn-success" value="下一步 >>">';
-            } else {
-                echo '<div class="progress progress-striped">
-  <div class="progress-bar progress-bar-success" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" style="width: 60%">
-    <span class="sr-only">60%</span>
-  </div>
-</div>';
-                echo '<meta http-equiv="refresh" content="0;url=install.php?step=5"><h2>请稍候</h2><br/>正在完成安装...';
-            }
-            break;
-
-        case '5':
-            $installReady = install_schema_ready();
-            echo '<h2>安装完成</h2><br/>';
-            echo '<div class="progress progress-striped">
-  <div class="progress-bar progress-bar-success" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" style="width: 90%">
-    <span class="sr-only">90%</span>
-  </div>
-</div>';
-            echo '恭喜你，安装已经完成<br/><br/>请添加一个计划任务，文件为本程序根目录下的 <b>do.php</b><br/><br/>计划任务运行时间建议为每分钟运行 ( Linux Crontab参考：<b><font color="blue">* * * * *</font></b> )<br/><br/><br/>为保证站点安全，系统已在 /setup 文件夹下放置了 install.lock 文件，如果您的服务器不支持写入，请手动放置一个空的 install.lock 文件到此文件夹下，否则任何人都有权限重新安装您的云签到。<br/><br/><b>请您尊重作者，无论如何都不要删减云签到的版权</b><br/><br/><input type="button" onclick="location = \'../index.php\'" class="btn btn-success" value="进入我的云签到 >>">';
-            if ($installReady) {
-                if (@file_put_contents(SYSTEM_ROOT2 . '/install.lock', '1') === false) {
-                    echo '<div class="alert alert-warning">瀹夎宸插畬鎴愶紝浣嗘棤娉曡嚜鍔ㄥ啓鍏?setup/install.lock锛岃鎵嬪姩鍒涘缓涓€涓┖鐨勬枃浠跺悗鍐嶈繘鍏ョ珯鐐广€?</div>';
-                }
-            } else {
-                echo '<div class="alert alert-warning">鏁版嵁搴撴湭閫氳繃瀹夎鏍￠獙锛岀郴缁熶笉浼氬啓鍏?install.lock锛岃鍏堝畬鎴愭暟鎹簱瀵煎叆鎴栭噸鏂拌繍琛岃嚜鍔ㄥ畨瑁呫€?</div>';
-            }
-            break;
-
-        default:
-            msg('未定义操作');
-            break;
-    }
-}
-?>
-</div>

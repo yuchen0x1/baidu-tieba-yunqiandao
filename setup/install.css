@@ -1,0 +1,116 @@
+/* Installation wizard presentation layer. The PHP workflow remains in install.php. */
+:root {
+  --install-ink: #17332f;
+  --install-ink-soft: #49635d;
+  --install-muted: #71847f;
+  --install-line: #dce9e4;
+  --install-brand: #0f766e;
+  --install-brand-deep: #0a4d49;
+  --install-accent: #f4b740;
+  --install-canvas: #eef5f2;
+  --install-surface: rgba(255, 255, 255, .88);
+  --install-shadow: 0 24px 70px rgba(24, 66, 57, .12);
+}
+
+*, *:before, *:after { box-sizing: border-box; }
+html, body { min-height: 100%; }
+
+body.install-body {
+  margin: 0;
+  color: var(--install-ink);
+  background: var(--install-canvas);
+  background-image: radial-gradient(circle at 10% 0%, rgba(15, 118, 110, .12), transparent 30%), linear-gradient(135deg, #f7fbf9 0%, #eaf2ef 100%);
+  font-family: "Inter", "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  font-size: 14px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+.install-shell { min-height: 100vh; }
+.install-topbar { display: flex; align-items: center; justify-content: space-between; min-height: 72px; padding: 0 clamp(20px, 5vw, 76px); background: rgba(255, 255, 255, .75); border-bottom: 1px solid rgba(220, 233, 228, .8); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+.install-brand, .install-topbar-meta { display: flex; align-items: center; }
+.install-brand { gap: 11px; color: var(--install-ink); }
+.install-brand:hover, .install-brand:focus { color: var(--install-brand); text-decoration: none; }
+.install-brand-mark { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; color: var(--install-ink); font-size: 18px; font-weight: 900; background: var(--install-accent); border-radius: 12px 4px 12px 4px; }
+.install-brand-copy strong, .install-brand-copy small { display: block; line-height: 1.2; }
+.install-brand-copy strong { font-size: 14px; letter-spacing: .02em; }
+.install-brand-copy small { margin-top: 3px; color: var(--install-muted); font-size: 11px; }
+.install-topbar-meta { gap: 22px; color: var(--install-muted); font-size: 12px; }
+.install-topbar-meta a { color: var(--install-brand); font-weight: 700; }
+.install-secure { display: inline-flex; align-items: center; gap: 7px; }
+.install-secure-dot { width: 7px; height: 7px; background: #24a36f; border-radius: 50%; box-shadow: 0 0 0 4px rgba(36, 163, 111, .12); }
+
+.install-main { width: min(100% - 40px, 1080px); margin: 0 auto; padding: 54px 0 26px; }
+.install-intro { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 30px; }
+.install-kicker { margin: 0 0 8px; color: var(--install-brand); font-size: 11px; font-weight: 850; letter-spacing: .16em; }
+.install-intro h1 { margin: 0; color: var(--install-ink); font-size: clamp(27px, 4vw, 38px); font-weight: 850; letter-spacing: -.04em; line-height: 1.2; }
+.install-intro p:not(.install-kicker) { max-width: 680px; margin: 11px 0 0; color: var(--install-muted); }
+.install-version { padding: 7px 12px; color: var(--install-brand-deep); font-size: 11px; font-weight: 750; white-space: nowrap; background: rgba(217, 241, 236, .72); border: 1px solid #c7e4dc; border-radius: 999px; }
+
+.install-steps { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 18px; }
+.install-step { position: relative; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 10px 8px; color: #8b9d98; font-size: 11px; font-weight: 700; border-top: 2px solid #d5e2de; }
+.install-step-number { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 22px; width: 22px; height: 22px; color: #80938e; font-size: 11px; background: #e2ece8; border-radius: 50%; }
+.install-step.is-current { color: var(--install-brand-deep); border-top-color: var(--install-brand); }
+.install-step.is-current .install-step-number { color: #fff; background: var(--install-brand); box-shadow: 0 0 0 4px rgba(15, 118, 110, .12); }
+.install-step.is-complete { color: var(--install-brand); border-top-color: #7ac5b6; }
+.install-step.is-complete .install-step-number { color: #fff; background: #4aae93; }
+
+.install-card { overflow: hidden; background: var(--install-surface); border: 1px solid rgba(255, 255, 255, .9); border-radius: 16px; box-shadow: var(--install-shadow); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
+.install-card-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 58px; padding: 0 30px; border-bottom: 1px solid var(--install-line); }
+.install-card-eyebrow { color: var(--install-brand); font-size: 11px; font-weight: 850; letter-spacing: .12em; text-transform: uppercase; }
+.install-lock-note { color: var(--install-muted); font-size: 11px; }
+.install-lock-note code { padding: 3px 6px; color: var(--install-brand-deep); background: #edf7f3; border-radius: 4px; }
+.install-content { min-height: 430px; padding: 34px 30px 38px; overflow-x: auto; }
+.install-content h2 { margin: 0 0 8px; color: var(--install-ink); font-size: 25px; font-weight: 850; letter-spacing: -.03em; }
+.install-content h4 { color: var(--install-ink); font-size: 15px; font-weight: 800; }
+.install-lead { margin: 0 0 24px; color: var(--install-muted); }
+.install-license-frame { display: block; width: 100%; height: 465px; border: 1px solid var(--install-line); border-radius: 10px; background: #fff; }
+.install-content .progress { height: 7px; margin: 0 0 28px; background: #dfebe7; border-radius: 999px; box-shadow: none; }
+.install-content .progress-bar { background: linear-gradient(90deg, var(--install-brand), #49ae98); border-radius: inherit; }
+.install-content .btn { min-height: 40px; padding: 9px 17px; border-radius: 7px; font-weight: 750; }
+.install-content .btn-success { color: #fff; background: var(--install-brand); border-color: var(--install-brand); }
+.install-content .btn-success:hover, .install-content .btn-success:focus { background: var(--install-brand-deep); border-color: var(--install-brand-deep); }
+.install-content .btn-danger { background: #fff; border-color: #e1c5c2; color: #ae4a42; }
+.install-content .btn-warning { color: #513901; background: #fff4d6; border-color: #eed28a; }
+.install-content form { max-width: 760px; }
+.install-content .input-group { display: grid; grid-template-columns: minmax(145px, 190px) minmax(0, 1fr); width: 100%; margin-bottom: 12px; }
+.install-content .input-group-addon { display: flex; align-items: center; min-width: 0; padding: 10px 13px; color: var(--install-ink-soft); text-align: left; background: #f4f9f7; border: 1px solid var(--install-line); border-radius: 7px 0 0 7px; }
+.install-content .input-group .form-control { width: 100%; height: 42px; border-color: var(--install-line); border-radius: 0 7px 7px 0; box-shadow: none; }
+.install-content .input-group .form-control:focus { border-color: var(--install-brand); box-shadow: 0 0 0 3px rgba(15, 118, 110, .13); }
+.install-content input[type="checkbox"] { accent-color: var(--install-brand); }
+.install-section-title { margin: 28px 0 14px; padding-top: 24px; border-top: 1px solid var(--install-line); }
+.install-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; max-width: 760px; margin-top: 18px; }
+.install-choice { position: relative; display: block; min-height: 112px; padding: 18px 46px 16px 18px; color: var(--install-ink); background: #f8fcfa; border: 1px solid var(--install-line); border-radius: 10px; transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
+.install-choice:hover, .install-choice:focus { color: var(--install-brand-deep); text-decoration: none; border-color: #8bcabc; box-shadow: 0 8px 20px rgba(15, 118, 110, .09); transform: translateY(-1px); }
+.install-choice strong, .install-choice span { display: block; }
+.install-choice strong { font-size: 15px; }
+.install-choice span { margin-top: 5px; color: var(--install-muted); font-size: 12px; }
+.install-choice b { position: absolute; top: 38px; right: 18px; color: var(--install-brand); font-size: 20px; }
+.install-content table { min-width: 720px; margin-bottom: 24px; }
+.install-content .table > thead > tr > th { color: var(--install-muted); background: #f4f9f7; border-color: var(--install-line); }
+.install-content .table > tbody > tr > td { border-color: #e5efeb; vertical-align: middle; }
+.install-content pre { padding: 18px; color: #d7ece5; background: #17332f; border: 0; border-radius: 8px; }
+.install-content .alert { margin-top: 18px; border-radius: 8px; }
+.install-footer { width: min(100% - 40px, 1080px); margin: 0 auto; padding: 0 0 30px; color: var(--install-muted); font-size: 11px; }
+.install-footer span { float: right; }
+
+@media (max-width: 700px) {
+  .install-topbar { padding: 0 18px; }
+  .install-topbar-meta { gap: 0; }
+  .install-topbar-meta a, .install-secure { display: none; }
+  .install-main { width: min(100% - 24px, 1080px); padding-top: 32px; }
+  .install-intro { display: block; margin-bottom: 22px; }
+  .install-version { display: inline-block; margin-top: 14px; }
+  .install-steps { grid-template-columns: repeat(3, 1fr); gap: 5px; }
+  .install-step { padding: 8px 4px; font-size: 10px; }
+  .install-step:nth-child(n+4) { margin-top: 2px; }
+  .install-card-bar { align-items: flex-start; flex-direction: column; gap: 4px; min-height: 74px; padding: 16px 18px; }
+  .install-content { padding: 26px 18px 30px; }
+  .install-license-frame { height: 390px; }
+  .install-choice-grid { grid-template-columns: 1fr; }
+  .install-content .input-group { grid-template-columns: 1fr; }
+  .install-content .input-group-addon { border-radius: 7px 7px 0 0; }
+  .install-content .input-group .form-control { height: 42px; border-radius: 0 0 7px 7px; }
+  .install-footer { width: min(100% - 24px, 1080px); }
+  .install-footer span { float: none; display: block; margin-top: 4px; }
+}

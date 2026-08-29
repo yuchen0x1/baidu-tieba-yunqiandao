@@ -144,7 +144,7 @@ docker compose -f docker/docker-compose.yml logs -f db
 
 在线更新使用 GitHub Release 的源码 ZIP，不会覆盖当前站点的 `config.php`、`key.php`、`.env`、`docker/.env` 或 `setup/install.lock`，也不会修改数据库。更新前会再次获取最新 Release，避免使用过期页面提交；网络不可用或服务器不可写时会保留原程序并提示手动更新。
 
-发布新版本时，请在本仓库创建正式 Release，并使用数字版本 tag（例如 `v5.08`）。Windows 部署包建议命名为包含 `windows` 的 `.zip` 文件，程序会自动将其作为下载入口展示。现有部署还可以运行 `windows/check-update.ps1` 做独立检查。
+发布新版本时，请在本仓库创建正式 Release，并使用数字版本 tag（例如 `v5.09`）。Windows 部署包建议命名为包含 `windows` 的 `.zip` 文件，程序会自动将其作为下载入口展示。现有部署还可以运行 `windows/check-update.ps1` 做独立检查。
 
 ## 使用计划任务
 
