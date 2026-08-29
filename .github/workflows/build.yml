@@ -2,11 +2,9 @@ name: 构建镜像
 
 on:
   workflow_dispatch:
-  # 只保留手动构建
-  # 如果不想这个年更项目一更新就原地去世，请保持注释
-  # push:
-  #   branches:
-  #     - master
+  push:
+    branches:
+      - main
 
 concurrency:
   group: build-${{ github.ref }}
@@ -22,7 +20,7 @@ jobs:
     steps:
       - 
         name: Checkout
-        uses: actions/checkout@master
+        uses: actions/checkout@v4
 
       - 
         name: Get version

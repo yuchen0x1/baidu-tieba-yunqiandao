@@ -1,6 +1,6 @@
 {
     "name": "yuchen0x1/forum-auto-sign",
-    "description": "百度贴吧云签到系统（遗留维护版）",
+    "description": "百度贴吧云签到系统，持续正常更新",
     "type": "project",
     "license": "AGPL-3.0",
     "require": {
