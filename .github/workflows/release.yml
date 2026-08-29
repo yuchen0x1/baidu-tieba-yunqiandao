@@ -37,8 +37,13 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          gh release create "${{ github.ref_name }}" "$PACKAGE" \
-            --repo "${{ github.repository }}" \
-            --title "百度贴吧云签到 ${{ github.ref_name }} Windows 部署包" \
-            --generate-notes
+          if gh release view "$RELEASE_TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$PACKAGE" --repo "${{ github.repository }}" --clobber
+          else
+            gh release create "$RELEASE_TAG" "$PACKAGE" \
+              --repo "${{ github.repository }}" \
+              --title "百度贴吧云签到 $RELEASE_TAG Windows 部署包" \
+              --generate-notes
+          fi
