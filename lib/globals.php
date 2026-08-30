@@ -151,7 +151,11 @@ if (SYSTEM_PAGE == 'admin:login') {
     } else {
         LoginGuard::auditLogin(true);
         if (function_exists('password_needs_rehash') && password_needs_rehash($p['pw'], PASSWORD_BCRYPT)) {
-            $m->query("UPDATE `" . DB_PREFIX . "users` SET `pw` = '" . $m->real_escape_string(EncodePwd($pw)) . "' WHERE `id` = " . (int) $p['id'] . ";");
+            $rehash = EncodePwd($pw);
+            $m->query("UPDATE `" . DB_PREFIX . "users` SET `pw` = '" . $m->real_escape_string($rehash) . "' WHERE `id` = " . (int) $p['id'] . ";");
+            // Keep the in-memory hash aligned with the persisted hash so the
+            // login cookie remains valid after an automatic password upgrade.
+            $p['pw'] = $rehash;
         }
         doAction('admin_login_3');
         if (isset($_POST['ispersis']) && $_POST['ispersis'] == 1) {
