@@ -171,7 +171,7 @@ powershell -ExecutionPolicy Bypass -File windows/start-web.ps1 -Port 8081
 - 管理员打开「系统更新」页面时，程序默认通过 HTTPS 请求当前仓库的 Gitee `latest` 正式 Release，并比较 Release tag 与当前程序版本；检测到更高版本后，页面会显示版本说明、Release 页面、Windows 部署包下载地址和「立即更新」按钮，没有更高版本时会明确显示当前已是最新版本。
 - 在线更新使用 Gitee Release 的源码 ZIP，不会覆盖当前站点的 `config.php`、`key.php`、`.env`、`docker/.env` 或 `setup/install.lock`，也不会修改数据库。
 - 更新前会再次获取最新 Release，避免使用过期页面提交；网络不可用或服务器不可写时会保留原程序并提示手动更新。
-- 发布新版本时，请在 Gitee 创建正式 Release，并使用数字版本 tag（例如 `v5.09`）。Windows 部署包建议命名为包含 `windows` 的 `.zip` 文件，程序会自动将其作为下载入口展示。现有部署还可以运行 `windows/check-update.ps1` 做独立检查；仓库内的 `tools/publish-gitee.ps1` 可用于生成并发布 Gitee Release。
+- 发布新版本时，请在 Gitee 创建正式 Release，并使用数字版本 tag（例如 `v5.09`）。Windows 部署包建议命名为包含 `windows` 的 `.zip` 文件，程序会自动将其作为下载入口展示。现有部署还可以运行 `windows/check-update.ps1` 做独立检查；`tools/publish-gitee.ps1 -Tag v5.10` 默认只生成本地包和 SHA-256，必须额外传入 `-Publish` 才会创建 Gitee Release。
 
 ## 六、计划任务：让签到按时跑起来
 

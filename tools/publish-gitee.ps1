@@ -5,7 +5,8 @@ param(
     [string]$Owner = "yuchen0x1",
     [string]$Repository = "baidu-tieba-yunqiandao",
     [string]$SourceRef = "main",
-    [string]$OutputDirectory = ""
+    [string]$OutputDirectory = "",
+    [switch]$Publish
 )
 
 $ErrorActionPreference = "Stop"
@@ -50,6 +51,10 @@ try {
 
     Write-Host "已生成：$package"
     Write-Host "校验文件：$checksum"
+    if (-not $Publish) {
+        Write-Host "仅生成本地发布包。传入 -Publish 后才会创建 Gitee Release 并上传附件。"
+        return
+    }
     if (-not $PSCmdlet.ShouldProcess("Gitee $Owner/$Repository Release $Tag", "创建 Release 并上传 Windows ZIP 和 SHA-256")) {
         return
     }

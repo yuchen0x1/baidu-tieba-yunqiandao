@@ -4,7 +4,7 @@
 
 ### 可靠性与运维
 - 更新通道调整为 Gitee 国内主通道；GitHub 仅在显式配置时使用，避免默认访问受限海外服务。
-- 新增 `tools/publish-gitee.ps1`，仅从干净的版本 Tag 生成 Windows ZIP 和 SHA-256 文件后发布到 Gitee。
+- 新增 `tools/publish-gitee.ps1`，仅从干净的版本 Tag 生成 Windows ZIP 和 SHA-256 文件；必须显式传入 `-Publish` 才会发布到 Gitee。
 - 修复登录失败审计未保存用户名、导致同账号限流规则无法命中的问题。
 - 修复数组形式请求参数在核心入口触发类型错误或转换警告的问题。
 - 固定 bcrypt cost 并保证自动重哈希后的登录 Cookie 使用最新密码哈希。
