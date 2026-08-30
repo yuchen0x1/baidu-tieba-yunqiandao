@@ -36,7 +36,8 @@
 **部署与运维**
 
 - Docker 部署：本地构建 PHP 8.4 + Caddy Web 镜像，配套 MariaDB 11.4、健康检查和命名卷。
-- 在线更新：管理员可在后台「系统更新」页面直接检查并安装新版本（见 5.4 节）。
+- 在线更新：管理员可在后台「系统更新」页面通过 Gitee 国内主通道检查并安装新版本（见 5.4 节）。
+- 健康检查：`/healthz.php?mode=live` 检查 PHP 存活，`/healthz.php?mode=ready` 同时检查安装锁、数据库和核心表。
 
 ## 二、先选部署方式：环境要求对照
 
@@ -116,6 +117,12 @@ docker compose -f docker/docker-compose.yml logs -f db
 6. 安装完成后确认 `setup/install.lock` 存在，防止安装程序重复运行。
 7. 在后台设置计划任务密码、站点地址、通知和 API Token，然后配置计划任务。
 
+Windows 部署包可双击 `windows/start-web.bat`，它会检查 PHP 版本、必需扩展和端口后打开安装页或站点首页。指定其他端口可运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File windows/start-web.ps1 -Port 8081
+```
+
 ## 五、配置参考
 
 ### 5.1 环境变量：数据库连接
@@ -142,7 +149,10 @@ docker compose -f docker/docker-compose.yml logs -f db
 | `PUID` / `PGID` | `1000` / `1000` | Compose 保留的容器用户配置变量 |
 | `TC_AUTO_CREATE_INSTALL_LOCK` | `false` | 容器启动时是否自动创建安装锁 |
 | `SSL_CERT_FILE` / `CURL_CA_BUNDLE` | 空 | Windows PHP 未配置 CA 根证书时，指向可信 CA bundle 文件；不要关闭 HTTPS 证书校验 |
-| `UPDATE_GITHUB_TOKEN` | 空 | 可选的 GitHub 只读 Token，用于提高 API 速率限制或访问受限仓库；不要提交到 Git |
+| `UPDATE_PRIMARY_CHANNEL` | `gitee` | 更新主通道，可选 `gitee` 或 `github`；默认使用国内 Gitee |
+| `UPDATE_ALLOW_FOREIGN_FALLBACK` | `false` | Gitee 失败时是否允许回退 GitHub；默认关闭 |
+| `UPDATE_GITHUB_TOKEN` | 空 | 可选的 GitHub 只读 Token，仅在明确启用 GitHub 通道时使用；不要提交到 Git |
+| `UPDATE_GITEE_TOKEN` | 空 | 可选的 Gitee 只读 Token，仅发送给 Gitee API；不要提交到 Git |
 
 ### 5.3 后台配置项
 
@@ -158,10 +168,10 @@ docker compose -f docker/docker-compose.yml logs -f db
 
 ### 5.4 在线更新机制
 
-- 管理员打开「系统更新」页面时，程序会通过 HTTPS 请求当前仓库的 GitHub `latest` 正式 Release，并比较 Release tag 与当前程序版本；检测到更高版本后，页面会显示版本说明、Release 页面、Windows 部署包下载地址和「立即更新」按钮，没有更高版本时会明确显示当前已是最新版本。
-- 在线更新使用 GitHub Release 的源码 ZIP，不会覆盖当前站点的 `config.php`、`key.php`、`.env`、`docker/.env` 或 `setup/install.lock`，也不会修改数据库。
+- 管理员打开「系统更新」页面时，程序默认通过 HTTPS 请求当前仓库的 Gitee `latest` 正式 Release，并比较 Release tag 与当前程序版本；检测到更高版本后，页面会显示版本说明、Release 页面、Windows 部署包下载地址和「立即更新」按钮，没有更高版本时会明确显示当前已是最新版本。
+- 在线更新使用 Gitee Release 的源码 ZIP，不会覆盖当前站点的 `config.php`、`key.php`、`.env`、`docker/.env` 或 `setup/install.lock`，也不会修改数据库。
 - 更新前会再次获取最新 Release，避免使用过期页面提交；网络不可用或服务器不可写时会保留原程序并提示手动更新。
-- 发布新版本时，请在本仓库创建正式 Release，并使用数字版本 tag（例如 `v5.09`）。Windows 部署包建议命名为包含 `windows` 的 `.zip` 文件，程序会自动将其作为下载入口展示。现有部署还可以运行 `windows/check-update.ps1` 做独立检查。
+- 发布新版本时，请在 Gitee 创建正式 Release，并使用数字版本 tag（例如 `v5.09`）。Windows 部署包建议命名为包含 `windows` 的 `.zip` 文件，程序会自动将其作为下载入口展示。现有部署还可以运行 `windows/check-update.ps1` 做独立检查；仓库内的 `tools/publish-gitee.ps1` 可用于生成并发布 Gitee Release。
 
 ## 六、计划任务：让签到按时跑起来
 
@@ -188,7 +198,13 @@ Linux `crontab` 示例：
 
 **问：Docker 容器健康检查失败？**
 
-答：先查看 `docker compose ... ps` 和 `logs web`。Web 健康检查访问容器内的 `http://127.0.0.1:8080/favicon.ico`，安装页的登录跳转不会影响该检查。
+答：先查看 `docker compose ... ps` 和 `logs web`。容器存活检查访问 `/healthz.php?mode=live`；安装完成后再访问 `/healthz.php?mode=ready`，确认数据库和核心表均已就绪。
+
+Windows 可运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File windows/check-health.ps1 -Mode ready
+```
 
 **问：`do.php` 提示密码错误或未设置密码？**
 
@@ -214,7 +230,7 @@ Authorization: Bearer <api-token>
 
 | 接口 | 方法 | 用途 |
 | --- | --- | --- |
-| `/api.php?action=update` | `GET` | 获取 GitHub 最新正式版本并判断是否需要更新 |
+| `/api.php?action=update` | `GET` | 获取 Gitee 最新正式版本并判断是否需要更新 |
 | `/api.php?action=status` | `GET` | 签到状态汇总 |
 | `/api.php?action=health` | `GET` | 百度账号健康状态 |
 | `/api.php?action=sign` | `POST` | 立即执行全部签到 |
@@ -260,11 +276,13 @@ Authorization: Bearer your-api-token
 composer install
 composer test
 composer lint
+composer check
 ```
 
 - `composer test`：运行 `tests/` 下的 PHPUnit 冒烟测试。
-- `composer lint`：检查 `lib/class.misc.php` 的 PHP 语法。
-- CI 还会使用 PHP 8.4 容器检查仓库内全部 PHP 文件，并验证 Docker Compose 配置。
+- `composer lint`：检查仓库内全部非依赖 PHP 文件的语法。
+- `composer check`：依次运行全仓语法检查和 PHPUnit 测试。
+- CI 会在 PHP 8.2 与 8.4 上执行 Composer 校验、依赖审计、全仓语法检查和 PHPUnit 测试，并验证 PowerShell 脚本与 Docker Compose 配置。
 - 测试不连接真实数据库或百度网络，不代表完整生产环境验收。
 
 **持续集成与镜像发布**
@@ -285,7 +303,7 @@ composer lint
 ├── templates/              # Web 页面模板
 ├── plugins/                # 插件及插件说明
 ├── setup/                  # 安装、升级、检查和 SQL 模板
-├── lib/class.updater.php   # GitHub Release 在线检查和安全更新
+├── lib/class.updater.php   # Gitee Release 在线检查和安全更新
 ├── docker/                 # Dockerfile、Compose 和环境变量示例
 ├── source/                 # CSS、JavaScript、字体和文档素材
 ├── tests/                  # PHPUnit 测试

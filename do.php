@@ -7,7 +7,7 @@ ignore_user_abort(true);
 set_time_limit(0);
 $cron_pw = option::get('cron_pw');
 $cmd_pw = function_exists('getopt') ? getopt('', array('pw::')) : false;
-$providedCronPassword = isset($_REQUEST['pw']) ? (string) $_REQUEST['pw'] : '';
+$providedCronPassword = request_scalar_value($_REQUEST, 'pw');
 $providedCommandPassword = is_array($cmd_pw) && isset($cmd_pw['pw']) ? (string) $cmd_pw['pw'] : '';
 $isCli = SYSTEM_ISCONSOLE;
 if (!$isCli && empty($cron_pw)) {

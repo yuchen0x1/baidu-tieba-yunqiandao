@@ -2,8 +2,8 @@
 
 /**
  * Release 在线更新支持（Gitee/GitHub 双通道）。
- * 自动判定服务器所处网络位置：国内服务器走 Gitee 通道，国外服务器走 GitHub 通道。
- * 版本检查只读取公开的 latest Release；真正更新只由管理员主动触发。
+ * 默认使用 Gitee 国内通道；海外通道仅在明确配置时启用。
+ * 版本检查只读取正式 latest Release；真正更新只由管理员主动触发。
  */
 class ProjectUpdater
 {
@@ -72,55 +72,49 @@ class ProjectUpdater
         if ($overrideUrl === null && defined('PROJECT_RELEASES_API_URL')) {
             $configured = trim((string) PROJECT_RELEASES_API_URL);
             // init.php 会默认把该常量定义为 GitHub 地址；仅当显式自定义时才跳过通道判定，保持最高优先
-            if ($configured !== '' && $configured !== self::GITHUB_RELEASES_API_URL) {
+            if ($configured !== '' && $configured !== self::GITHUB_RELEASES_API_URL && $configured !== self::GITEE_RELEASES_API_URL) {
                 $overrideUrl = $configured;
             }
         }
         if ($overrideUrl !== null) {
             return self::requestRelease($overrideUrl, 'custom');
         }
-        $channel = self::determineChannel();
-        if ($channel === 'gitee') {
+        $channel = self::primaryChannel();
+        if ($channel === 'github') {
+            return self::requestRelease(self::GITHUB_RELEASES_API_URL, 'github');
+        }
+        try {
+            return self::requestRelease(self::GITEE_RELEASES_API_URL, 'gitee');
+        } catch (RuntimeException $giteeError) {
+            if (!self::foreignFallbackEnabled()) {
+                throw $giteeError;
+            }
             try {
-                return self::requestRelease(self::GITEE_RELEASES_API_URL, 'gitee');
-            } catch (RuntimeException $giteeError) {
-                try {
-                    // Gitee 通道失败，自动回退 GitHub
-                    return self::requestRelease(self::GITHUB_RELEASES_API_URL, 'github');
-                } catch (RuntimeException $githubError) {
-                    throw new RuntimeException('Gitee 通道获取更新失败：' . $giteeError->getMessage() . '；GitHub 回退通道也失败：' . $githubError->getMessage(), 0, $githubError);
-                }
+                return self::requestRelease(self::GITHUB_RELEASES_API_URL, 'github');
+            } catch (RuntimeException $githubError) {
+                throw new RuntimeException('Gitee 通道获取更新失败：' . $giteeError->getMessage() . '；GitHub 回退通道也失败：' . $githubError->getMessage(), 0, $githubError);
             }
         }
-        return self::requestRelease(self::GITHUB_RELEASES_API_URL, 'github');
+    }
+
+    public static function primaryChannel()
+    {
+        $configured = strtolower(trim((string) getenv('UPDATE_PRIMARY_CHANNEL')));
+        return in_array($configured, array('gitee', 'github'), true) ? $configured : 'gitee';
+    }
+
+    public static function foreignFallbackEnabled()
+    {
+        $configured = getenv('UPDATE_ALLOW_FOREIGN_FALLBACK');
+        return $configured !== false && filter_var($configured, FILTER_VALIDATE_BOOLEAN);
     }
 
     /**
-     * 判定更新通道（结果静态缓存）：
-     * a) 百度 IP 属地接口返回"中国/China" → gitee；
-     * b) ip.sb GeoIP 返回"CN" → gitee；
-     * c) 两者都不可用时竞速 Gitee 与 GitHub 的 latest Release，先成功者胜；
-     * d) 全部失败 → 兜底 github。
+     * 保留旧接口名，兼容插件调用；默认不再进行 GeoIP 或海外竞速请求。
      */
     public static function determineChannel()
     {
-        static $cached = null;
-        if ($cached !== null) {
-            return $cached;
-        }
-        $body = self::geoFetch('https://qifu-api.baidubce.com/ip/local/geo/v1/district');
-        if ($body !== false && self::bodyIndicatesChina($body)) {
-            $cached = 'gitee';
-            return $cached;
-        }
-        $body = self::geoFetch('https://api.ip.sb/geoip');
-        if ($body !== false && self::bodyIndicatesCn($body)) {
-            $cached = 'gitee';
-            return $cached;
-        }
-        $raced = self::raceReleaseChannel();
-        $cached = $raced !== null ? $raced : 'github';
-        return $cached;
+        return self::primaryChannel();
     }
 
     private static function requestRelease($apiUrl, $channel)
@@ -128,7 +122,7 @@ class ProjectUpdater
         if (!self::isAllowedUrl($apiUrl)) {
             throw new RuntimeException('更新服务器地址不受信任');
         }
-        $curl = self::createReleaseCurl($apiUrl);
+        $curl = self::createReleaseCurl($apiUrl, true);
         if ($curl === false) {
             throw new RuntimeException('无法初始化更新连接');
         }
@@ -136,6 +130,15 @@ class ProjectUpdater
         $error = curl_error($curl);
         $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
+        if (in_array($status, array(401, 403, 404), true) && self::hasCredentialForUrl($apiUrl)) {
+            $curl = self::createReleaseCurl($apiUrl, false);
+            if ($curl !== false) {
+                $body = curl_exec($curl);
+                $error = curl_error($curl);
+                $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+                curl_close($curl);
+            }
+        }
         if ($body === false || $error !== '' || $status < 200 || $status >= 300) {
             throw new RuntimeException('无法连接 ' . self::channelLabel($channel) . ' 更新服务器' . ($error !== '' ? '：' . $error : '（HTTP ' . $status . '）'));
         }
@@ -186,7 +189,7 @@ class ProjectUpdater
         return '自定义';
     }
 
-    private static function createReleaseCurl($apiUrl)
+    private static function createReleaseCurl($apiUrl, $includeAuth = true)
     {
         if (!function_exists('curl_init')) {
             return false;
@@ -202,11 +205,11 @@ class ProjectUpdater
         $host = strtolower((string) parse_url((string) $apiUrl, PHP_URL_HOST));
         // GitHub 凭据绝不发送给 Gitee，反之亦然
         $token = getenv('UPDATE_GITHUB_TOKEN');
-        if ($token !== false && trim((string) $token) !== '' && strpos($host, 'github.com') !== false) {
+        if ($includeAuth && $token !== false && trim((string) $token) !== '' && strpos($host, 'github.com') !== false) {
             $headers[] = 'Authorization: Bearer ' . trim((string) $token);
         }
         $giteeToken = getenv('UPDATE_GITEE_TOKEN');
-        if ($giteeToken !== false && trim((string) $giteeToken) !== '' && strpos($host, 'gitee.com') !== false) {
+        if ($includeAuth && $giteeToken !== false && trim((string) $giteeToken) !== '' && strpos($host, 'gitee.com') !== false) {
             $headers[] = 'Authorization: Bearer ' . trim((string) $giteeToken);
         }
         curl_setopt_array($curl, array(
@@ -225,8 +228,20 @@ class ProjectUpdater
         return $curl;
     }
 
+    private static function hasCredentialForUrl($url)
+    {
+        $host = strtolower((string) parse_url((string) $url, PHP_URL_HOST));
+        if (strpos($host, 'github.com') !== false) {
+            return trim((string) getenv('UPDATE_GITHUB_TOKEN')) !== '';
+        }
+        if (strpos($host, 'gitee.com') !== false) {
+            return trim((string) getenv('UPDATE_GITEE_TOKEN')) !== '';
+        }
+        return false;
+    }
+
     /**
-     * 竞速 Gitee 与 GitHub 的 latest Release：先成功返回含 tag_name 数据者胜出。
+     * 兼容旧插件的通道竞速辅助；默认更新流程不会调用此方法。
      * 无法判定时返回 null，由调用方兜底。
      */
     private static function raceReleaseChannel()
@@ -551,9 +566,13 @@ class ProjectUpdater
         $headers = array('User-Agent: Tieba-Cloud-Sign-Updater');
         $host = strtolower((string) parse_url((string) $url, PHP_URL_HOST));
         $token = getenv('UPDATE_GITHUB_TOKEN');
-        // GitHub 凭据不发送给其他主机（如 Gitee）
+        // 凭据严格按下载域名隔离，私有 Gitee Release 的源码包也可使用只读令牌。
         if ($token !== false && trim((string) $token) !== '' && strpos($host, 'github.com') !== false) {
             $headers[] = 'Authorization: Bearer ' . trim((string) $token);
+        }
+        $giteeToken = getenv('UPDATE_GITEE_TOKEN');
+        if ($giteeToken !== false && trim((string) $giteeToken) !== '' && $host === 'gitee.com') {
+            $headers[] = 'Authorization: Bearer ' . trim((string) $giteeToken);
         }
         curl_setopt_array($curl, array(
             CURLOPT_RETURNTRANSFER => true,

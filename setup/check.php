@@ -3,7 +3,8 @@ if (!defined('DO_NOT_LOAD_UI')) {
     define('SYSTEM_FN', '百度贴吧云签到');
     define('SYSTEM_VER', '1.0');
     define('SYSTEM_ROOT', dirname(__FILE__) . '/..');
-    define('SYSTEM_PAGE', isset($_REQUEST['mod']) ? strip_tags($_REQUEST['mod']) : 'default');
+    require_once SYSTEM_ROOT . '/lib/request.php';
+    define('SYSTEM_PAGE', request_text_value($_REQUEST, 'mod', 'default'));
     header("content-type:text/html; charset=utf-8");
     echo '<!DOCTYPE html><html><head>';
     echo '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />';

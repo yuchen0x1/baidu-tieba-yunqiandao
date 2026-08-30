@@ -3,7 +3,8 @@ define('SYSTEM_FN', '百度贴吧云签到');
 define('SYSTEM_VER', '5.09');
 define('SYSTEM_ROOT2', dirname(__FILE__));
 define('SYSTEM_ROOT', dirname(__FILE__) . '/..');
-define('SYSTEM_PAGE', isset($_REQUEST['mod']) ? strip_tags($_REQUEST['mod']) : 'default');
+require_once SYSTEM_ROOT . '/lib/request.php';
+define('SYSTEM_PAGE', request_text_value($_REQUEST, 'mod', 'default'));
 header("content-type:text/html; charset=utf-8");
 require SYSTEM_ROOT2 . '/../lib/msg.php';
 include SYSTEM_ROOT2 . '/../lib/class.wcurl.php';
@@ -247,15 +248,15 @@ define(\'SYSTEM_SALT\',\'\');
                 $http = 'http://';
             }
             preg_match("/^.*\//", $_SERVER['SCRIPT_NAME'], $sysurl);
-            $fromConfig = !empty($_POST['from_config']);
+            $fromConfig = request_scalar_value($_POST, 'from_config') !== '';
             if ($fromConfig) {
                 require SYSTEM_ROOT2 . '/../config.php';
             } else {
-                define('DB_HOST', isset($_POST['dbhost']) ? trim((string) $_POST['dbhost']) : '');
-                define('DB_USER', isset($_POST['dbuser']) ? trim((string) $_POST['dbuser']) : '');
-                define('DB_PASSWD', isset($_POST['dbpw']) ? (string) $_POST['dbpw'] : '');
-                define('DB_NAME', isset($_POST['dbname']) ? trim((string) $_POST['dbname']) : '');
-                define('DB_PREFIX', isset($_POST['dbprefix']) ? trim((string) $_POST['dbprefix']) : '');
+                define('DB_HOST', trim(request_scalar_value($_POST, 'dbhost')));
+                define('DB_USER', trim(request_scalar_value($_POST, 'dbuser')));
+                define('DB_PASSWD', request_scalar_value($_POST, 'dbpw'));
+                define('DB_NAME', trim(request_scalar_value($_POST, 'dbname')));
+                define('DB_PREFIX', trim(request_scalar_value($_POST, 'dbprefix')));
                 define('DB_SSL', !empty($_POST['dbssl']) ? 1 : 0);
             }
             if (!preg_match('/^[A-Za-z0-9_]+$/', DB_NAME) || !preg_match('/^[A-Za-z0-9_]+$/', DB_PREFIX)) {
@@ -267,9 +268,9 @@ define(\'SYSTEM_SALT\',\'\');
             $sql  = str_ireplace('{VAR-COOKIE-SALT}', $installCryptoKey, $sql);
             //$sql  = str_ireplace('{VAR-TOOLPW}', md5(md5(md5($_POST['toolpw']))), $sql);
             $sql  = str_ireplace('{VAR-SYSTEM-URL}', $http . $_SERVER['HTTP_HOST'] . str_ireplace('setup/', '', $sysurl[0]), $sql);
-            $installUser = isset($_POST['user']) ? trim(strip_tags($_POST['user'])) : '';
-            $installMail = isset($_POST['mail']) ? trim(strip_tags($_POST['mail'])) : '';
-            $installPw = isset($_POST['pw']) ? (string) $_POST['pw'] : '';
+            $installUser = request_text_value($_POST, 'user');
+            $installMail = request_text_value($_POST, 'mail');
+            $installPw = request_scalar_value($_POST, 'pw');
             if (empty($installUser) || empty($installMail) || empty($installPw)) {
                 msg('请正确填写创始人信息');
             }
@@ -287,9 +288,9 @@ define(\'SYSTEM_SALT\',\'\');
                 global $m;
                 $testInstall = $m->fetch_row($m->query("SHOW TABLES LIKE '" . DB_PREFIX . "users'"));
                 if (!empty($testInstall[0])) {
-                    if (!empty($_POST['force_user']) && !empty($_POST['force_pw'])) {
-                        $force_user = !empty($_POST['force_user']) ? addslashes($_POST['force_user']) : msg('请输入原站点的管理员用户名');
-                        $force_pw   = !empty($_POST['force_pw'])   ? addslashes($_POST['force_pw'])   : msg('请输入原站点的管理员密码');
+                    if (request_scalar_value($_POST, 'force_user') !== '' && request_scalar_value($_POST, 'force_pw') !== '') {
+                        $force_user = addslashes(request_scalar_value($_POST, 'force_user'));
+                        $force_pw = request_scalar_value($_POST, 'force_pw');
                         $account    = $m->once_fetch_array("SELECT * FROM `" . DB_PREFIX . "users` WHERE `name` = '{$force_user}';");
                         if (empty($account['role'])) {
                             msg('原站点的管理员用户名错误，请返回重新输入');
@@ -306,6 +307,9 @@ define(\'SYSTEM_SALT\',\'\');
                         echo '<div class="input-group"><span class="input-group-addon" id="basic-addon1">用户名</span><input type="text" class="form-control" name="force_user" required></div><br/>';
                         echo '<div class="input-group"><span class="input-group-addon" id="basic-addon1">密码</span><input type="password" class="form-control" name="force_pw" required></div><br/>';
                         foreach ($_POST as $key => $value) {
+                            if (!is_scalar($value)) {
+                                continue;
+                            }
                             echo '<input type="hidden" name="' . htmlspecialchars($key, ENT_QUOTES, 'UTF-8') . '" value="' . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . '">';
                         }
                         echo '<br/><input type="submit" class="btn btn-success" value="下一步 >>"></form>';

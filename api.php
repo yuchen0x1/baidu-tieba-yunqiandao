@@ -34,7 +34,7 @@ if (!hash_equals($apiToken, $auth)) {
     die(json_encode(array('error' => '认证失败'), JSON_UNESCAPED_UNICODE));
 }
 
-$action = isset($_GET['action']) ? trim(strip_tags($_GET['action'])) : '';
+$action = request_text_value($_GET, 'action');
 global $m, $i;
 
 switch ($action) {

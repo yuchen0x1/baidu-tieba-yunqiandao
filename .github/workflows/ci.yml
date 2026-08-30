@@ -6,17 +6,57 @@ on:
   pull_request:
 
 jobs:
-  php-lint:
-    name: PHP syntax check
+  php:
+    name: PHP ${{ matrix.php }} checks
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.4']
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Lint PHP files
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: curl, mbstring, mysqli, zip
+          tools: composer
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Validate dependencies
         run: |
-          docker run --rm -v "$PWD":/app -w /app php:8.4-cli-alpine sh -c \
-            "find . -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 php -l"
+          composer validate --strict
+          composer check-platform-reqs
+          composer audit --locked
+
+      - name: Run project checks
+        run: composer check
+
+  windows-scripts:
+    name: Windows PowerShell syntax
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Parse PowerShell scripts
+        shell: pwsh
+        run: |
+          $failed = $false
+          Get-ChildItem windows,tools -Filter '*.ps1' -Recurse | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | Write-Error
+              $failed = $true
+            }
+          }
+          if ($failed) { exit 1 }
 
   compose:
     name: Compose validation

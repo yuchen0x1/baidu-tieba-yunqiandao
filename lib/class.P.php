@@ -7,6 +7,7 @@
 class P
 {
     const PWDMODE  = true; //允许从数据库获得密码加密方式？
+    const PASSWORD_COST = 12;
     public $pwdmode;
     public $salt   = '';
 
@@ -63,7 +64,7 @@ class P
     public function pwd($pwd, $with_legacy = false)
     {
         if (function_exists("password_hash")) {
-            $newHash = password_hash($pwd, PASSWORD_BCRYPT, ["cost" => 12]);
+            $newHash = password_hash($pwd, PASSWORD_BCRYPT, array('cost' => self::PASSWORD_COST));
             if ($with_legacy) {
                 $legacy_hash = $this->legacy_pwd($pwd);
                 return [
@@ -91,6 +92,12 @@ class P
         // legacy
         $legacyHash = $this->legacy_pwd($pwd);
         return $legacyHash !== '' && $hash === $legacyHash;
+    }
+
+    public static function needsRehash($hash)
+    {
+        return function_exists('password_needs_rehash')
+            && password_needs_rehash((string) $hash, PASSWORD_BCRYPT, array('cost' => self::PASSWORD_COST));
     }
 
     /**

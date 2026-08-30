@@ -55,4 +55,35 @@ final class UpdaterTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         ProjectUpdater::parseRelease($payload);
     }
+
+    public function testDomesticChannelIsTheDefault(): void
+    {
+        $previous = getenv('UPDATE_PRIMARY_CHANNEL');
+        putenv('UPDATE_PRIMARY_CHANNEL');
+        try {
+            $this->assertSame('gitee', ProjectUpdater::primaryChannel());
+            $this->assertFalse(ProjectUpdater::foreignFallbackEnabled());
+        } finally {
+            if ($previous === false) {
+                putenv('UPDATE_PRIMARY_CHANNEL');
+            } else {
+                putenv('UPDATE_PRIMARY_CHANNEL=' . $previous);
+            }
+        }
+    }
+
+    public function testExplicitForeignChannelRequiresConfiguration(): void
+    {
+        $previous = getenv('UPDATE_PRIMARY_CHANNEL');
+        putenv('UPDATE_PRIMARY_CHANNEL=github');
+        try {
+            $this->assertSame('github', ProjectUpdater::primaryChannel());
+        } finally {
+            if ($previous === false) {
+                putenv('UPDATE_PRIMARY_CHANNEL');
+            } else {
+                putenv('UPDATE_PRIMARY_CHANNEL=' . $previous);
+            }
+        }
+    }
 }

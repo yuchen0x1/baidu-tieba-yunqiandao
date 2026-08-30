@@ -111,11 +111,12 @@ if (SYSTEM_PAGE == 'admin:login') {
 // 检查验证码
     if (option::get('captcha')) {
         session_start();
-        if (empty($_POST['captcha'])) {
+        $captcha = request_scalar_value($_POST, 'captcha');
+        if ($captcha === '') {
             redirect('index.php?mod=login&error_msg=' . urlencode('请填写验证码'));
                 die;
         } else {
-            if (strtolower($_POST['captcha']) != strtolower($_SESSION['captcha'])) {
+            if (strtolower($captcha) != strtolower((string) $_SESSION['captcha'])) {
                 redirect('index.php?mod=login&error_msg=' . urlencode('验证码错误'));
                 die;
             } else {
@@ -124,9 +125,10 @@ if (SYSTEM_PAGE == 'admin:login') {
         }
     }
     // 正常登录流程
-    $name = isset($_POST['user']) ? sqladds($_POST['user']) : '';
-    $pw = isset($_POST['pw']) ? $_POST['pw'] : '';
-    $loginRawName = isset($_POST['user']) ? substr(trim(preg_replace('/[^a-zA-Z0-9@._-]/', '', (string) $_POST['user'])), 0, 100) : '';
+    $rawLoginName = request_scalar_value($_POST, 'user');
+    $name = sqladds($rawLoginName);
+    $pw = request_scalar_value($_POST, 'pw');
+    $loginRawName = LoginGuard::normalizeUsername($rawLoginName);
     if (empty($name) || empty($pw)) {
         ReDirect("index.php?mod=login&error_msg=" . urlencode('请填写账户或密码'));
             die;
@@ -139,18 +141,18 @@ if (SYSTEM_PAGE == 'admin:login') {
     }
     $osq = $m->query("SELECT * FROM  `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE `name` = '{$name}' OR `email` = '{$name}' LIMIT 1");
     if ($m->num_rows($osq) == 0) {
-        LoginGuard::auditLogin(false);
+        LoginGuard::auditLogin(false, $loginRawName);
         ReDirect("index.php?mod=login&error_msg=" . urlencode('账户不存在 [ 提示：账户不是昵称，账户可为用户名或者邮箱地址 ]'));
             die;
     }
     $p = $m->fetch_array($osq);
     if (!VerifyPwd($pw, $p['pw'])) {
-        LoginGuard::auditLogin(false);
+        LoginGuard::auditLogin(false, $loginRawName);
         ReDirect("index.php?mod=login&error_msg=" . urlencode('密码错误'));
         die;
     } else {
-        LoginGuard::auditLogin(true);
-        if (function_exists('password_needs_rehash') && password_needs_rehash($p['pw'], PASSWORD_BCRYPT)) {
+        LoginGuard::auditLogin(true, $loginRawName);
+        if (P::needsRehash($p['pw'])) {
             $rehash = EncodePwd($pw);
             $m->query("UPDATE `" . DB_PREFIX . "users` SET `pw` = '" . $m->real_escape_string($rehash) . "' WHERE `id` = " . (int) $p['id'] . ";");
             // Keep the in-memory hash aligned with the persisted hash so the
@@ -186,11 +188,12 @@ if (SYSTEM_PAGE == 'admin:login') {
     // 检查验证码
     if (option::get('captcha')) {
         session_start();
-        if (empty($_POST['captcha'])) {
+        $captcha = request_scalar_value($_POST, 'captcha');
+        if ($captcha === '') {
             redirect('index.php?mod=reg&error_msg=' . urlencode('请填写验证码'));
             die;
         } else {
-            if (strtolower($_POST['captcha']) != strtolower($_SESSION['captcha'])) {
+            if (strtolower($captcha) != strtolower((string) $_SESSION['captcha'])) {
                 redirect('index.php?mod=reg&error_msg=' . urlencode('验证码错误'));
                 die;
             } else {
@@ -199,18 +202,19 @@ if (SYSTEM_PAGE == 'admin:login') {
         }
     }
     // 正常注册流程
-    $name = isset($_POST['user']) ? sqladds($_POST['user']) : '';
+    $name = sqladds(request_scalar_value($_POST, 'user'));
 // 用户名不得含有@符号，避免登录时与邮箱混淆
     if (stripos($name, '@') !== false) {
         msg('注册失败：用户名不得含有@符号');
     }
-    $mail = isset($_POST['mail']) ? sqladds($_POST['mail']) : '';
-    $pw = isset($_POST['pw']) ? sqladds($_POST['pw']) : '';
-    $yr = isset($_POST['yr']) ? sqladds($_POST['yr']) : '';
+    $mail = sqladds(request_scalar_value($_POST, 'mail'));
+    $pw = request_scalar_value($_POST, 'pw');
+    $repeatPw = request_scalar_value($_POST, 'rpw');
+    $yr = sqladds(request_scalar_value($_POST, 'yr'));
     if (empty($name) || empty($mail) || empty($pw)) {
         msg('注册失败：请正确填写用户名、密码或邮箱');
     }
-    if ($_POST['pw'] != $_POST['rpw']) {
+    if ($pw !== $repeatPw) {
         msg('注册失败：两次输入的密码不一致，请重新输入');
     }
     $x = $m->once_fetch_array("SELECT COUNT(*) AS total FROM `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE `name` = '{$name}' OR `email` = '{$mail}' LIMIT 1");

@@ -1,0 +1,78 @@
+<?php
+
+use PHPUnit\Framework\TestCase;
+
+final class InputAndAuthTest extends TestCase
+{
+    public function testScalarRequestValuesAreReadWithoutArrayCoercion(): void
+    {
+        $source = array('text' => ' <b>admin</b> ', 'array' => array('admin'));
+
+        $this->assertSame('admin', request_text_value($source, 'text'));
+        $this->assertSame('', request_scalar_value($source, 'array'));
+        $this->assertSame('fallback', request_scalar_value($source, 'missing', 'fallback'));
+    }
+
+    public function testLoginIdentityNormalizationMatchesAuditAndLockKeys(): void
+    {
+        $this->assertSame('Admin@example.com', LoginGuard::normalizeUsername(' Admin+()@example.com '));
+        $this->assertSame('', LoginGuard::normalizeUsername(array('admin')));
+        $this->assertSame(100, strlen(LoginGuard::normalizeUsername(str_repeat('a', 120))));
+    }
+
+    public function testLoginAuditPersistsTheNormalizedIdentity(): void
+    {
+        global $m;
+        $previous = $m ?? null;
+        $database = new class {
+            public array $queries = array();
+
+            public function query($sql)
+            {
+                $this->queries[] = $sql;
+                return true;
+            }
+
+            public function real_escape_string($value)
+            {
+                return addslashes((string) $value);
+            }
+        };
+        $m = $database;
+        $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
+        $_SERVER['HTTP_USER_AGENT'] = 'PHPUnit';
+
+        try {
+            LoginGuard::auditLogin(false, ' Admin+()@example.com ');
+            $this->assertStringContainsString("VALUES ('Admin@example.com', '127.0.0.1', 'PHPUnit', 0", end($database->queries));
+        } finally {
+            $m = $previous;
+            unset($_SERVER['REMOTE_ADDR'], $_SERVER['HTTP_USER_AGENT']);
+        }
+    }
+
+    public function testBcryptCostDoesNotTriggerRepeatedRehash(): void
+    {
+        $hash = password_hash('test-password', PASSWORD_BCRYPT, array('cost' => P::PASSWORD_COST));
+
+        $this->assertTrue(password_verify('test-password', $hash));
+        $this->assertFalse(P::needsRehash($hash));
+        $this->assertTrue(P::needsRehash(password_hash('test-password', PASSWORD_BCRYPT, array('cost' => 10))));
+    }
+
+    public function testDatabaseEndpointSupportsPortsAndIpv6(): void
+    {
+        $this->assertSame(array('host' => '127.0.0.1', 'port' => 3307), parse_database_endpoint('127.0.0.1:3307'));
+        $this->assertSame(array('host' => '::1', 'port' => 3307), parse_database_endpoint('[::1]:3307'));
+        $this->assertSame(array('host' => 'db', 'port' => null), parse_database_endpoint('db'));
+    }
+
+    public function testLiveHealthDoesNotRequireInstallationOrDatabase(): void
+    {
+        $health = project_health_check(dirname(__DIR__) . '/does-not-exist', 'live');
+
+        $this->assertTrue($health['ok']);
+        $this->assertSame('live', $health['mode']);
+        $this->assertTrue($health['checks']['php']);
+    }
+}

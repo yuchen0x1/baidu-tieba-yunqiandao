@@ -1,5 +1,18 @@
 # 更新日志
 
+## 未发布
+
+### 可靠性与运维
+- 更新通道调整为 Gitee 国内主通道；GitHub 仅在显式配置时使用，避免默认访问受限海外服务。
+- 新增 `tools/publish-gitee.ps1`，仅从干净的版本 Tag 生成 Windows ZIP 和 SHA-256 文件后发布到 Gitee。
+- 修复登录失败审计未保存用户名、导致同账号限流规则无法命中的问题。
+- 修复数组形式请求参数在核心入口触发类型错误或转换警告的问题。
+- 固定 bcrypt cost 并保证自动重哈希后的登录 Cookie 使用最新密码哈希。
+- 新增 `/healthz.php` 存活与就绪检查，以及 Windows 环境检查启动器和健康检查脚本。
+- CI 扩展为 PHP 8.2/8.4 测试矩阵、依赖审计、全仓 PHP 语法和 PowerShell 脚本检查。
+- Release 同时发布 Windows ZIP 的 SHA-256 校验文件。
+- Windows 更新检查补齐 Gitee 失败后的 GitHub 回退，并严格隔离两个平台的访问 Token。
+
 ## 2026-08-30 V5.09 安装向导 UI 升级
 
 ### 前端体验

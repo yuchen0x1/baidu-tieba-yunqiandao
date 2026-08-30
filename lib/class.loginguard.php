@@ -45,18 +45,29 @@ class LoginGuard
     /**
      * 记录一次登录尝试
      */
-    public static function auditLogin($success)
+    public static function auditLogin($success, $username = null)
     {
         global $m;
         $table = self::table();
         if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
             return;
         }
-        $username = '';
+        if ($username === null) {
+            $username = request_scalar_value($_POST, 'user');
+        }
+        $username = self::escapeAuditValue(self::normalizeUsername($username), 100);
         $ip = self::escapeAuditValue(self::clientIp(), 45);
         $ua = self::escapeAuditValue(isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '', 255);
         $successValue = $success ? 1 : 0;
         $m->query("INSERT INTO `{$table}` (`username`, `ip`, `ua`, `success`, `ts`) VALUES ('{$username}', '{$ip}', '{$ua}', {$successValue}, UNIX_TIMESTAMP());");
+    }
+
+    public static function normalizeUsername($username)
+    {
+        if (!is_scalar($username)) {
+            return '';
+        }
+        return substr(trim(preg_replace('/[^a-zA-Z0-9@._-]/', '', (string) $username)), 0, 100);
     }
 
     private static function escapeAuditValue($value, $limit)
@@ -75,7 +86,7 @@ class LoginGuard
         if ($ip === null) {
             $ip = self::clientIp();
         }
-        $username = $m->real_escape_string(substr((string) $username, 0, 100));
+        $username = $m->real_escape_string(self::normalizeUsername($username));
         $ip = $m->real_escape_string(substr((string) $ip, 0, 45));
         $since = time() - self::WINDOW;
         $row = $m->once_fetch_array("SELECT COUNT(*) AS c, MAX(ts) AS last FROM `{$table}` WHERE `success` = 0 AND `username` = '{$username}' AND `ip` = '{$ip}' AND `ts` > {$since};");

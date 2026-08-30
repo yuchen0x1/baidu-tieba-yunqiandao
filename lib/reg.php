@@ -40,8 +40,8 @@ $i['table'] = $i['tabpart'];
 $i['table'] = ['tieba']; //贴吧表列表
 
 //当前页面/模式, $i['mode'][0] 一般表示页面
-if (!empty($_REQUEST['mod'])) {
-    $i['mode'] = explode(':', strip_tags($_REQUEST['mod']));
+if (request_text_value($_REQUEST, 'mod') !== '') {
+    $i['mode'] = explode(':', request_text_value($_REQUEST, 'mod'));
 } else {
     $i['mode'][0] = 'default';
 }

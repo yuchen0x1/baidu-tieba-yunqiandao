@@ -15,6 +15,10 @@
     },
     "scripts": {
         "test": "phpunit",
-        "lint": "php -l lib/class.misc.php"
+        "lint": "@php tools/lint.php",
+        "check": [
+            "@lint",
+            "@test"
+        ]
     }
 }

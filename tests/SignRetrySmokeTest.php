@@ -1,6 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * 签到核心链路冒烟测试
@@ -17,9 +18,7 @@ final class SignRetrySmokeTest extends TestCase
         $this->assertTrue(is_callable(array('misc', 'shouldRetry')));
     }
 
-    /**
-     * @dataProvider retryGateProvider
-     */
+    #[DataProvider('retryGateProvider')]
     public function testRetryGate($retryMax, $signAgain, $today, $expected): void
     {
         $this->assertSame($expected, misc::shouldRetry($retryMax, $signAgain, $today));

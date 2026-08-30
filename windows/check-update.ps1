@@ -4,8 +4,8 @@
     [string]$ApiUrl = ""
 )
 
-# 在线更新双通道：自动判定服务器位置，国内走 Gitee，国外走 GitHub。
-# 显式传入 ApiUrl 时跳过通道判定，保持最高优先。
+# 在线更新双通道：默认使用 Gitee 国内主通道。
+# 显式传入 ApiUrl 或 UPDATE_PRIMARY_CHANNEL=github 时才使用其他通道。
 $ErrorActionPreference = "Stop"
 
 # 启用 TLS 1.2，确保 Windows PowerShell 5.1 可与 Gitee / ip.sb / GitHub 完成握手
@@ -32,7 +32,7 @@ function Test-CNByIpSb {
     return $false
 }
 
-# c) 两个地理接口都不可用时：Gitee 与 GitHub latest Release 竞速，先成功返回有效数据者胜出
+# 旧版通道竞速辅助函数保留用于兼容；默认检查流程不会调用它们。
 function Find-RacingChannel {
     param([string]$Repository)
     try { Add-Type -AssemblyName System.Net.Http } catch { return $null }
@@ -75,14 +75,12 @@ function Find-RacingChannel {
     }
 }
 
-# 通道判定链：a) → b) → c)，d) 全部失败时兜底 GitHub
+# 通道判定：默认 Gitee；GitHub 必须显式配置。
 function Get-UpdateChannel {
     param([string]$Repository)
-    if (Test-ChinaByBaiduGeo) { return "gitee" }
-    if (Test-CNByIpSb) { return "gitee" }
-    $raced = Find-RacingChannel -Repository $Repository
-    if ($raced) { return $raced }
-    return "github"
+    $configured = ([string]$env:UPDATE_PRIMARY_CHANNEL).Trim().ToLowerInvariant()
+    if ($configured -eq "github") { return "github" }
+    return "gitee"
 }
 
 if ($ApiUrl -ne "") {
@@ -99,34 +97,64 @@ if ($ApiUrl -ne "") {
     }
 }
 
-$headers = @{ "User-Agent" = "Tieba-Cloud-Sign-Updater"; "Accept" = "application/vnd.github+json" }
-$token = [string]$env:UPDATE_GITHUB_TOKEN
-# GitHub 凭据不发送给 Gitee
-if (-not [string]::IsNullOrWhiteSpace($token) -and $apiUrl -match "api\.github\.com") {
-    $headers["Authorization"] = "Bearer " + $token
-}
-try {
-    $release = Invoke-RestMethod -Uri $apiUrl -Headers $headers -TimeoutSec 15
-} catch {
-    $statusCode = 0
-    if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
-        $statusCode = [int]$_.Exception.Response.StatusCode
+function Get-Release {
+    param([string]$Uri)
+    $headers = @{ "User-Agent" = "Tieba-Cloud-Sign-Updater"; "Accept" = "application/json" }
+    $token = ""
+    if ($Uri -match '^https://api\.github\.com/') {
+        $token = [string]$env:UPDATE_GITHUB_TOKEN
+        $headers["Accept"] = "application/vnd.github+json"
+    } elseif ($Uri -match '^https://gitee\.com/api/') {
+        $token = [string]$env:UPDATE_GITEE_TOKEN
     }
-    if ($statusCode -eq 401 -and $headers.ContainsKey("Authorization")) {
-        $headers.Remove("Authorization")
-        $release = Invoke-RestMethod -Uri $apiUrl -Headers $headers -TimeoutSec 15
+    if (-not [string]::IsNullOrWhiteSpace($token)) {
+        $headers["Authorization"] = "Bearer " + $token
+    }
+    try {
+        return Invoke-RestMethod -Uri $Uri -Headers $headers -TimeoutSec 15
+    } catch {
+        $statusCode = 0
+        if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
+            $statusCode = [int]$_.Exception.Response.StatusCode
+        }
+        if ($statusCode -in @(401, 403, 404) -and $headers.ContainsKey("Authorization")) {
+            $headers.Remove("Authorization")
+            return Invoke-RestMethod -Uri $Uri -Headers $headers -TimeoutSec 15
+        }
+        throw
+    }
+}
+
+try {
+    $release = Get-Release -Uri $apiUrl
+} catch {
+    if ($ApiUrl -eq "" -and $apiUrl -match '^https://gitee\.com/api/' -and [System.Convert]::ToBoolean(($env:UPDATE_ALLOW_FOREIGN_FALLBACK -as [string]) -eq 'true')) {
+        Write-Verbose "Gitee update request failed, falling back to GitHub"
+        $apiUrl = "https://api.github.com/repos/$Repository/releases/latest"
+        $release = Get-Release -Uri $apiUrl
     } else {
         throw
     }
 }
 $latest = [string]$release.tag_name -replace '^[vV]', ''
+if ([string]::IsNullOrWhiteSpace($latest)) {
+    throw "更新服务器响应缺少 tag_name"
+}
 
 if ([version]$latest -gt [version]$CurrentVersion) {
     $asset = @($release.assets | Where-Object { $_.name -match '\.zip$' -and $_.name -match 'windows' } | Select-Object -First 1)
+    $checksum = @($release.assets | Where-Object { $_.name -match '\.zip\.sha256$' } | Select-Object -First 1)
+    $releaseUrl = [string]$release.html_url
+    if ([string]::IsNullOrWhiteSpace($releaseUrl) -and $apiUrl -match '^https://gitee\.com/api/') {
+        $releaseUrl = "https://gitee.com/$Repository/releases/tag/$($release.tag_name)"
+    }
     Write-Output "Update available: V$latest (current V$CurrentVersion)"
-    Write-Output "Release: $($release.html_url)"
+    Write-Output "Release: $releaseUrl"
     if ($asset.Count -gt 0) {
         Write-Output "Windows package: $($asset[0].browser_download_url)"
+    }
+    if ($checksum.Count -gt 0) {
+        Write-Output "SHA-256: $($checksum[0].browser_download_url)"
     }
     exit 10
 }

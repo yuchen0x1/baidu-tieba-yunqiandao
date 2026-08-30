@@ -43,6 +43,6 @@ RUN apk add --no-cache \
     && chmod +x /etc/cont-init.d/* /etc/services.d/*/run
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1
+  CMD wget -q -O /dev/null 'http://127.0.0.1:8080/healthz.php?mode=live' || exit 1
 
 ENTRYPOINT ["/init"]
