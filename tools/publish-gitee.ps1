@@ -11,9 +11,13 @@ param(
 
 $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$token = [string]$env:GITEE_TOKEN
+$token = [string]$env:GITEE_ACCESS_TOKEN
 if ([string]::IsNullOrWhiteSpace($token)) {
-    throw "未找到 GITEE_TOKEN。请使用 Gitee 个人令牌后重试。"
+    # Backward-compatible fallback for older deployment shells.
+    $token = [string]$env:GITEE_TOKEN
+}
+if ([string]::IsNullOrWhiteSpace($token)) {
+    throw "未找到 GITEE_ACCESS_TOKEN。请使用 Gitee 个人令牌后重试。"
 }
 
 Push-Location $projectRoot
