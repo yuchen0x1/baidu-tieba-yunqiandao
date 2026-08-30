@@ -1,9 +1,12 @@
 name: 发布 Windows 部署包
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      enable_github_release:
+        description: 'Temporary migration override. Enter enable to allow a GitHub Release.'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -11,8 +14,8 @@ permissions:
 jobs:
   release:
     name: 构建并发布 Windows 部署包
-    # 国内仓库为当前发布目标；如需恢复 GitHub Release，必须显式设置仓库变量。
-    if: ${{ vars.PUBLISH_GITHUB_RELEASE == 'true' }}
+    # 当前项目只使用国内 Gitee 发布。该旧工作流仅在迁移时经双重显式开关启用。
+    if: ${{ inputs.enable_github_release == 'enable' && vars.ALLOW_GITHUB_RELEASE_MIGRATION == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

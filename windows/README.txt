@@ -26,7 +26,7 @@
 - 默认服务地址：http://127.0.0.1:8080
 - 管理员进入“系统更新”即可在线检查 Gitee 最新正式 Release；检测到新版本后可保留站点配置地更新源码。
 - 若需只检查 Windows 部署包，可运行 `powershell -ExecutionPolicy Bypass -File windows\check-update.ps1`。
-- 更新检查会在 Gitee 通道失败时回退 GitHub；Release 提供校验文件时会同时显示 SHA-256 下载地址。
+- 更新检查仅使用 Gitee 国内通道；Release 提供校验文件时会同时显示 SHA-256 下载地址。
 
 安全提示
 - 不要把 BDUSS、STOKEN、数据库密码或通知凭据提交到 Git 或公开渠道。

@@ -149,10 +149,7 @@ powershell -ExecutionPolicy Bypass -File windows/start-web.ps1 -Port 8081
 | `PUID` / `PGID` | `1000` / `1000` | Compose 保留的容器用户配置变量 |
 | `TC_AUTO_CREATE_INSTALL_LOCK` | `false` | 容器启动时是否自动创建安装锁 |
 | `SSL_CERT_FILE` / `CURL_CA_BUNDLE` | 空 | Windows PHP 未配置 CA 根证书时，指向可信 CA bundle 文件；不要关闭 HTTPS 证书校验 |
-| `UPDATE_PRIMARY_CHANNEL` | `gitee` | 更新主通道，可选 `gitee` 或 `github`；默认使用国内 Gitee |
-| `UPDATE_ALLOW_FOREIGN_FALLBACK` | `false` | Gitee 失败时是否允许回退 GitHub；默认关闭 |
-| `UPDATE_GITHUB_TOKEN` | 空 | 可选的 GitHub 只读 Token，仅在明确启用 GitHub 通道时使用；不要提交到 Git |
-| `UPDATE_GITEE_TOKEN` | 空 | 可选的 Gitee 只读 Token，仅发送给 Gitee API；不要提交到 Git |
+| `UPDATE_GITEE_TOKEN` | 空 | Gitee Release 为私有或 API 限流时必需的只读 Token，仅发送给 Gitee API；不要提交到 Git |
 
 ### 5.3 后台配置项
 
@@ -170,6 +167,7 @@ powershell -ExecutionPolicy Bypass -File windows/start-web.ps1 -Port 8081
 
 - 管理员打开「系统更新」页面时，程序默认通过 HTTPS 请求当前仓库的 Gitee `latest` 正式 Release，并比较 Release tag 与当前程序版本；检测到更高版本后，页面会显示版本说明、Release 页面、Windows 部署包下载地址和「立即更新」按钮，没有更高版本时会明确显示当前已是最新版本。
 - 在线更新使用 Gitee Release 的源码 ZIP，不会覆盖当前站点的 `config.php`、`key.php`、`.env`、`docker/.env` 或 `setup/install.lock`，也不会修改数据库。
+- 若 Gitee API 返回 `403` 或 `429`，请在部署环境设置只读 `UPDATE_GITEE_TOKEN`；令牌不会写入配置文件，也不会发送到其他域名。
 - 更新前会再次获取最新 Release，避免使用过期页面提交；网络不可用或服务器不可写时会保留原程序并提示手动更新。
 - 发布新版本时，请在 Gitee 创建正式 Release，并使用数字版本 tag（例如 `v5.09`）。Windows 部署包建议命名为包含 `windows` 的 `.zip` 文件，程序会自动将其作为下载入口展示。现有部署还可以运行 `windows/check-update.ps1` 做独立检查；`tools/publish-gitee.ps1 -Tag v5.10` 默认只生成本地包和 SHA-256，必须额外传入 `-Publish` 才会创建 Gitee Release。
 

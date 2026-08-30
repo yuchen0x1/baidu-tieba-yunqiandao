@@ -3,7 +3,8 @@
 ## 未发布
 
 ### 可靠性与运维
-- 更新通道调整为 Gitee 国内主通道；GitHub 仅在显式配置时使用，避免默认访问受限海外服务。
+- 更新通道调整为仅使用 Gitee 国内源，禁用 GitHub、海外 GeoIP 探测和海外回退。
+- Gitee Release 查询与下载仅使用 `UPDATE_GITEE_TOKEN`；受限仓库或 API 限流时需要在部署环境配置该只读令牌。
 - 新增 `tools/publish-gitee.ps1`，仅从干净的版本 Tag 生成 Windows ZIP 和 SHA-256 文件；必须显式传入 `-Publish` 才会发布到 Gitee。
 - 修复登录失败审计未保存用户名、导致同账号限流规则无法命中的问题。
 - 修复数组形式请求参数在核心入口触发类型错误或转换警告的问题。

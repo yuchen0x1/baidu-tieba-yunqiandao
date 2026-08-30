@@ -12,13 +12,13 @@ final class UpdaterTest extends TestCase
             'tag_name' => $tag,
             'name' => '百度贴吧云签到 ' . $tag,
             'body' => '测试版本说明',
-            'html_url' => 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/tag/' . $tag,
-            'zipball_url' => 'https://api.github.com/repos/yuchen0x1/baidu-tieba-yunqiandao/zipball/' . $tag,
+            'html_url' => 'https://gitee.com/yuchen0x1/baidu-tieba-yunqiandao/releases/tag/' . $tag,
+            'zipball_url' => 'https://gitee.com/yuchen0x1/baidu-tieba-yunqiandao/repository/archive/' . $tag . '.zip',
             'published_at' => '2026-08-29T00:00:00Z',
             'prerelease' => false,
             'assets' => array(array(
                 'name' => 'tieba-cloud-sign-windows-' . $tag . '.zip',
-                'browser_download_url' => 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/' . $tag . '/package.zip',
+                'browser_download_url' => 'https://gitee.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/' . $tag . '/package.zip',
                 'size' => 123,
                 'digest' => 'sha256:test'
             ))
@@ -56,6 +56,14 @@ final class UpdaterTest extends TestCase
         ProjectUpdater::parseRelease($payload);
     }
 
+    public function testForeignReleaseUrlIsRejected(): void
+    {
+        $payload = $this->payload();
+        $payload['html_url'] = 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/tag/v5.10';
+        $this->expectException(InvalidArgumentException::class);
+        ProjectUpdater::parseRelease($payload);
+    }
+
     public function testDomesticChannelIsTheDefault(): void
     {
         $previous = getenv('UPDATE_PRIMARY_CHANNEL');
@@ -72,12 +80,12 @@ final class UpdaterTest extends TestCase
         }
     }
 
-    public function testExplicitForeignChannelRequiresConfiguration(): void
+    public function testForeignChannelConfigurationCannotEnableIt(): void
     {
         $previous = getenv('UPDATE_PRIMARY_CHANNEL');
         putenv('UPDATE_PRIMARY_CHANNEL=github');
         try {
-            $this->assertSame('github', ProjectUpdater::primaryChannel());
+            $this->assertSame('gitee', ProjectUpdater::primaryChannel());
         } finally {
             if ($previous === false) {
                 putenv('UPDATE_PRIMARY_CHANNEL');
