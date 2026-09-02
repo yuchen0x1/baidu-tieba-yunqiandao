@@ -61,6 +61,7 @@ if (!empty($i['user']['bduss'])) {
         foreach ($i['user']['baidu_portrait'] as $pkey => $pval) {
             if (isset($f[$pkey])) {
                 echo '<div id="tbpidpanel_' . $pkey . '" class="tbpanel" style="display:none">';
+                echo '<div class="text-right" style="margin-bottom:10px"><form action="setting.php?mod=showtb" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="' . htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') . '"><input type="hidden" name="restore_pid" value="' . (int) $pkey . '"><button type="submit" class="btn btn-default btn-sm" title="将该账号下所有贴吧恢复为自动签到">恢复此账号签到</button></form></div>';
                 echo '<div class="table-responsive"><table class="table table-hover"><thead><tr>';
                 echo '<th>序号</th>';
                 echo '<th>贴吧</th>';

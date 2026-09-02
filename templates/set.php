@@ -52,6 +52,19 @@ function addset($name, $type, $x, $other = '', $text = '')
                 <input type="text" name="mail" value="<?php echo htmlspecialchars($i['user']['email'], ENT_QUOTES, 'UTF-8') ?>" class="form-control" required>
             </td>
         </tr>
+        <tr>
+            <td>个人 API Token<br/>用于 API 自动签到、查询健康状态、日志与签到日历。Token 只可访问当前账号数据，生成后仅展示一次。</td>
+            <td>
+                <?php
+                $tokenRow = $m->once_fetch_array("SELECT `api_token_hash` FROM `" . DB_PREFIX . "users` WHERE `id` = " . (int) UID . " LIMIT 1");
+                $hasApiToken = !empty($tokenRow['api_token_hash']);
+                ?>
+                <span class="label <?php echo $hasApiToken ? 'label-success' : 'label-default'; ?>"><?php echo $hasApiToken ? '已启用' : '未生成'; ?></span>
+                <button type="submit" class="btn btn-default btn-sm" name="api_action" value="generate" onclick="return confirm('生成新 Token 会立即使旧 Token 失效，确定继续吗？');"><?php echo $hasApiToken ? '重新生成 Token' : '生成 Token'; ?></button>
+                <?php if ($hasApiToken) { ?><button type="submit" class="btn btn-danger btn-sm" name="api_action" value="revoke" onclick="return confirm('确定撤销个人 API Token 吗？');">撤销 Token</button><?php } ?>
+                <div class="text-muted" style="margin-top:8px">接口：<code>api.php?action=status</code>、<code>calendar</code>、<code>logs</code>；写操作使用 POST。</div>
+            </td>
+        </tr>
         <?php doAction('set_2'); ?>
     </tbody>
 </table></div><input type="submit" class="btn btn-primary" value="提交更改">

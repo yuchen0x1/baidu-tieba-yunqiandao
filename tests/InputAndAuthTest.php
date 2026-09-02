@@ -67,6 +67,38 @@ final class InputAndAuthTest extends TestCase
         $this->assertSame(array('host' => 'db', 'port' => null), parse_database_endpoint('db'));
     }
 
+    public function testProxyParsingSupportsIpv4DomainAndIpv6(): void
+    {
+        $this->assertSame(
+            array('type' => 'http', 'host' => '127.0.0.1', 'port' => '7890', 'user' => '', 'pass' => ''),
+            misc::parseProxyUrl('http://127.0.0.1:7890')
+        );
+        $this->assertSame(
+            array('type' => 'socks5', 'host' => '2001:db8::1', 'port' => '1080', 'user' => 'user', 'pass' => 'pass'),
+            misc::parseProxyUrl('socks5://user:pass@[2001:db8::1]:1080')
+        );
+        $this->assertFalse(misc::parseProxyUrl('http://host:70000'));
+        $this->assertFalse(misc::parseProxyUrl('http://host'));
+    }
+
+    public function testPluginIdsRejectTraversalAndInvalidCharacters(): void
+    {
+        global $i;
+        $previous = isset($i) ? $i : null;
+        $i = array('plugins' => array('actived' => array()));
+        require_once SYSTEM_ROOT . '/lib/plugins.php';
+
+        try {
+            $this->assertTrue(valid_plugin_id('ver4_like'));
+            $this->assertTrue(valid_plugin_id('plugin-name_2'));
+            $this->assertFalse(valid_plugin_id('../outside'));
+            $this->assertFalse(valid_plugin_id('plugin/name'));
+            $this->assertFalse(valid_plugin_id('plugin name'));
+        } finally {
+            $i = $previous;
+        }
+    }
+
     public function testLiveHealthDoesNotRequireInstallationOrDatabase(): void
     {
         $health = project_health_check(dirname(__DIR__) . '/does-not-exist', 'live');
