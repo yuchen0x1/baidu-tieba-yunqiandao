@@ -9,6 +9,7 @@ $pageLabels = array(
     'set' => '个人设置',
     'baiduid' => '百度账号',
     'showtb' => '贴吧与签到',
+    'calendar' => '签到日历',
     'admin:tools' => '工具箱',
     'admin:set' => '设置中心',
     'admin:users' => '用户管理',
@@ -17,6 +18,7 @@ $pageLabels = array(
     'admin:cron' => '计划任务',
     'admin:update' => '系统更新',
     'admin:plugins' => '插件管理',
+    'thanks' => '开源致谢',
     'login' => '登录',
     'reg' => '注册'
 );
@@ -44,7 +46,9 @@ $userInitial = function_exists('mb_substr') ? mb_substr($userName, 0, 1, 'UTF-8'
                     <li class="<?php checkIfActive('default'); ?>"><a href="index.php"><span class="sidebar-icon glyphicon glyphicon-home"></span><span>工作台</span></a></li>
                     <li class="<?php checkIfActive('baiduid'); ?>"><a href="index.php?mod=baiduid"><span class="sidebar-icon glyphicon glyphicon-link"></span><span>百度账号</span></a></li>
                     <li class="<?php checkIfActive('showtb'); ?>"><a href="index.php?mod=showtb"><span class="sidebar-icon glyphicon glyphicon-calendar"></span><span>贴吧与签到</span></a></li>
+                    <li class="<?php checkIfActive('calendar'); ?>"><a href="index.php?mod=calendar"><span class="sidebar-icon glyphicon glyphicon-th"></span><span>签到日历</span></a></li>
                     <li class="<?php checkIfActive('set'); ?>"><a href="index.php?mod=set"><span class="sidebar-icon glyphicon glyphicon-cog"></span><span>个人设置</span></a></li>
+                    <li class="<?php checkIfActive('thanks'); ?>"><a href="index.php?mod=thanks"><span class="sidebar-icon glyphicon glyphicon-heart"></span><span>开源致谢</span></a></li>
                     <?php doAction('navi_1'); ?>
                 </ul>
             </nav>

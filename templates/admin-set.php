@@ -51,7 +51,23 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
     $content2['retry_max'] = array('td1' => '<b>签到失败重试次数</b><br/>0为无限，-1为不重试','type' => 'number','text' => '','extra' => 'min="-1" step="1"');
     $content2['sign_hour'] = array('td1' => '<b>签到开始时间</b><br/>24小时制。例如设为-1，则从0点开始签到','type' => 'number','text' => '','extra' => 'min="-1" step="1" max="24"');
     $content2['sign_sleep'] = array('td1' => '<b>签到间隔时间</b><br/>单位为毫秒，0为不暂停','type' => 'number','text' => '适量的间隔时间可以防止签到过快而失败的问题，但会导致签到效率降低','extra' => 'min="0" step="1"');
+    $content2['sign_jitter'] = array('td1' => '<b>签到随机抖动</b><br/>单位为毫秒，每次签到在间隔基础上随机追加 0~该值 的等待时间，0为关闭','type' => 'number','text' => '随机化请求节奏可以降低被百度风控识别的概率','extra' => 'min="0" step="1"');
+    $content2['client_version'] = array('td1' => '<b>模拟客户端版本号</b><br/>客户端签到与贴吧扫描使用的版本号','type' => 'text','text' => '百度更新客户端后旧版本号可能触发风控，可在此手动更新；留空使用内置默认值','extra' => '');
+    $shuffleHtml = '<tr><td><b>签到乱序</b></td><td>
+	            <label><input type="radio" name="sign_shuffle" value="1" ' . (option::get('sign_shuffle') != '0' ? 'checked' : '') . '> 随机乱序（推荐，降低风控特征）</label><br/>
+	            <label><input type="radio" name="sign_shuffle" value="0" ' . (option::get('sign_shuffle') == '0' ? 'checked' : '') . '> 按固定顺序</label>
+	        </td></tr>';
+    $content2['sign_shuffle'] = array('html' => $shuffleHtml,'type' => 'else');
     $content2['enable_addtieba'] = array('td1' => '<b>允许手动添加贴吧</b>','type' => 'checkbox','text' => '开启后用户可以手动添加贴吧，添加时必须≤最大关注贴吧数量','extra' => '');
+    $healthDisableHtml = '<tr><td><b>失效账号自动停用</b><br/><br/>BDUSS 健康检查连续失败达到阈值后，自动停止该账号所有贴吧的签到并推送提醒<br/>重新绑定账号后需在「贴吧与签到」页手动恢复</td><td>
+	        <label><input type="radio" name="health_auto_disable" value="1" ' . (option::get('health_auto_disable') == '1' ? 'checked' : '') . '> 启用自动停用</label>
+	        <label><input type="radio" name="health_auto_disable" value="0" ' . (option::get('health_auto_disable') != '1' ? 'checked' : '') . '> 关闭（仅提醒）</label>
+	        <br/><br/><div class="input-group">
+	        <span class="input-group-addon">连续失败阈值</span>
+	        <input type="number" min="1" max="20" step="1" class="form-control" name="health_fail_max" value="' . htmlspecialchars(option::get('health_fail_max') ?: '3', ENT_QUOTES, 'UTF-8') . '">
+	        </div>
+	        </td></tr>';
+    $content2['health_auto_disable'] = array('html' => $healthDisableHtml,'type' => 'else');
     require_once SYSTEM_ROOT . '/lib/security.php';
     $sign_mode = safe_sign_modes(option::get('sign_mode'));
     $smhtml = '<tr><td><b>签到模式设置</b><br/>选择多个将在某个模式失败后使用下一种<br/>启用的签到模式越多，消耗的流量和时间越多</td><td>
@@ -83,6 +99,57 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
 		</td>
 	</tr>';
     $content2['fb_tables'] = array('html' => $fthtml,'type' => 'else');
+    $proxyType = option::get('proxy_type');
+    $proxyHtml = '<tr><td><b>全局网络代理</b><br/><br/>签到与扫描请求统一经由代理发出<br/>账号列表页可为单个账号设置独立代理覆盖全局<br/>带鉴权格式：socks5://用户名:密码@主机:端口</td><td>
+		<div class="input-group">
+			  <span class="input-group-addon">代理类型</span>
+			  <select name="proxy_type" class="form-control" onchange="if(this.value == \'0\') { $(\'#proxy_set\').hide(); } else { $(\'#proxy_set\').show(); }">
+			    <option value="0"' . ($proxyType == '0' || $proxyType === null || $proxyType === false ? ' selected' : '') . '>不使用代理</option>
+			    <option value="1"' . ($proxyType == '1' ? ' selected' : '') . '>HTTP(S) 代理</option>
+			    <option value="2"' . ($proxyType == '2' ? ' selected' : '') . '>SOCKS5 代理</option>
+			  </select>
+		</div><br/>
+		<div id="proxy_set" style="' . ($proxyType == '1' || $proxyType == '2' ? '' : 'display:none') . '">
+		<div class="input-group">
+			  <span class="input-group-addon">主机:端口</span>
+			  <input type="text" class="form-control" name="proxy_host" value="' . htmlspecialchars(option::get('proxy_host'), ENT_QUOTES, 'UTF-8') . '" placeholder="例如 127.0.0.1:7890">
+		</div><br/>
+		<div class="input-group">
+			  <span class="input-group-addon">用户名(可选)</span>
+			  <input type="text" class="form-control" name="proxy_user" value="' . htmlspecialchars(option::get('proxy_user'), ENT_QUOTES, 'UTF-8') . '">
+		</div><br/>
+		<div class="input-group">
+			  <span class="input-group-addon">密码(可选)</span>
+			  <input type="text" class="form-control" name="proxy_pass" value="' . htmlspecialchars(option::get('proxy_pass'), ENT_QUOTES, 'UTF-8') . '">
+		</div>
+		</div>
+		</td></tr>';
+    $content2['proxy'] = array('html' => $proxyHtml,'type' => 'else');
+    $damaType = option::get('dama_type');
+    $damaHtml = '<tr><td><b>打码平台</b><br/><br/>绑定账号遇到验证码时自动提交打码平台识别<br/>目前支持超级鹰（chaojiying.com）</td><td>
+		<div class="input-group">
+			  <span class="input-group-addon">打码平台</span>
+			  <select name="dama_type" class="form-control" onchange="if(this.value == \'none\') { $(\'#dama_set\').hide(); } else { $(\'#dama_set\').show(); }">
+			    <option value="none"' . ($damaType == 'none' || $damaType === null || $damaType === false ? ' selected' : '') . '>不使用打码平台</option>
+			    <option value="chaojiying"' . ($damaType == 'chaojiying' ? ' selected' : '') . '>超级鹰</option>
+			  </select>
+		</div><br/>
+		<div id="dama_set" style="' . ($damaType == 'chaojiying' ? '' : 'display:none') . '">
+		<div class="input-group">
+			  <span class="input-group-addon">账号</span>
+			  <input type="text" class="form-control" name="dama_username" value="' . htmlspecialchars(option::get('dama_username'), ENT_QUOTES, 'UTF-8') . '">
+		</div><br/>
+		<div class="input-group">
+			  <span class="input-group-addon">密码</span>
+			  <input type="text" class="form-control" name="dama_password" value="' . htmlspecialchars(option::get('dama_password'), ENT_QUOTES, 'UTF-8') . '">
+		</div><br/>
+		<div class="input-group">
+			  <span class="input-group-addon">软件ID(可选)</span>
+			  <input type="text" class="form-control" name="dama_softid" value="' . htmlspecialchars(option::get('dama_softid'), ENT_QUOTES, 'UTF-8') . '">
+		</div>
+		</div>
+		</td></tr>';
+    $content2['dama'] = array('html' => $damaHtml,'type' => 'else');
     echo former::create($set2, $content2);
 } else {
     /*准备*/
@@ -129,6 +196,7 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
 		<div class="input-group">
 			<span class="input-group-addon">邀请码设置</span><input type="text" name="yr_reg" id="yr_reg" value="' . htmlspecialchars($reg3, ENT_QUOTES, 'UTF-8') . '" class="form-control">
 		</div><br/>
+		<label class="checkbox-inline"><input type="checkbox" name="reg_mail_verify" value="1"' . (option::get('reg_mail_verify') == '1' ? ' checked' : '') . '> 注册时需要邮箱验证（需先在下方配置邮件服务，验证邮件有效期为24小时）</label>
 		<div class="input-group">
 			<span class="input-group-addon">停止注册提示</span><input type="text" name="stop_reg" id="stop_reg" value="' . htmlspecialchars($reg4, ENT_QUOTES, 'UTF-8') . '" class="form-control">
 		</div>
@@ -274,6 +342,11 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
                 <option value="webhook"<?php echo $sel('webhook'); ?>>通用 Webhook</option>
                 <option value="bark"<?php echo $sel('bark'); ?>>Bark (iOS 推送)</option>
                 <option value="pushplus"<?php echo $sel('pushplus'); ?>>PushPlus (微信推送)</option>
+                <option value="dingtalk"<?php echo $sel('dingtalk'); ?>>钉钉群机器人</option>
+                <option value="wecom"<?php echo $sel('wecom'); ?>>企业微信群机器人</option>
+                <option value="feishu"<?php echo $sel('feishu'); ?>>飞书群机器人</option>
+                <option value="wxpusher"<?php echo $sel('wxpusher'); ?>>WxPusher (微信推送)</option>
+                <option value="ntfy"<?php echo $sel('ntfy'); ?>>ntfy</option>
                 <option value="mail"<?php echo $sel('mail'); ?>>邮件 (发送至管理员邮箱)</option>
             </select>
         </div><br/>
@@ -300,6 +373,38 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
         <div class="input-group">
             <span class="input-group-addon">Webhook URL</span>
             <input type="text" name="notify_webhook_url" class="form-control" value="<?php echo htmlspecialchars(option::get('notify_webhook_url'), ENT_QUOTES, 'UTF-8'); ?>" placeholder="https://example.com/hook">
+        </div><br/>
+        <div class="input-group">
+            <span class="input-group-addon">钉钉 Webhook</span>
+            <input type="text" name="notify_dingtalk_webhook" class="form-control" value="<?php echo htmlspecialchars(option::get('notify_dingtalk_webhook'), ENT_QUOTES, 'UTF-8'); ?>" placeholder="https://oapi.dingtalk.com/robot/send?access_token=...">
+        </div><br/>
+        <div class="input-group">
+            <span class="input-group-addon">钉钉加签密钥</span>
+            <input type="text" name="notify_dingtalk_secret" class="form-control" value="<?php echo htmlspecialchars(option::get('notify_dingtalk_secret'), ENT_QUOTES, 'UTF-8'); ?>" placeholder="SEC 开头，未开启加签可留空">
+        </div><br/>
+        <div class="input-group">
+            <span class="input-group-addon">企业微信 Webhook</span>
+            <input type="text" name="notify_wecom_webhook" class="form-control" value="<?php echo htmlspecialchars(option::get('notify_wecom_webhook'), ENT_QUOTES, 'UTF-8'); ?>" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=...">
+        </div><br/>
+        <div class="input-group">
+            <span class="input-group-addon">飞书 Webhook</span>
+            <input type="text" name="notify_feishu_webhook" class="form-control" value="<?php echo htmlspecialchars(option::get('notify_feishu_webhook'), ENT_QUOTES, 'UTF-8'); ?>" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/...">
+        </div><br/>
+        <div class="input-group">
+            <span class="input-group-addon">WxPusher AppToken</span>
+            <input type="text" name="notify_wxpusher_token" class="form-control" value="<?php echo htmlspecialchars(option::get('notify_wxpusher_token'), ENT_QUOTES, 'UTF-8'); ?>" placeholder="AT_...">
+        </div><br/>
+        <div class="input-group">
+            <span class="input-group-addon">WxPusher UID</span>
+            <input type="text" name="notify_wxpusher_uid" class="form-control" value="<?php echo htmlspecialchars(option::get('notify_wxpusher_uid'), ENT_QUOTES, 'UTF-8'); ?>" placeholder="UID_...">
+        </div><br/>
+        <div class="input-group">
+            <span class="input-group-addon">ntfy 服务器</span>
+            <input type="url" name="notify_ntfy_server" class="form-control" value="<?php echo htmlspecialchars(option::get('notify_ntfy_server') ?: 'https://ntfy.sh', ENT_QUOTES, 'UTF-8'); ?>" placeholder="https://ntfy.sh">
+        </div><br/>
+        <div class="input-group">
+            <span class="input-group-addon">ntfy Topic</span>
+            <input type="text" name="notify_ntfy_topic" class="form-control" value="<?php echo htmlspecialchars(option::get('notify_ntfy_topic'), ENT_QUOTES, 'UTF-8'); ?>" placeholder="仅字母、数字、下划线和连字符">
         </div><br/>
         <label><input type="checkbox" name="notify_on_fail" value="1"<?php echo option::get('notify_on_fail') ? ' checked' : ''; ?>> 签到失败提醒</label><br/>
         <label><input type="checkbox" name="notify_on_health" value="1"<?php echo option::get('notify_on_health') ? ' checked' : ''; ?>> 账号失效提醒</label>

@@ -6,8 +6,8 @@
  */
 
 define('SYSTEM_FN', '百度贴吧云签到');
-define('SYSTEM_VER', '5.09');
-define('SYSTEM_VER_NOTE', '安装向导UI+在线更新+通知+安全+API+加密');
+define('SYSTEM_VER', '5.12');
+define('SYSTEM_VER_NOTE', '全渠道通知+云点赞+逐用户API+签到日历');
 define('SYSTEM_ROOT', dirname(__FILE__));
 require_once SYSTEM_ROOT . '/lib/request.php';
 define('PLUGIN_ROOT', dirname(__FILE__) . '/plugins/');
@@ -56,18 +56,14 @@ if (
     require_once SYSTEM_ROOT . '/config.php';
     $lockConnection = class_exists('mysqli') ? @mysqli_init() : false;
     if ($lockConnection) {
-        $lockHost = DB_HOST;
-        $lockPort = null;
-        $lockHostSeparator = strrpos($lockHost, ':');
-        if ($lockHostSeparator !== false && strpos($lockHost, ']') === false) {
-            $lockPort = (int) substr($lockHost, $lockHostSeparator + 1);
-            $lockHost = substr($lockHost, 0, $lockHostSeparator);
-        }
+        $lockEndpoint = parse_database_endpoint(DB_HOST);
+        $lockHost = $lockEndpoint['host'];
+        $lockPort = $lockEndpoint['port'];
         $lockFlags = defined('DB_SSL') && DB_SSL ? MYSQLI_CLIENT_SSL : 0;
         if (@$lockConnection->real_connect($lockHost, DB_USER, DB_PASSWD, DB_NAME, $lockPort, null, $lockFlags)) {
             $lockConnection->set_charset('utf8mb4');
             $lockTablesReady = true;
-            foreach (array('baiduid', 'cron', 'options', 'plugins', 'tieba', 'users', 'users_options', 'baiduid_health', 'cron_log_batch') as $lockTable) {
+            foreach (array('baiduid', 'cron', 'options', 'plugins', 'tieba', 'users', 'users_options', 'baiduid_health', 'cron_log_batch', 'sign_history') as $lockTable) {
                 $lockTableName = $lockConnection->real_escape_string(DB_PREFIX . $lockTable);
                 $lockResult = $lockConnection->query(
                     "SELECT COUNT(*) AS total FROM information_schema.tables " .
@@ -152,16 +148,15 @@ define('UPDATE_CACHE', SYSTEM_ROOT . '/setup/update_cache/');
 require SYSTEM_ROOT . '/lib/sfc.functions.php';
 require SYSTEM_ROOT . '/lib/class.updater.php';
 require SYSTEM_ROOT . '/lib/ui.php';
+require SYSTEM_ROOT . '/lib/class.SignManager.php';
 if (!defined('SYSTEM_NO_PLUGIN')) {
     require SYSTEM_ROOT . '/lib/plugins.php';
-require SYSTEM_ROOT . '/lib/class.SignManager.php';
+}
 
 // 注册 BDUSS 健康度检查（每天执行一次）
 if (!defined('SYSTEM_DO_NOT_LOGIN')) {
     @include_once SYSTEM_ROOT . '/lib/class.cron.php';
     cron::set('system_health_check', 'lib/cron_system_health_check.php', 0, 'BDUSS 健康度检查（自动检测失效的百度账号）', 86400);
-}
-
 }
 if (!defined('SYSTEM_NO_CHECK_LOGIN')) {
     require SYSTEM_ROOT . '/lib/globals.php';

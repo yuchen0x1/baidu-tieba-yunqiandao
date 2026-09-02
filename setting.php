@@ -39,7 +39,7 @@ switch (SYSTEM_PAGE) {
         } elseif (isset($_GET['xorder'])) {
             global $m;
             foreach ($_POST as $id => $order) {
-                $id = preg_replace('/[^A-Za-z0-9_]/', '', (string) $id);
+                $id = preg_replace('/[^A-Za-z0-9_-]/', '', (string) $id);
                 $order = (int) $order;
                 if ($id !== '' && $id !== 'csrf_token') {
                     $m->query('UPDATE `' . DB_NAME . '`.`' . DB_PREFIX . "plugins` SET `order`={$order} WHERE `name`='" . $m->real_escape_string($id) . "'");
@@ -109,6 +109,19 @@ switch (SYSTEM_PAGE) {
             @option::set('sign_sleep', $sou['sign_sleep']);
             @option::set('sign_scan', $sou['sign_scan']);
             @option::set('same_pid', $sou['same_pid']);
+            @option::set('sign_jitter', $sou['sign_jitter']);
+            @option::set('client_version', isset($sou['client_version']) ? trim($sou['client_version']) : '');
+            @option::set('sign_shuffle', isset($sou['sign_shuffle']) ? $sou['sign_shuffle'] : '0');
+            @option::set('proxy_type', isset($sou['proxy_type']) ? $sou['proxy_type'] : '0');
+            @option::set('proxy_host', isset($sou['proxy_host']) ? trim($sou['proxy_host']) : '');
+            @option::set('proxy_user', isset($sou['proxy_user']) ? $sou['proxy_user'] : '');
+            @option::set('proxy_pass', isset($sou['proxy_pass']) ? $sou['proxy_pass'] : '');
+            @option::set('dama_type', isset($sou['dama_type']) ? $sou['dama_type'] : 'none');
+            @option::set('dama_username', isset($sou['dama_username']) ? $sou['dama_username'] : '');
+            @option::set('dama_password', isset($sou['dama_password']) ? $sou['dama_password'] : '');
+            @option::set('dama_softid', isset($sou['dama_softid']) ? trim($sou['dama_softid']) : '');
+            @option::set('health_auto_disable', isset($sou['health_auto_disable']) ? $sou['health_auto_disable'] : '0');
+            @option::set('health_fail_max', max(1, min(20, (int) $sou['health_fail_max'])));
             if (empty($sou['fb_tables'])) {
                 @option::set('fb_tables', null);
             } else {
@@ -134,6 +147,7 @@ switch (SYSTEM_PAGE) {
             @option::set('enable_reg', $sou['enable_reg']);
             isset($sou['captcha']) and @option::set('captcha', $sou['captcha']);
             @option::set('yr_reg', $sou['yr_reg']);
+            @option::set('reg_mail_verify', isset($sou['reg_mail_verify']) ? $sou['reg_mail_verify'] : '0');
             @option::set('stop_reg', $sou['stop_reg']);
             @option::set('icp', $sou['icp']);
             @option::set('bbs_us', $sou['bbs_us']);
@@ -152,7 +166,7 @@ switch (SYSTEM_PAGE) {
             isset($sou['cron_asyn']) and @option::set('cron_asyn', $sou['cron_asyn']);
             @option::set('sign_multith', $sou['sign_multith']);
             @option::set('cktime', $sou['cktime']);
-            @option::set('notify_enable', isset($sou['notify_enable']) ? 1 : 0);
+            @option::set('notify_enable', isset($sou['notify_enable']) && $sou['notify_enable'] == '1' ? 1 : 0);
             @option::set('notify_channel', isset($sou['notify_channel']) ? $sou['notify_channel'] : 'none');
             @option::set('notify_serverchan_key', isset($sou['notify_serverchan_key']) ? $sou['notify_serverchan_key'] : '');
             @option::set('notify_telegram_token', isset($sou['notify_telegram_token']) ? $sou['notify_telegram_token'] : '');
@@ -162,6 +176,14 @@ switch (SYSTEM_PAGE) {
             @option::set('notify_on_health', isset($sou['notify_on_health']) ? 1 : 0);
             @option::set('notify_bark_url', isset($sou['notify_bark_url']) ? $sou['notify_bark_url'] : '');
             @option::set('notify_pushplus_token', isset($sou['notify_pushplus_token']) ? $sou['notify_pushplus_token'] : '');
+            @option::set('notify_dingtalk_webhook', isset($sou['notify_dingtalk_webhook']) ? trim($sou['notify_dingtalk_webhook']) : '');
+            @option::set('notify_dingtalk_secret', isset($sou['notify_dingtalk_secret']) ? trim($sou['notify_dingtalk_secret']) : '');
+            @option::set('notify_wecom_webhook', isset($sou['notify_wecom_webhook']) ? trim($sou['notify_wecom_webhook']) : '');
+            @option::set('notify_feishu_webhook', isset($sou['notify_feishu_webhook']) ? trim($sou['notify_feishu_webhook']) : '');
+            @option::set('notify_wxpusher_token', isset($sou['notify_wxpusher_token']) ? trim($sou['notify_wxpusher_token']) : '');
+            @option::set('notify_wxpusher_uid', isset($sou['notify_wxpusher_uid']) ? trim($sou['notify_wxpusher_uid']) : '');
+            @option::set('notify_ntfy_server', isset($sou['notify_ntfy_server']) ? trim($sou['notify_ntfy_server']) : 'https://ntfy.sh');
+            @option::set('notify_ntfy_topic', isset($sou['notify_ntfy_topic']) ? trim($sou['notify_ntfy_topic']) : '');
             @option::set('api_token', isset($sou['api_token']) ? $sou['api_token'] : '');
         }
         doAction('admin_set_save');
@@ -316,6 +338,66 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
           break;
             */
 
+            case 'install_plugin_online':
+                doAction('plugin_install_online_1');
+                if (!class_exists('ZipArchive')) {
+                    msg('插件安装失败：你的主机不支持 ZipArchive 类，请返回');
+                }
+                if (!is_writable(SYSTEM_ROOT . '/plugins')) {
+                    msg('插件安装失败：你的主机不支持文件写入，请手动安装插件');
+                }
+                $onlineUrl = trim((string) (isset($_POST['plugin_gitee_url']) ? $_POST['plugin_gitee_url'] : ''));
+                if ($onlineUrl === '') {
+                    msg('请填写插件包的 Gitee 下载地址');
+                }
+                $parts = parse_url($onlineUrl);
+                if (empty($parts['host']) || strtolower($parts['host']) !== 'gitee.com' || (isset($parts['scheme']) && strtolower($parts['scheme']) !== 'https')) {
+                    msg('仅允许从 https://gitee.com 下载插件包');
+                }
+                if (!preg_match('/\.zip$/i', (string) (isset($parts['path']) ? $parts['path'] : ''))) {
+                    msg('下载地址必须指向 ZIP 格式的插件包');
+                }
+                if (!defined('UPDATE_CACHE')) {
+                    msg('系统缓存目录未定义，无法在线安装');
+                }
+                if (!is_dir(UPDATE_CACHE) && !@mkdir(UPDATE_CACHE, 0755, true)) {
+                    msg('无法创建下载缓存目录，请检查写入权限');
+                }
+                $zipPath = rtrim(UPDATE_CACHE, '/\\') . '/plugin_online_' . bin2hex(random_bytes(8)) . '.zip';
+                try {
+                    $dl = new wcurl($onlineUrl);
+                    $dl->set(CURLOPT_TIMEOUT, 120);
+                    //不跟随跨域重定向，避免 Gitee URL 被利用为 SSRF 下载器
+                    $dl->set(CURLOPT_FOLLOWLOCATION, false);
+                    $data = $dl->exec();
+                } catch (Exception $e) {
+                    msg('插件下载失败：' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'));
+                }
+                if (empty($data)) {
+                    msg('插件下载失败：网络返回为空或地址发生了重定向');
+                }
+                if (strlen($data) > 52428800) {
+                    msg('插件下载失败：压缩包超过 50 MB 限制');
+                }
+                if (@file_put_contents($zipPath, $data, LOCK_EX) === false) {
+                    msg('插件下载失败：无法写入缓存文件');
+                }
+                $z = new ZipArchive();
+                if (!$z->open($zipPath)) {
+                    @unlink($zipPath);
+                    msg('插件安装失败：无法打开压缩包，请确认地址指向有效的 ZIP 文件');
+                }
+                $pluginId = extractPluginArchive($z, SYSTEM_ROOT . '/plugins');
+                if ($pluginId === false) {
+                    $z->close();
+                    @unlink($zipPath);
+                    msg('插件安装失败：ZIP 目录结构不合法、入口文件不存在或目标插件已存在');
+                }
+                $z->close();
+                @unlink($zipPath);
+                doAction('plugin_install_online_2');
+                msg('插件包下载并解压成功（插件标识：' . htmlspecialchars($pluginId, ENT_QUOTES, 'UTF-8') . '），请回到插件列表点击「安装插件」完成注册');
+                break;
             case 'install_plugin':
                 doAction('plugin_install_1');
                 if (!class_exists('ZipArchive')) {
@@ -338,25 +420,14 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
                 if (!$z->open($file['tmp_name'])) {
                     msg('插件安装失败：无法打开压缩包');
                 }
-                $rdc = explode('/', $z->getNameIndex(0), 2);
-                $rd  = $rdc[0];
-                if (!preg_match('/^[A-Za-z0-9_\-]+$/', $rd)) {
-                    msg('插件安装失败：插件包根目录名不合法');
+                $pluginId = extractPluginArchive($z, SYSTEM_ROOT . '/plugins');
+                if ($pluginId === false) {
+                    $z->close();
+                    msg('插件安装失败：ZIP 目录结构不合法、入口文件不存在或目标插件已存在');
                 }
-                $cleanRd = str_ireplace(array('-master','master-'), '', $rd);
-                if ($z->getFromName($rd . '/' . $rd . '.php') === false) {
-                    if ($z->getFromName($rd . '/' . $cleanRd . '.php')) {
-                        $z->renameIndex(0, $cleanRd);
-                        $rd = $cleanRd;
-                    } else {
-                        msg('插件安装失败：插件包不合法，请确认此插件为' . SYSTEM_FN . '插件');
-                    }
-                }
-                if (!safe_zip_extract($z, SYSTEM_ROOT . '/plugins')) {
-                    msg('插件安装失败：解压缩失败');
-                }
+                $z->close();
                 doAction('plugin_install_2');
-                msg('插件安装成功');
+                msg('插件安装成功（插件标识：' . htmlspecialchars($pluginId, ENT_QUOTES, 'UTF-8') . '），请回到插件列表点击「安装插件」完成注册');
 
                 break;
             default:
@@ -563,6 +634,96 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
             $x = $m->once_fetch_array("SELECT * FROM  `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE  `id` = " . UID . " LIMIT 1");
             $m->query("DELETE FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `" . DB_PREFIX . "baiduid`.`uid` = " . UID . " AND `" . DB_PREFIX . "baiduid`.`id` = " . $del);
             $m->query('DELETE FROM `' . DB_NAME . '`.`' . DB_PREFIX . $x['t'] . '` WHERE `' . DB_PREFIX . $x['t'] . '`.`uid` = ' . UID . ' AND `' . DB_PREFIX . $x['t'] . '`.`pid` = ' . $del);
+        } elseif (isset($_POST['batch_import'])) {
+            //批量导入 BDUSS（可带 STOKEN），每行一个账号
+            $batchRaw = (string) (isset($_POST['batch_bduss']) ? $_POST['batch_bduss'] : '');
+            $lines = preg_split('/\r?\n/', $batchRaw);
+            $lines = array_filter(array_map('trim', $lines), 'strlen');
+            if (count($lines) > 50) {
+                msg('单次最多导入 50 个账号，请分批操作');
+            }
+            $quota = option::get('bduss_num');
+            $countRow = $m->once_fetch_array("SELECT COUNT(*) AS c FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `uid` = " . UID);
+            $current = (int) $countRow['c'];
+            $samePid = option::get('same_pid');
+            $ok = 0;
+            $skip = 0;
+            $fail = 0;
+            $failDetail = array();
+            foreach ($lines as $line) {
+                //兼容 BDUSS=xxx / STOKEN=yyy 前缀与常见分隔符
+                $line = str_ireplace(array('BDUSS=', 'STOKEN='), array('', ';'), $line);
+                $parts = preg_split('/[,;|\s]+|----/', $line);
+                $parts = array_values(array_filter(array_map('trim', $parts), 'strlen'));
+                $bduss = isset($parts[0]) ? str_replace('"', '', $parts[0]) : '';
+                $stoken = isset($parts[1]) ? str_replace('"', '', $parts[1]) : '';
+                if (strlen($bduss) < 20) {
+                    $fail++;
+                    $failDetail[] = '格式无效';
+                    continue;
+                }
+                if ($quota == '-1' && ROLE != 'admin') {
+                    $skip++;
+                    continue;
+                }
+                if ($quota != '0' && $quota != '-1' && !ISVIP && ($current + $ok) >= (int) $quota) {
+                    $skip++;
+                    continue;
+                }
+                $info = getBaiduUserInfo($bduss);
+                if (empty($info['portrait'])) {
+                    $fail++;
+                    $failDetail[] = 'Cookie 校验失败';
+                    continue;
+                }
+                $portrait = sqladds($info['portrait']);
+                $bname = sqladds($info['name']);
+                $encB = $m->real_escape_string(P::encrypt($bduss));
+                $encS = $stoken !== '' ? ', `' . 'stoken' . '` = \'' . $m->real_escape_string(P::encrypt($stoken)) . '\'' : '';
+                if ($samePid === '3') {
+                    $dup = $m->once_fetch_array("SELECT `id` FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `portrait` = '{$portrait}' AND `uid` = " . UID . " LIMIT 1");
+                } else {
+                    $dup = $m->once_fetch_array("SELECT `id`, `uid` FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `portrait` = '{$portrait}' LIMIT 1");
+                }
+                if (!empty($dup)) {
+                    if ($samePid === '3' && $dup['id'] > 0) {
+                        $m->query("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` SET `bduss` = '{$encB}'{$encS} WHERE `id` = " . (int) $dup['id']);
+                        $ok++;
+                    } elseif (($samePid == '1' || $samePid == '2') && !ISADMIN) {
+                        $skip++;
+                    } else {
+                        $encSIns = $stoken !== '' ? ', \'' . $m->real_escape_string(P::encrypt($stoken)) . '\'' : ', NULL';
+                        $m->query("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` (`id`, `uid`, `bduss`, `stoken`, `name`, `portrait`) VALUES (NULL, " . UID . ", '{$encB}'{$encSIns}, '{$bname}', '{$portrait}')");
+                        $ok++;
+                    }
+                } else {
+                    $encSIns = $stoken !== '' ? ', \'' . $m->real_escape_string(P::encrypt($stoken)) . '\'' : ', NULL';
+                    $m->query("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` (`id`, `uid`, `bduss`, `stoken`, `name`, `portrait`) VALUES (NULL, " . UID . ", '{$encB}'{$encSIns}, '{$bname}', '{$portrait}')");
+                    $ok++;
+                }
+            }
+            $summary = '批量导入完成：成功 ' . $ok . ' 个，跳过 ' . $skip . ' 个（配额或重复），失败 ' . $fail . ' 个';
+            if (!empty($failDetail)) {
+                $summary .= '<br/>失败原因：' . htmlspecialchars(implode('；', array_slice($failDetail, 0, 5)), ENT_QUOTES, 'UTF-8');
+            }
+            if ($ok > 0) {
+                CleanUser(UID);
+            }
+            msg($summary, 'index.php?mod=baiduid');
+        } elseif (isset($_POST['proxy_pid'])) {
+            //账号级代理覆盖：留空恢复跟随全局，off 表示该账号禁用代理
+            $proxyPid = (int) $_POST['proxy_pid'];
+            $proxyOwner = $m->once_fetch_array("SELECT `id` FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `id` = {$proxyPid} AND `uid` = " . UID);
+            if (empty($proxyOwner) && !ISADMIN) {
+                msg('权限不足，无法修改该账号的代理设置');
+            }
+            $proxyRaw = trim((string) (isset($_POST['proxy']) ? $_POST['proxy'] : ''));
+            if ($proxyRaw !== '' && strcasecmp($proxyRaw, 'off') !== 0 && misc::parseProxyUrl($proxyRaw) === false) {
+                msg('代理格式不正确<br/><br/>支持格式：http://host:port 或 socks5://user:pass@host:port，留空跟随全局，off 为禁用');
+            }
+            $proxyVal = $m->escape_string($proxyRaw);
+            $m->query("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` SET `proxy` = '{$proxyVal}' WHERE `id` = {$proxyPid}" . (!ISADMIN ? ' AND `uid` = ' . UID : ''));
+            Redirect('index.php?mod=baiduid');
         } elseif (empty($bdussIn)) {
             msg('BDUSS或STOKEN不合法，请核验后重新绑定');
         }
@@ -584,7 +745,17 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
 
         break;
     case 'showtb':
-        if (isset($_GET['set'])) {
+        if (isset($_POST['restore_pid'])) {
+            $restorePidRaw = isset($_POST['restore_pid']) ? $_POST['restore_pid'] : '';
+            if (!is_scalar($restorePidRaw) || preg_match('/^\d{1,10}$/', (string) $restorePidRaw) !== 1) {
+                msg('无效的账号参数');
+            }
+            $restorePid = (int) $restorePidRaw;
+            if (!SignManager::restoreBaiduid($restorePid, ISADMIN ? 0 : UID)) {
+                msg('账号不存在或无权恢复');
+            }
+            Redirect('index.php?mod=showtb&ok');
+        } elseif (isset($_GET['set'])) {
             $x = $m->fetch_array($m->query('SELECT * FROM  `' . DB_NAME . '`.`' . DB_PREFIX . TABLE . '` WHERE  `uid` = ' . UID . ' LIMIT 1'));
             $f = $x['tieba'];
             foreach ($_POST['no'] as $k => $x) {
@@ -641,6 +812,21 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
 
         break;
     case 'set':
+        $apiAction = isset($_POST['api_action']) ? (string) $_POST['api_action'] : '';
+        if ($apiAction === 'generate') {
+            try {
+                $plainToken = 'tcs_' . bin2hex(random_bytes(32));
+            } catch (Throwable $e) {
+                $plainToken = 'tcs_' . hash('sha256', uniqid('', true) . mt_rand());
+            }
+            $tokenHash = hash('sha256', $plainToken);
+            $m->query("UPDATE `" . DB_PREFIX . "users` SET `api_token_hash` = '" . $m->real_escape_string($tokenHash) . "' WHERE `id` = " . (int) UID);
+            msg('新的个人 API Token 已生成。此值只显示一次，请立即保存：<br/><br/><code style="word-break:break-all;display:block;padding:12px;background:#f5f5f5">' . htmlspecialchars($plainToken, ENT_QUOTES, 'UTF-8') . '</code><br/>调用时使用 <code>Authorization: Bearer 上述Token</code>。它只能访问当前账号的数据，可在个人设置中随时撤销。', 'index.php?mod=set');
+        }
+        if ($apiAction === 'revoke') {
+            $m->query("UPDATE `" . DB_PREFIX . "users` SET `api_token_hash` = NULL WHERE `id` = " . (int) UID);
+            Redirect('index.php?mod=set&ok');
+        }
         // 获取头像的url
         // 无法获取无id帐号头像, 不建议使用 *wontfix
 

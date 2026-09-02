@@ -6,6 +6,7 @@ CREATE TABLE `{VAR-PREFIX}baiduid` (
   `uid` int(30) unsigned NOT NULL,
   `bduss` text NOT NULL,
   `stoken` text NULL DEFAULT NULL,
+  `proxy` varchar(255) COLLATE utf8mb4_general_ci DEFAULT '' NOT NULL,
   `name` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT '' NOT NULL,
   `portrait` varchar(40) COLLATE utf8mb4_general_ci DEFAULT '' NOT NULL,
   PRIMARY KEY (`id`),
@@ -57,6 +58,7 @@ INSERT INTO `{VAR-PREFIX}options` VALUES ('sign_mode', 'a:2:{i:0;s:1:\"1\";i:1;s
 INSERT INTO `{VAR-PREFIX}options` VALUES ('footer', '');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('ann', 'Hello World!');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('enable_reg', '1');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('reg_mail_verify', '0');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('captcha', '0');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('yr_reg', '');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('icp', '');
@@ -81,6 +83,17 @@ INSERT INTO `{VAR-PREFIX}options` VALUES ('cron_last_do', '0');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('cron_isdoing', '0');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('cron_pw', '');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('sign_sleep', '0');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('sign_jitter', '0');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('sign_shuffle', '1');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('client_version', '');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('proxy_type', '0');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('proxy_host', '');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('proxy_user', '');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('proxy_pass', '');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('dama_type', 'none');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('dama_username', '');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('dama_password', '');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('dama_softid', '');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('cktime', '999999');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('bduss_num', '0');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('sign_multith', '1');
@@ -90,7 +103,7 @@ INSERT INTO `{VAR-PREFIX}options` VALUES ('cron_sign_again', 'a:2:{s:3:\"num\";i
 INSERT INTO `{VAR-PREFIX}options` VALUES ('sign_hour', '0');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('mail_secure', 'none');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('freetable', 'tieba');
-INSERT INTO `{VAR-PREFIX}options` VALUES ('core_version', '5.09');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('core_version', '5.12');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('core_revision', '');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('vid', '10000');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('update_server', '0');
@@ -104,6 +117,14 @@ INSERT INTO `{VAR-PREFIX}options` VALUES ('notify_telegram_chatid', '');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('notify_webhook_url', '');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('notify_bark_url', '');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('notify_pushplus_token', '');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('notify_dingtalk_webhook', '');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('notify_dingtalk_secret', '');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('notify_wecom_webhook', '');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('notify_feishu_webhook', '');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('notify_wxpusher_token', '');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('notify_wxpusher_uid', '');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('notify_ntfy_server', 'https://ntfy.sh');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('notify_ntfy_topic', '');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('notify_on_fail', '1');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('notify_on_health', '1');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('api_token', '');
@@ -112,7 +133,8 @@ INSERT INTO `{VAR-PREFIX}options` VALUES ('system_keywords', '贴吧云签到');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('system_description', '百度贴吧云签到，在服务器上配置好就无需进行任何操作便可以实现贴吧的全自动签到。配合插件使用还可实现云灌水、点赞、封禁、删帖、审查等功能。Git代码库 https://github.com/yuchen0x1/tieba-cloud-sign');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('bbs_us', '');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('bbs_pw', '');
-INSERT INTO `{VAR-PREFIX}options` VALUES ('same_pid', '3');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('health_auto_disable', '0');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('health_fail_max', '3');
 
 
 DROP TABLE IF EXISTS `{VAR-PREFIX}plugins`;
@@ -167,9 +189,11 @@ CREATE TABLE `{VAR-PREFIX}users` (
   `created_at` INT UNSIGNED NOT NULL DEFAULT 0,
   `last_login` INT UNSIGNED NOT NULL DEFAULT 0,
   `auth_version` INT UNSIGNED NOT NULL DEFAULT 0,
+  `api_token_hash` CHAR(64) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`) USING BTREE,
-  UNIQUE KEY `email` (`email`) USING BTREE
+  UNIQUE KEY `email` (`email`) USING BTREE,
+  UNIQUE KEY `api_token_hash` (`api_token_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
@@ -216,6 +240,23 @@ CREATE TABLE `{VAR-PREFIX}cron_log_batch` (
   KEY `action` (`action`),
   KEY `status` (`status`),
   KEY `created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS `{VAR-PREFIX}sign_history`;
+CREATE TABLE `{VAR-PREFIX}sign_history` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `pid` INT UNSIGNED NOT NULL DEFAULT 0,
+  `uid` INT UNSIGNED NOT NULL DEFAULT 0,
+  `tieba` VARCHAR(200) NOT NULL DEFAULT '',
+  `status` VARCHAR(20) NOT NULL DEFAULT '',
+  `error_code` INT NOT NULL DEFAULT 0,
+  `message` VARCHAR(500) NOT NULL DEFAULT '',
+  `created_at` INT UNSIGNED NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `pid_created_at` (`pid`, `created_at`),
+  KEY `uid_created_at` (`uid`, `created_at`),
+  KEY `created_at` (`created_at`),
+  KEY `status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 DROP TABLE IF EXISTS `{VAR-PREFIX}login_audit`;

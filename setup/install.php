@@ -1,6 +1,6 @@
 <?php
 define('SYSTEM_FN', '百度贴吧云签到');
-define('SYSTEM_VER', '5.09');
+define('SYSTEM_VER', '5.12');
 define('SYSTEM_ROOT2', dirname(__FILE__));
 define('SYSTEM_ROOT', dirname(__FILE__) . '/..');
 require_once SYSTEM_ROOT . '/lib/request.php';
@@ -25,13 +25,9 @@ function install_schema_ready()
     if (!$connection) {
         return false;
     }
-    $host = DB_HOST;
-    $port = null;
-    $hostSeparator = strrpos($host, ':');
-    if ($hostSeparator !== false && strpos($host, ']') === false) {
-        $port = (int) substr($host, $hostSeparator + 1);
-        $host = substr($host, 0, $hostSeparator);
-    }
+        $endpoint = parse_database_endpoint(DB_HOST);
+        $host = $endpoint['host'];
+        $port = $endpoint['port'];
     $flags = defined('DB_SSL') && DB_SSL ? MYSQLI_CLIENT_SSL : 0;
     try {
         $connected = @$connection->real_connect($host, DB_USER, DB_PASSWD, DB_NAME, $port, null, $flags);
@@ -43,7 +39,7 @@ function install_schema_ready()
     }
     $connection->set_charset('utf8mb4');
 
-    foreach (array('baiduid', 'cron', 'options', 'plugins', 'tieba', 'users', 'users_options', 'baiduid_health', 'cron_log_batch') as $table) {
+    foreach (array('baiduid', 'cron', 'options', 'plugins', 'tieba', 'users', 'users_options', 'baiduid_health', 'cron_log_batch', 'sign_history') as $table) {
         $tableName = $connection->real_escape_string(DB_PREFIX . $table);
         $result = $connection->query("SELECT COUNT(*) AS total FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '{$tableName}'");
         if (!$result) {
@@ -248,7 +244,7 @@ define(\'SYSTEM_SALT\',\'\');
                 $http = 'http://';
             }
             preg_match("/^.*\//", $_SERVER['SCRIPT_NAME'], $sysurl);
-            $fromConfig = request_scalar_value($_POST, 'from_config') !== '';
+    $fromConfig = request_scalar_value($_POST, 'from_config') === '1';
             if ($fromConfig) {
                 require SYSTEM_ROOT2 . '/../config.php';
             } else {

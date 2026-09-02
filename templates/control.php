@@ -15,6 +15,11 @@ switch ($i['mode'][0]) {
         template('showtb');
 
         break;
+    case 'calendar':
+                      loadhead('签到日历');
+        template('calendar');
+
+        break;
     case 'log':
         //兼容老版本插件，重定向到showtb
 
@@ -94,6 +99,11 @@ switch ($i['mode'][0]) {
 
                 break;
         }
+
+        break;
+    case 'thanks':
+                      loadhead('开源致谢');
+        template('thanks');
 
         break;
     default:
