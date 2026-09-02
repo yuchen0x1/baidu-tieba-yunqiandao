@@ -126,6 +126,7 @@ class misc
             return $f;
         } else {
             $ch = new wcurl('https://tieba.baidu.com/f/commit/share/fnameShareApi?ie=utf-8&fname=' . urlencode($kw), array('User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 14_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.1 Mobile/15E148 Safari/604.1','Referer: https://tieba.baidu.com/'));
+            self::applyProxy($ch);
             $r = json_decode($ch->exec(), true);
             return intval($r['no']) === 0 ? $r['data']['fid'] : false;
         }
@@ -135,18 +136,29 @@ class misc
      * 得到TBS
      */
     private static $tbs_cache = [];
-    public static function getTbs($uid, $bduss)
+    public static function getTbs($uid, $bduss, $pid = 0)
     {
-        if (isset(self::$tbs_cache[$bduss])) {
-            return self::$tbs_cache[$bduss];
+        if (isset(self::$tbs_cache[$pid][$bduss])) {
+            return self::$tbs_cache[$pid][$bduss];
         }
         $ch = new wcurl('https://tieba.baidu.com/dc/common/tbs');
+        self::applyProxy($ch, $pid);
         $ch->addcookie("BDUSS=" . $bduss);
         $x = json_decode($ch->exec(), true);
-        self::$tbs_cache[$bduss] = isset($x['tbs']) && isset($x['is_login']) && $x['is_login']
+        self::$tbs_cache[$pid][$bduss] = isset($x['tbs']) && isset($x['is_login']) && $x['is_login']
             ? $x['tbs']
             : '';
-        return self::$tbs_cache[$bduss];
+        return self::$tbs_cache[$pid][$bduss];
+    }
+
+    /**
+     * 当前模拟的贴吧客户端版本号（可在后台"签到设置"中修改）
+     * @return string
+     */
+    public static function clientVersion()
+    {
+        $ver = option::get('client_version');
+        return empty($ver) ? '12.22.1.0' : $ver;
     }
 
     /**
@@ -155,7 +167,7 @@ class misc
      */
     public static function addTiebaSign(&$data, $withClientType = true)
     {
-        $data["_client_version"] = "12.22.1.0";
+        $data["_client_version"] = self::clientVersion();
         if ($withClientType) {
             $data["_client_type"] = "4";
         }
@@ -165,6 +177,115 @@ class misc
             $x .= $k . '=' . $v;
         }
         $data['sign'] = strtoupper(md5($x . 'tiebaclient!!!'));
+    }
+
+    /**
+     * 解析代理字符串，格式：type://[user:pass@]host:port
+     * @param string $str 代理字符串
+     * @return array|false 解析失败返回 false
+     */
+    public static function parseProxyUrl($str)
+    {
+        $str = trim((string) $str);
+        if ($str === '' || strcasecmp($str, 'off') === 0) {
+            return false;
+        }
+        $type = 'http';
+        if (preg_match('/^(https?|socks5):\/\//i', $str, $m)) {
+            $type = strtolower($m[1]) === 'socks5' ? 'socks5' : 'http';
+            $str = substr($str, strlen($m[0]));
+        }
+        $auth = array('user' => '', 'pass' => '');
+        $authAt = strrpos($str, '@');
+        if ($authAt !== false) {
+            $authPart = substr($str, 0, $authAt);
+            $str = substr($str, $authAt + 1);
+            $kv = explode(':', $authPart, 2);
+            $auth = array(
+                'user' => rawurldecode(isset($kv[0]) ? $kv[0] : ''),
+                'pass' => rawurldecode(isset($kv[1]) ? $kv[1] : '')
+            );
+        }
+        $port = '';
+        if (preg_match('/^\[([0-9a-f:]+)\]:(\d{1,5})$/i', $str, $hp)) {
+            $host = $hp[1];
+            $port = $hp[2];
+        } elseif (preg_match('/^([a-z0-9.-]+):(\d{1,5})$/i', $str, $hp)) {
+            $host = $hp[1];
+            $port = $hp[2];
+        } else {
+            return false;
+        }
+        if ((int) $port < 1 || (int) $port > 65535) {
+            return false;
+        }
+        return array_merge(array('type' => $type, 'host' => $host, 'port' => $port), $auth);
+    }
+
+    /**
+     * 取某个百度账号的代理配置（账号级覆盖优先于全局设置）
+     * @param int $pid 百度账号 PID，0 表示只取全局设置
+     * @return array|false 无代理时返回 false
+     */
+    public static function getProxy($pid = 0)
+    {
+        global $m;
+        if ($pid > 0) {
+            static $columnExists = null;
+            if ($columnExists === null) {
+                $col = $m->once_fetch_array("SELECT COUNT(*) AS c FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = '" . DB_PREFIX . "baiduid' AND column_name = 'proxy'");
+                $columnExists = !empty($col['c']);
+            }
+            if ($columnExists) {
+                $row = $m->once_fetch_array("SELECT `proxy` FROM `" . DB_PREFIX . "baiduid` WHERE `id` = " . (int) $pid);
+                $parsed = self::parseProxyUrl(isset($row['proxy']) ? $row['proxy'] : '');
+                if ($parsed !== false) {
+                    return $parsed;
+                }
+                // 账号级显式关闭(off)时不再回退全局
+                if (strcasecmp(trim((string) (isset($row['proxy']) ? $row['proxy'] : '')), 'off') === 0) {
+                    return false;
+                }
+            }
+        }
+        $proxyHost = trim((string) option::get('proxy_host'));
+        if ((string) option::get('proxy_type') === '0' || $proxyHost === '') {
+            return false;
+        }
+        // 支持 host:port 与 [IPv6]:port 两种写法
+        $host = '';
+        $port = '';
+        if (preg_match('/^\[([0-9a-f:]+)\]:(\d{1,5})$/i', $proxyHost, $mm)) {
+            $host = $mm[1];
+            $port = $mm[2];
+        } elseif (preg_match('/^([a-z0-9.-]+):(\d{1,5})$/i', $proxyHost, $mm)) {
+            $host = $mm[1];
+            $port = $mm[2];
+        }
+        if ($host === '' || (int) $port < 1 || (int) $port > 65535) {
+            return false;
+        }
+        return array(
+            'type' => (string) option::get('proxy_type') === '2' ? 'socks5' : 'http',
+            'host' => $host,
+            'port' => $port,
+            'user' => (string) option::get('proxy_user'),
+            'pass' => (string) option::get('proxy_pass'),
+        );
+    }
+
+    /**
+     * 为 wcurl 实例应用代理配置
+     * @param wcurl $ch cURL 实例
+     * @param int   $pid 百度账号 PID，0 表示全局设置
+     * @return wcurl
+     */
+    public static function applyProxy($ch, $pid = 0)
+    {
+        if ($ch instanceof wcurl) {
+            $ch->setProxy((array) self::getProxy($pid));
+        }
+        return $ch;
     }
 
     /**
@@ -190,11 +311,12 @@ class misc
         $ch = new wcurl('https://c.tieba.baidu.com/c/c/forum/msign', array(
             'User-Agent: bdtb for Android 6.5.8'
         ));
+        self::applyProxy($ch, $pid);
         $ch->addcookie(array('BDUSS' => $ck));
         $temp = array(
             'fid' => $fid,
             'kw' => $kw,
-            'tbs' => misc::getTbs($uid, $ck)
+            'tbs' => misc::getTbs($uid, $ck, $pid)
         );
         self::addTiebaSign($temp);
         return $ch->post($temp);
@@ -206,7 +328,8 @@ class misc
     public static function DoSign_Mobile($uid, $kw, $id, $pid, $fid, $ck)
     {
         //没问题了
-        $ch = new wcurl('https://tieba.baidu.com/mo/q/sign?tbs=' . misc::getTbs($uid, $ck) . '&kw=' . urlencode($kw) . '&is_like=1&fid=' . $fid, array('User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 14_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.1 Mobile/15E148 Safari/604.1','Referer: https://tieba.baidu.com/f?kw=' . $kw , 'Host: tieba.baidu.com','X-Forwarded-For: ' . mt_rand(0, 255) . '.' . mt_rand(0, 255) . '.' . mt_rand(0, 255) . '.' . mt_rand(0, 255), 'Origin: https://tieba.baidu.com', 'Connection: Keep-Alive'));
+        $ch = new wcurl('https://tieba.baidu.com/mo/q/sign?tbs=' . misc::getTbs($uid, $ck, $pid) . '&kw=' . urlencode($kw) . '&is_like=1&fid=' . $fid, array('User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 14_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.1 Mobile/15E148 Safari/604.1','Referer: https://tieba.baidu.com/f?kw=' . $kw , 'Host: tieba.baidu.com','X-Forwarded-For: ' . mt_rand(0, 255) . '.' . mt_rand(0, 255) . '.' . mt_rand(0, 255) . '.' . mt_rand(0, 255), 'Origin: https://tieba.baidu.com', 'Connection: Keep-Alive'));
+        self::applyProxy($ch, $pid);
         $ch->addcookie(array('BDUSS' => $ck,'BAIDUID' => strtoupper(md5(time()))));
         return $ch->exec();
     }
@@ -219,6 +342,7 @@ class misc
         global $m,$today;
         $cookie = array('BDUSS' => $ck,'BAIDUID' => strtoupper(md5(time())));
         $ch = new wcurl('https://tieba.baidu.com/mo/m?kw=' . urlencode($kw) . '&fid=' . $fid, array('User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 14_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.1 Mobile/15E148 Safari/604.1','Referer: https://wapp.baidu.com/','Content-Type: application/x-www-form-urlencoded'));
+        self::applyProxy($ch, $pid);
         $ch->addcookie($cookie);
         $s  = $ch->exec();
         $ch->close();
@@ -232,11 +356,13 @@ class misc
                     'User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 14_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.1 Mobile/15E148 Safari/604.1'
                 )
             );
+            self::applyProxy($ch, $pid);
             $ch->addcookie($cookie);
             $ch->exec();
             $ch->close();
 //临时判断解决方案
             $ch = new wcurl('https://tieba.baidu.com/mo/m?kw=' . urlencode($kw) . '&fid=' . $fid, array('User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 14_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.1 Mobile/15E148 Safari/604.1','Referer: https://wapp.baidu.com/','Content-Type: application/x-www-form-urlencoded'));
+            self::applyProxy($ch, $pid);
             $ch->addcookie($cookie);
             $s = $ch->exec();
             $ch->close();
@@ -253,12 +379,13 @@ class misc
     public static function DoSign_Client($uid, $kw, $id, $pid, $fid, $ck)
     {
         $ch = new wcurl('https://c.tieba.baidu.com/c/c/forum/sign');
+        self::applyProxy($ch, $pid);
         $ch->addcookie("BDUSS=" . $ck);
         $temp = array(
             'BDUSS' => misc::getCookie($pid),
             'fid' => $fid,
             'kw' => $kw,
-            'tbs' => misc::getTbs($uid, $ck)
+            'tbs' => misc::getTbs($uid, $ck, $pid)
         );
         self::addTiebaSign($temp);
         return $ch->post($temp);
@@ -323,11 +450,25 @@ class misc
 
         if ($status_succ === true) {
             $m->query("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` SET  `latest` =  '" . $today . "',`status` =  '0',`last_error` = NULL WHERE `" . DB_PREFIX . $table . "`.`id` = '{$id}'", true);
+            if (class_exists('SignManager')) {
+                SignManager::logTiebaResult($pid, $uid, $kw, 'success');
+            }
         } elseif (!empty($error_code)) {
             $m->query("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` SET  `latest` =  '" . $today . "',`status` =  '" . $error_code . "',`last_error` = '" . $error_msg . "' WHERE `" . DB_PREFIX . $table . "`.`id` = '{$id}'", true);
+            if (class_exists('SignManager')) {
+                SignManager::logTiebaResult($pid, $uid, $kw, 'error', (int) $error_code, $error_msg);
+            }
+        } else {
+            if (class_exists('SignManager')) {
+                SignManager::logTiebaResult($pid, $uid, $kw, 'error', 0, '签到接口未返回可识别的结果');
+            }
         }
 
         usleep(option::get('sign_sleep') * 1000);
+        $jitter = (int) option::get('sign_jitter');
+        if ($jitter > 0) {
+            usleep(mt_rand(0, $jitter) * 1000);
+        }
     }
 
     /**
@@ -357,12 +498,13 @@ class misc
      * 执行一个表的签到任务
      * @param string $table 表
      */
-    public static function DoSign($table)
+    public static function DoSign($table, $onlyUid = 0)
     {
         global $m;
         require_once SYSTEM_ROOT . '/lib/security.php';
         $sign_mode = safe_sign_modes(option::get('sign_mode'));
         $today = date('d');
+        $uidWhere = (int) $onlyUid > 0 ? ' AND `uid` = ' . (int) $onlyUid : '';
         if (date('H') <= option::get('sign_hour')) {
             return option::get('sign_hour') . '点时忽略签到';
         }
@@ -371,7 +513,7 @@ class misc
 //处理所有未签到的贴吧
         if ($limit == 0) {
             $q  = array();
-            $qs = $m->query("SELECT * FROM  `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` WHERE `no` = 0 AND `latest` != '" . $today . "'");
+            $qs = $m->query("SELECT * FROM  `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` WHERE `no` = 0 AND `latest` != '" . $today . "'{$uidWhere}");
             while ($qss = $m->fetch_array($qs)) {
                 $q[] = array(
                     'id'     => $qss['id'],
@@ -385,9 +527,11 @@ class misc
                     'last_error'    => $qss['last_error']
                 );
             }
-            shuffle($q);
+            if (option::get('sign_shuffle') != '0') {
+                shuffle($q);
+            }
         } else {
-            $q = rand_row(DB_PREFIX . $table, 'id', $limit, "`no` = 0 AND `latest` != '{$today}'", true);
+            $q = rand_row(DB_PREFIX . $table, 'id', $limit, "`no` = 0 AND `latest` != '{$today}'{$uidWhere}", true);
         }
 
         foreach ($q as $x) {
@@ -399,16 +543,17 @@ class misc
      * 执行一个表的签到重試任务
      * @param string $table 表
      */
-    public static function DoSign_retry($table)
+    public static function DoSign_retry($table, $onlyUid = 0)
     {
         global $m;
+        $uidWhere = (int) $onlyUid > 0 ? ' AND `uid` = ' . (int) $onlyUid : '';
         $today = date('Y-m-d');
         $todayDay = date('d');
         if (date('H') <= option::get('sign_hour')) {
             return option::get('sign_hour') . '点时忽略签到';
         }
 
-        $x = $m->fetch_array($m->query("SELECT count(id) AS `c` FROM `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` WHERE `no` = 0 AND `latest` != '{$todayDay}' "));
+        $x = $m->fetch_array($m->query("SELECT count(id) AS `c` FROM `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` WHERE `no` = 0 AND `latest` != '{$todayDay}'{$uidWhere} "));
         if ($x['c'] == 0) {
             $limit = option::get('cron_limit');
             require_once SYSTEM_ROOT . '/lib/security.php';
@@ -420,7 +565,7 @@ class misc
         //重新尝试签到出错的贴吧
             if ($limit == 0) {
                 if (self::shouldRetry($retry_max, $sign_again, $today)) {
-                    $qs = $m->query("SELECT * FROM  `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` WHERE `no` = 0 AND `status` IN (340011,2280007,110001,1989004,255)");
+                    $qs = $m->query("SELECT * FROM  `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` WHERE `no` = 0 AND `status` IN (340011,2280007,110001,1989004,255){$uidWhere}");
                     while ($qss = $m->fetch_array($qs)) {
                         $q[] = array(
                             'id'     => $qss['id'],
@@ -434,11 +579,13 @@ class misc
                             'last_error'    => $qss['last_error']
                         );
                     }
-                    shuffle($q);
+                    if (option::get('sign_shuffle') != '0') {
+                        shuffle($q);
+                    }
                 }
             } else {
                 if (self::shouldRetry($retry_max, $sign_again, $today)) {
-                    $q = rand_row(DB_PREFIX . $table, 'id', $limit, "`no` = 0 AND `status` IN (340011,2280007,110001,1989004,255) AND `latest` = '{$todayDay}'", true);
+                    $q = rand_row(DB_PREFIX . $table, 'id', $limit, "`no` = 0 AND `status` IN (340011,2280007,110001,1989004,255) AND `latest` = '{$todayDay}'{$uidWhere}", true);
                 }
             }
 
@@ -459,6 +606,7 @@ class misc
     public static function loginBaidu($bd_name, $bd_pw, $verifycode = '', $vcodestr = '')
     {
         $x = new wcurl('https://c.tieba.baidu.com/c/s/login');
+        self::applyProxy($x);
         $p = array(
                 'passwd'      => base64_encode($bd_pw),
                 'timestamp'   => time() . '156',
@@ -489,12 +637,43 @@ class misc
             switch ($v['error_code']) {
                 case '5': //需要验证码或验证码输入错误
                 case '6':
+                    if (!isset($v['anti']['vcode_md5']) || !isset($v['anti']['vcode_pic_url'])) {
+                        return array(-3, '', '');
+                    }
+                    // 首次遇到验证码时，若已配置打码平台则自动识别后重试一次
+                    if (empty($verifycode) && class_exists('dama') && dama::enabled()) {
+                        $img = self::fetchCaptchaImage($v['anti']['vcode_pic_url']);
+                        $code = dama::solve($img);
+                        if ($code !== false && !empty($code)) {
+                            return self::loginBaidu($bd_name, $bd_pw, $code, $v['anti']['vcode_md5']);
+                        }
+                    }
                     return array(-3, $v['anti']['vcode_md5'], $v['anti']['vcode_pic_url']);
                 break;
                 default: //其他错误
                     return array((int)$v['error_code'], $v['error_msg']);
                 break;
             }
+        }
+    }
+
+    /**
+     * 抓取验证码图片内容（供打码平台识别）
+     * @param string $url 验证码图片地址
+     * @return string 图片二进制内容，失败返回空字符串
+     */
+    public static function fetchCaptchaImage($url)
+    {
+        if (empty($url)) {
+            return '';
+        }
+        try {
+            $ch = new wcurl($url, array('Referer: https://tieba.baidu.com/'));
+            self::applyProxy($ch);
+            $ch->setTimeOut(15000);
+            return (string) $ch->exec();
+        } catch (Exception $e) {
+            return '';
         }
     }
 
@@ -544,6 +723,7 @@ class misc
         $head[] = 'Content-Type: application/x-www-form-urlencoded';
         $head[] = 'User-Agent: Mozilla/5.0 (SymbianOS/9.3; Series60/3.2 NokiaE72-1/021.021; Profile/MIDP-2.1 Configuration/CLDC-1.1 ) AppleWebKit/525 (KHTML, like Gecko) Version/3.0 BrowserNG/7.1.16352';
         $tl = new wcurl('https://c.tieba.baidu.com/c/f/forum/like', $head);
+        self::applyProxy($tl);
         $data = array(
             'BDUSS' => $bduss,
             'friend_uid' => $userid,
@@ -561,18 +741,20 @@ class misc
     {
 
         $tl = new wcurl("https://tieba.baidu.com/mg/o/getForumHome?st=0&pn={$pn}&rn=200", ['User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36']);
+        self::applyProxy($tl);
         $tl->addCookie(array('BDUSS' => $bduss, 'STOKEN' => $stoken));
         return $tl->get();
     }
 
-    public static function getTieba3($bduss, $stoken, $pn = 1)
+    public static function getTieba3($bduss, $stoken, $pn = 1, $pid = 0)
     {
         $head = [
             'Subapp-Type: hybrid',
             'Content-Type: application/x-www-form-urlencoded',
-            'User-Agent: tieba/12.58.1.0',
+            'User-Agent: tieba/' . self::clientVersion(),
         ];
         $tl = new wcurl('https://tieba.baidu.com/c/f/forum/forumGuide', $head);
+        self::applyProxy($tl, $pid);
         $data = array(
             'BDUSS' => $bduss,
             'stoken' => $stoken,
@@ -617,8 +799,8 @@ class misc
         $uid    = (int) $cma['uid'];
         $table  = self::getTable($uid);
         $tb     = $m->fetch_array($m->query("SELECT count(id) AS `c` FROM `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` WHERE `uid` = {$uid}"));
-        $bduss  = $cma['bduss'];
-        $stoken = $cma['stoken'];
+        $bduss  = P::decrypt($cma['bduss']);
+        $stoken = P::decrypt($cma['stoken']);
         $isvip  = self::isvip($uid);
         $pid    = $cma['id'];
         //$bid    = self::getUserid($pid);
@@ -627,7 +809,7 @@ class misc
         $a      = 0;
         while (true) {
             //if (empty($bid)) break;
-            $rc = self::getTieba3($bduss, $stoken, $pn);//fetch forum list //default 200 per page
+            $rc = self::getTieba3($bduss, $stoken, $pn, $pid);//fetch forum list //default 200 per page
             $rc = json_decode($rc, true);
             if (!$rc) {
                 break;
@@ -697,7 +879,9 @@ class misc
     {
 
         $resp = ["sign" => null, "imgurl" => null];
-        $get_qrcode = json_decode((new wcurl("https://passport.baidu.com/v2/api/getqrcode?lp=pc"))->get(), true);
+        $qrcode_ch = new wcurl("https://passport.baidu.com/v2/api/getqrcode?lp=pc");
+        self::applyProxy($qrcode_ch);
+        $get_qrcode = json_decode($qrcode_ch->get(), true);
         if (isset($get_qrcode["imgurl"]) && isset($get_qrcode["sign"])) {
             $resp = ["sign" => $get_qrcode["sign"], "imgurl" => $get_qrcode["imgurl"]];
         }
@@ -713,7 +897,9 @@ class misc
         //1 无需操作
         //2 已确认
         $r = ["error" => 1, "bduss" => "", "stoken" => "", "msg" => ""];
-        $response = (new wcurl("https://passport.baidu.com/channel/unicast?channel_id={$sign}&callback="))->get();
+        $unicast_ch = new wcurl("https://passport.baidu.com/channel/unicast?channel_id={$sign}&callback=");
+        self::applyProxy($unicast_ch);
+        $response = $unicast_ch->get();
         if ($response) {
             $responseParse = json_decode(str_replace(array("(",")"), '', $response), true);
             if (!$responseParse["errno"]) {
@@ -722,7 +908,9 @@ class misc
                     $r["error"] = -1;
                     $r["msg"] = "Continue";
                 } else {
-                    $s_bduss = json_decode(preg_replace("/'([^'']+)'/", '"$1"', str_replace("\\&", "&", (new wcurl('https://passport.baidu.com/v3/login/main/qrbdusslogin?bduss=' . $channel_v["v"]))->get())), true);
+                    $qrlogin_ch = new wcurl('https://passport.baidu.com/v3/login/main/qrbdusslogin?bduss=' . $channel_v["v"]);
+                    self::applyProxy($qrlogin_ch);
+                    $s_bduss = json_decode(preg_replace("/'([^'']+)'/", '"$1"', str_replace("\\&", "&", $qrlogin_ch->get())), true);
                     if ($s_bduss && $s_bduss["code"] === "110000") {
                         $r["error"] = 0;
                         $r["msg"] = "Success";

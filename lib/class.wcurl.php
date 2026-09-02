@@ -282,6 +282,30 @@ class wcurl
     }
 
     /**
+     * 设置代理
+     * @param array $proxy 代理配置 array('type' => 'http|socks5', 'host' => 'x.x.x.x', 'port' => 8080, 'user' => '', 'pass' => '')
+     * @return $this
+     */
+    public function setProxy(array $proxy)
+    {
+        if (empty($proxy['host']) || empty($proxy['port'])) {
+            return $this;
+        }
+        $host = (string) $proxy['host'];
+        $endpoint = strpos($host, ':') !== false ? '[' . $host . ']:' . $proxy['port'] : $host . ':' . $proxy['port'];
+        $this->set(CURLOPT_PROXY, $endpoint);
+        $type = isset($proxy['type']) && strtolower((string) $proxy['type']) === 'socks5' ? 'socks5' : 'http';
+        if ($type === 'socks5' && defined('CURLPROXY_SOCKS5_HOSTNAME')) {
+            // 远程DNS解析，避免本地DNS污染
+            $this->set(CURLOPT_PROXYTYPE, CURLPROXY_SOCKS5_HOSTNAME);
+        }
+        if (isset($proxy['user']) && $proxy['user'] !== '') {
+            $this->set(CURLOPT_PROXYUSERPWD, $proxy['user'] . ':' . (isset($proxy['pass']) ? $proxy['pass'] : ''));
+        }
+        return $this;
+    }
+
+    /**
      * 设置超时时间 单位:毫秒
      * @param int $time 超时时间
      * @return $this

@@ -71,7 +71,7 @@ global $m;
       //echo '<td><a href="setting.php?mod=baiduid&reget='.$key.'"">'.$name.'</a></td>';
         echo '<td>' . $name . '</td><td><input type="text" class="form-control" readonly value="' . htmlspecialchars($i['user']['baidu_portrait'][$key], ENT_QUOTES, 'UTF-8') . '"></td>';
         echo '<td><input type="text" class="form-control" readonly value="' . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . '"></td>';
-        echo '<td><input type="text" class="form-control" readonly value="' . htmlspecialchars($i['user']['stoken'][$key], ENT_QUOTES, 'UTF-8') . '"></td><td><a class="btn btn-default" href="setting.php?mod=baiduid&del=' . htmlspecialchars($key, ENT_QUOTES, 'UTF-8') . '" onclick="return confirm(\'确定要解绑该账号吗？\');">解绑</a></td></tr>';
+        echo '<td><input type="text" class="form-control" readonly value="' . htmlspecialchars($i['user']['stoken'][$key], ENT_QUOTES, 'UTF-8') . '"></td><td><a class="btn btn-default" href="setting.php?mod=baiduid&del=' . htmlspecialchars($key, ENT_QUOTES, 'UTF-8') . '" onclick="return confirm(\'确定要解绑该账号吗？\');">解绑</a><br/><br/><form method="post" action="setting.php"><input type="hidden" name="mod" value="baiduid"><input type="hidden" name="csrf_token" value="' . htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') . '"><input type="hidden" name="proxy_pid" value="' . htmlspecialchars($key, ENT_QUOTES, 'UTF-8') . '"><input type="text" class="form-control input-sm" name="proxy" placeholder="代理(留空跟随全局)" value="' . htmlspecialchars(isset($i['user']['bduss_proxy'][$key]) ? $i['user']['bduss_proxy'][$key] : '', ENT_QUOTES, 'UTF-8') . '" title="格式：http://host:port 或 socks5://user:pass@host:port，off 为禁用"> <button type="submit" class="btn btn-default btn-sm" style="margin-top:5px">保存代理</button></form></td></tr>';
     }
     ?>
   </tbody>
@@ -182,6 +182,22 @@ global $m;
 <br>
 <input type="submit" class="btn btn-primary" value="点击提交">
 </form>
+
+<br/><br/>
+<div class="panel panel-default">
+    <div class="panel-heading" onclick="$('#batch_import_box').fadeToggle();"><h3 class="panel-title"><span class="glyphicon glyphicon-chevron-down"></span> 批量导入（多账号粘贴）</h3></div>
+    <div class="panel-body" id="batch_import_box" style="display:none">
+        <form action="setting.php" method="post">
+            <input type="hidden" name="mod" value="baiduid">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="hidden" name="batch_import" value="1">
+            <textarea class="form-control" style="height:150px" name="batch_bduss" placeholder="每行一个账号，支持以下格式：&#10;BDUSS值&#10;BDUSS值----STOKEN值&#10;BDUSS值,STOKEN值&#10;BDUSS=BDUSS值;STOKEN=STOKEN值"></textarea>
+            <br/>
+            <button type="submit" class="btn btn-primary">开始导入</button>
+            <span class="text-muted" style="margin-left:10px">单次最多 50 行；系统会自动校验每个 Cookie 并识别账号名，无效行将被跳过</span>
+        </form>
+    </div>
+</div>
 
 <br/><br/><b>以下是贴吧账号手动绑定教程：</b><br/><br/>
 <div class="panel panel-default">
