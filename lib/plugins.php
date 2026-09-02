@@ -14,6 +14,123 @@ function valid_plugin_id($plugin)
 }
 
 /**
+ * 安全提取插件 ZIP：强制单根目录，剥离仓库根目录后提取到插件标识目录。
+ * 兼容 Gitee/GitHub 的 repository-main 归档结构，同时拒绝 Zip Slip 与覆盖既有插件。
+ */
+function extractPluginArchive($zip, $targetRoot)
+{
+    if (!$zip instanceof ZipArchive || !is_dir($targetRoot)) {
+        return false;
+    }
+    $archiveRoot = '';
+    $pluginId = '';
+    $entries = array();
+    for ($index = 0; $index < $zip->numFiles; $index++) {
+        $name = $zip->getNameIndex($index);
+        if ($name === false) {
+            return false;
+        }
+        $name = str_replace('\\', '/', $name);
+        if ($name === '' || strpos($name, "\0") !== false || strpos($name, '../') !== false || $name[0] === '/' || preg_match('/^[A-Za-z]:/', $name)) {
+            return false;
+        }
+        $segments = explode('/', $name, 2);
+        if (count($segments) < 2 || !valid_plugin_id($segments[0])) {
+            return false;
+        }
+        if ($archiveRoot === '') {
+            $archiveRoot = $segments[0];
+        } elseif ($archiveRoot !== $segments[0]) {
+            return false;
+        }
+        $entries[] = array($name, $segments[1]);
+    }
+    if ($archiveRoot === '') {
+        return false;
+    }
+    $candidate = preg_replace('/(?:-master|master-|-(?:main|dev))$/i', '', $archiveRoot);
+    $directPluginFiles = array();
+    $nestedPluginDirs = array();
+    foreach ($entries as $entry) {
+        if (strpos($entry[1], '/') === false && preg_match('/^([A-Za-z0-9_-]+)\.php$/', $entry[1], $match)) {
+            $directPluginFiles[] = $match[1];
+        }
+        if (preg_match('/^([A-Za-z0-9_-]+)\/\1\.php$/', $entry[1], $match) && valid_plugin_id($match[1])) {
+            $nestedPluginDirs[] = $match[1];
+        }
+    }
+    $directPluginFiles = array_values(array_unique($directPluginFiles));
+    $nestedPluginDirs = array_values(array_unique($nestedPluginDirs));
+    $sourcePrefix = '';
+    if (count($directPluginFiles) === 1 && valid_plugin_id($directPluginFiles[0])) {
+        $candidate = $directPluginFiles[0];
+    } elseif (count($directPluginFiles) === 0 && count($nestedPluginDirs) === 1) {
+        $candidate = $nestedPluginDirs[0];
+        $sourcePrefix = $candidate . '/';
+    }
+    if (!valid_plugin_id($candidate)) {
+        return false;
+    }
+    $pluginId = $candidate;
+    $hasEntry = false;
+    foreach ($entries as $entry) {
+        if ($entry[1] === $sourcePrefix . $pluginId . '.php') {
+            $hasEntry = true;
+            break;
+        }
+    }
+    if (!$hasEntry || is_dir(rtrim($targetRoot, '/\\') . '/' . $pluginId)) {
+        return false;
+    }
+    $base = rtrim(str_replace('\\', '/', realpath($targetRoot)), '/') . '/' . $pluginId;
+    foreach ($entries as $entry) {
+        $relative = $entry[1];
+        if ($sourcePrefix !== '') {
+            if (strpos($relative, $sourcePrefix) !== 0) {
+                continue;
+            }
+            $relative = substr($relative, strlen($sourcePrefix));
+        }
+        if ($relative === '') {
+            continue;
+        }
+        if (strpos($relative, '../') !== false || $relative[0] === '/' || preg_match('/^[A-Za-z]:/', $relative)) {
+            DeleteFile($base);
+            return false;
+        }
+        $target = $base . '/' . $relative;
+        if (substr($target, 0, strlen($base . '/')) !== $base . '/') {
+            DeleteFile($base);
+            return false;
+        }
+        if (substr($relative, -1) === '/') {
+            if (!is_dir($target) && !mkdir($target, 0755, true) && !is_dir($target)) {
+                DeleteFile($base);
+                return false;
+            }
+            continue;
+        }
+        $dir = dirname($target);
+        if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
+            DeleteFile($base);
+            return false;
+        }
+        $stream = $zip->getStream($entry[0]);
+        if ($stream === false) {
+            DeleteFile($base);
+            return false;
+        }
+        $content = stream_get_contents($stream);
+        fclose($stream);
+        if ($content === false || file_put_contents($target, $content, LOCK_EX) === false) {
+            DeleteFile($base);
+            return false;
+        }
+    }
+    return $pluginId;
+}
+
+/**
  * 加载所有激活的插件
  */
 function loadplugins()
@@ -40,6 +157,9 @@ function activePlugin($plugin)
 {
 
     global $m;
+    if (!valid_plugin_id($plugin)) {
+        return false;
+    }
     if (file_exists(SYSTEM_ROOT . '/plugins/' . $plugin . '/' . $plugin . '.php')) {
         $m->query("UPDATE `" . DB_PREFIX . "plugins` SET `status` = '1' WHERE `name` = '{$plugin}';");
         $callback_file =  SYSTEM_ROOT . '/plugins/' . $plugin . '/' . $plugin . '_callback.php';
@@ -64,6 +184,9 @@ function inactivePlugin($plugin)
 {
 
     global $m;
+    if (!valid_plugin_id($plugin)) {
+        return false;
+    }
     if (file_exists(SYSTEM_ROOT . '/plugins/' . $plugin . '/' . $plugin . '.php')) {
         $m->query("UPDATE `" . DB_PREFIX . "plugins` SET `status` = '0' WHERE `name` = '{$plugin}';");
         $callback_file =  SYSTEM_ROOT . '/plugins/' . $plugin . '/' . $plugin . '_callback.php';
@@ -88,6 +211,9 @@ function installPlugin($plugin)
 {
 
     global $m,$i;
+    if (!valid_plugin_id($plugin)) {
+        return false;
+    }
     if (file_exists(SYSTEM_ROOT . '/plugins/' . $plugin . '/' . $plugin . '.php')) {
         $info = getPluginInfo($plugin);
     //安装前判断版本
@@ -123,6 +249,9 @@ function uninstallPlugin($plugin, $delete = true)
 {
 
     global $m;
+    if (!valid_plugin_id($plugin)) {
+        return false;
+    }
     inactivePlugin($plugin);
     $callback_file =  SYSTEM_ROOT . '/plugins/' . $plugin . '/' . $plugin . '_callback.php';
     if (file_exists($callback_file)) {
@@ -224,6 +353,9 @@ function getPlugins($full = true)
 function getPluginInfo($plugin)
 {
 
+    if (!valid_plugin_id($plugin)) {
+        return false;
+    }
     $path = SYSTEM_ROOT . '/plugins/' . $plugin . '/';
     if (!file_exists($path . $plugin . '.php')) {
         return false;

@@ -86,7 +86,7 @@ doAction('admin_plugins');
 ?>
 <div class="alert alert-info" id="tb_num">当前有 <?php echo count($i['plugins']['all']); ?> 个已安装的插件，<?php echo count($i['plugins']['actived']) ?> 个已激活的插件，总共有 <?php echo count($x) ?> 个插件
 <br/>插件手工安装方法：直接解包插件并上传到 /plugins/ 即可
-<br/><a href="javascript:;" data-toggle="modal" data-target="#InstallPlugin">上传安装插件</a> | <a href="<?php echo htmlspecialchars(PROJECT_WIKI_URL, ENT_QUOTES, 'UTF-8'); ?>/%E8%B4%B4%E5%90%A7%E4%BA%91%E7%AD%BE%E5%88%B0%E6%8F%92%E4%BB%B6%E5%BA%93" target="_blank">插件库</a> | <a href="javascript:;" onclick="alert('请确保插件目录名和插件入口文件的文件名一致(扩展名除外)<br/>例如，插件目录名是 <i>wmzz_debug</i>，则插件入口文件的文件名应该是 <i>wmzz_debug.php</i><br/><br/>如果您是从Git上下载的插件包，请注意去掉文件夹名称-master之类的字符');" target="_blank">找不到上传的插件？</a>
+<br/><a href="javascript:;" data-toggle="modal" data-target="#InstallPlugin">上传安装插件</a> | <a href="javascript:;" data-toggle="modal" data-target="#InstallPluginOnline">从 Gitee 在线安装</a> | <a href="<?php echo htmlspecialchars(PROJECT_WIKI_URL, ENT_QUOTES, 'UTF-8'); ?>/%E8%B4%B4%E5%90%A7%E4%BA%91%E7%AD%BE%E5%88%B0%E6%8F%92%E4%BB%B6%E5%BA%93" target="_blank">插件库</a> | <a href="javascript:;" onclick="alert('请确保插件目录名和插件入口文件的文件名一致(扩展名除外)<br/>例如，插件目录名是 <i>wmzz_debug</i>，则插件入口文件的文件名应该是 <i>wmzz_debug.php</i><br/><br/>如果您是从Git上下载的插件包，请注意去掉文件夹名称-master之类的字符');" target="_blank">找不到上传的插件？</a>
 </div>
 <form action="setting.php?mod=admin:plugins&xorder" method="post">
 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
@@ -124,6 +124,29 @@ doAction('admin_plugins');
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
         <button type="submit" class="btn btn-primary" id="installplugin_button">上传插件</button>
+      </div>
+      </form>
+    </div><!-- /.modal-content -->
+  </div><!-- /.modal-dialog -->
+</div><!-- /.modal -->
+
+<div class="modal fade" id="InstallPluginOnline" tabindex="-1" role="dialog" aria-labelledby="InstallPluginOnlineLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+        <h4 class="modal-title" id="InstallPluginOnlineLabel">从 Gitee 在线安装插件</h4>
+      </div>
+      <form action="<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=install_plugin_online" onsubmit="$('#installplugin_online_button').attr('disabled',true);" method="post">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
+      <div class="modal-body">
+        插件包下载地址（仅允许 https://gitee.com 的 ZIP 下载链接）：
+        <br/><br/><input type="url" name="plugin_gitee_url" class="form-control" required placeholder="https://gitee.com/xxx/xxx/repository/archive/main.zip" style="width:100%">
+        <br/><br/>下载后自动解压到 /plugins/，随后请回到插件列表点击「安装插件」完成注册
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
+        <button type="submit" class="btn btn-primary" id="installplugin_online_button">下载并安装</button>
       </div>
       </form>
     </div><!-- /.modal-content -->

@@ -20,12 +20,18 @@ foreach ($iterator as $file) {
         continue;
     }
     $count++;
-    $command = escapeshellarg(PHP_BINARY) . ' -l ' . escapeshellarg($file->getPathname());
-    exec($command, $output, $exitCode);
-    if ($exitCode !== 0) {
-        $failed[] = $file->getPathname();
+    //进程内语法检查：TOKEN_PARSE 让解析器对非法语法抛出 ParseError，
+    //无需为每个文件启动 php -l 子进程，也就不存在命令注入面。
+    $source = @file_get_contents($file->getPathname());
+    if ($source === false) {
+        $failed[] = $file->getPathname() . ' (无法读取文件)';
+        continue;
     }
-    $output = array();
+    try {
+        token_get_all($source, TOKEN_PARSE);
+    } catch (ParseError $e) {
+        $failed[] = $file->getPathname() . ' : ' . $e->getMessage();
+    }
 }
 
 if ($failed !== array()) {

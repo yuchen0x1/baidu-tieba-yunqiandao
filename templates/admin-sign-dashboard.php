@@ -24,19 +24,20 @@ $log_table = DB_PREFIX . SignManager::LOG_TABLE;
         <p><form action="do.php?mod=runcron&cron=system_health_check" method="post" target="_blank" style="display:inline;"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>"><input type="hidden" name="pw" value="<?php echo htmlspecialchars(option::get('cron_pw'), ENT_QUOTES, 'UTF-8'); ?>"><button type="submit" class="btn btn-primary btn-sm">手动执行健康度检查</button></form></p>
         <div class="table-responsive">
         <table class="table table-hover table-bordered table-striped">
-            <thead><tr><th>账号ID</th><th>名称</th><th>状态</th><th>最后成功</th><th>最后失败</th><th>失败次数</th><th>错误信息</th></tr></thead>
+            <thead><tr><th>账号ID</th><th>名称</th><th>状态</th><th>最后成功</th><th>最后失败</th><th>失败次数</th><th>错误信息</th><th>操作</th></tr></thead>
             <tbody>
 <?php
 $rows = $m->query("SELECT h.*, IFNULL(b.name, h.name) AS display_name FROM `$health_table` h LEFT JOIN `" . DB_PREFIX . "baiduid` b ON h.pid = b.id ORDER BY h.status ASC, h.fail_count DESC;");
 if ($m->num_rows($rows) == 0) {
-    echo '<tr><td colspan="7" class="text-center">尚未执行健康度检查，请先运行手动检查</td></tr>';
+    echo '<tr><td colspan="8" class="text-center">尚未执行健康度检查，请先运行手动检查</td></tr>';
 } else {
     while ($r = $m->fetch_array($rows)) {
         $status_label = $r['status'] == 'ok' ? 'label-success' : ($r['status'] == 'invalid' ? 'label-danger' : 'label-default');
         $status_text = $r['status'] == 'ok' ? '正常' : ($r['status'] == 'invalid' ? '已失效' : $r['status']);
         $last_ok = $r['last_ok'] ? date('Y-m-d H:i', $r['last_ok']) : '-';
         $last_fail = $r['last_fail'] ? date('Y-m-d H:i', $r['last_fail']) : '-';
-        echo '<tr><td>' . $r['pid'] . '</td><td>' . htmlspecialchars($r['display_name'], ENT_QUOTES, 'UTF-8') . '</td><td><span class="label ' . $status_label . '">' . htmlspecialchars($status_text, ENT_QUOTES, 'UTF-8') . '</span></td><td>' . $last_ok . '</td><td>' . $last_fail . '</td><td>' . intval($r['fail_count']) . '</td><td>' . htmlspecialchars($r['error_msg'], ENT_QUOTES, 'UTF-8') . '</td></tr>';
+        $restore = $r['status'] == 'invalid' ? '<form action="setting.php?mod=showtb" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="' . htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') . '"><input type="hidden" name="restore_pid" value="' . (int) $r['pid'] . '"><button type="submit" class="btn btn-default btn-xs">恢复签到</button></form>' : '-';
+        echo '<tr><td>' . $r['pid'] . '</td><td>' . htmlspecialchars($r['display_name'], ENT_QUOTES, 'UTF-8') . '</td><td><span class="label ' . $status_label . '">' . htmlspecialchars($status_text, ENT_QUOTES, 'UTF-8') . '</span></td><td>' . $last_ok . '</td><td>' . $last_fail . '</td><td>' . intval($r['fail_count']) . '</td><td>' . htmlspecialchars($r['error_msg'], ENT_QUOTES, 'UTF-8') . '</td><td>' . $restore . '</td></tr>';
     }
 }
 ?>

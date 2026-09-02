@@ -63,6 +63,37 @@ class Notify
                     return array('ok' => false, 'detail' => '未配置 PushPlus Token');
                 }
                 return self::sendPushPlus($ppToken, $title, $content);
+            case 'dingtalk':
+                $dtUrl = option::get('notify_dingtalk_webhook');
+                if (empty($dtUrl)) {
+                    return array('ok' => false, 'detail' => '未配置钉钉机器人 Webhook');
+                }
+                return self::sendDingTalk($dtUrl, option::get('notify_dingtalk_secret'), $title, $content);
+            case 'wecom':
+                $wcUrl = option::get('notify_wecom_webhook');
+                if (empty($wcUrl)) {
+                    return array('ok' => false, 'detail' => '未配置企业微信机器人 Webhook');
+                }
+                return self::sendWeCom($wcUrl, $title, $content);
+            case 'feishu':
+                $fsUrl = option::get('notify_feishu_webhook');
+                if (empty($fsUrl)) {
+                    return array('ok' => false, 'detail' => '未配置飞书机器人 Webhook');
+                }
+                return self::sendFeiShu($fsUrl, $title, $content);
+            case 'wxpusher':
+                $xpToken = option::get('notify_wxpusher_token');
+                $xpUid = option::get('notify_wxpusher_uid');
+                if (empty($xpToken) || empty($xpUid)) {
+                    return array('ok' => false, 'detail' => '未配置 WxPusher AppToken / UID');
+                }
+                return self::sendWxPusher($xpToken, $xpUid, $title, $content);
+            case 'ntfy':
+                $ntfyTopic = option::get('notify_ntfy_topic');
+                if (empty($ntfyTopic) || preg_match('/^[A-Za-z0-9_-]{1,128}$/', $ntfyTopic) !== 1) {
+                    return array('ok' => false, 'detail' => '未配置或配置了无效的 ntfy Topic');
+                }
+                return self::sendNtfy(option::get('notify_ntfy_server'), $ntfyTopic, $title, $content);
             case 'mail':
                 return self::sendMail($title, $content);
             default:
@@ -78,8 +109,7 @@ class Notify
         try {
             $c = new wcurl('https://sctapi.ftqq.com/' . urlencode($key) . '.send');
             $c->set(CURLOPT_TIMEOUT, 15);
-            $c->post(array('title' => $title, 'desp' => $content));
-            $resp = $c->exec();
+            $resp = $c->post(array('title' => $title, 'desp' => $content));
             $json = json_decode($resp, true);
             if (is_array($json) && isset($json['code']) && (int) $json['code'] === 0) {
                 return array('ok' => true, 'detail' => 'Server酱 发送成功');
@@ -99,8 +129,7 @@ class Notify
             $text = $title . "\n\n" . $content;
             $c = new wcurl('https://api.telegram.org/bot' . $token . '/sendMessage');
             $c->set(CURLOPT_TIMEOUT, 15);
-            $c->post(array('chat_id' => $chatId, 'text' => $text, 'disable_web_page_preview' => '1'));
-            $resp = $c->exec();
+            $resp = $c->post(array('chat_id' => $chatId, 'text' => $text, 'disable_web_page_preview' => '1'));
             $json = json_decode($resp, true);
             if (is_array($json) && !empty($json['ok'])) {
                 return array('ok' => true, 'detail' => 'Telegram 发送成功');
@@ -180,6 +209,150 @@ class Notify
         }
     }
 
+
+    /**
+     * 钉钉群机器人（支持加签安全设置）
+     */
+    public static function sendDingTalk($webhook, $secret, $title, $content)
+    {
+        try {
+            if (!empty($secret)) {
+                $timestamp = time() * 1000;
+                $stringToSign = $timestamp . "\n" . $secret;
+                $sign = urlencode(base64_encode(hash_hmac('sha256', $stringToSign, $secret, true)));
+                $webhook .= (strpos($webhook, '?') === false ? '?' : '&') . 'timestamp=' . $timestamp . '&sign=' . $sign;
+            }
+            $c = new wcurl($webhook);
+            $c->set(CURLOPT_TIMEOUT, 15);
+            $payload = json_encode(array(
+                'msgtype' => 'text',
+                'text' => array('content' => $title . "\n" . $content),
+            ), JSON_UNESCAPED_UNICODE);
+            $c->set(CURLOPT_POST, 1);
+            $c->set(CURLOPT_POSTFIELDS, $payload);
+            $c->set(CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+            $resp = $c->exec();
+            $json = json_decode($resp, true);
+            if (is_array($json) && isset($json['errcode']) && (int) $json['errcode'] === 0) {
+                return array('ok' => true, 'detail' => '钉钉 发送成功');
+            }
+            return array('ok' => false, 'detail' => '钉钉 返回: ' . substr((string) $resp, 0, 200));
+        } catch (Exception $e) {
+            return array('ok' => false, 'detail' => '钉钉 异常: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 企业微信群机器人
+     */
+    public static function sendWeCom($webhook, $title, $content)
+    {
+        try {
+            $c = new wcurl($webhook);
+            $c->set(CURLOPT_TIMEOUT, 15);
+            $payload = json_encode(array(
+                'msgtype' => 'text',
+                'text' => array('content' => $title . "\n" . $content),
+            ), JSON_UNESCAPED_UNICODE);
+            $c->set(CURLOPT_POST, 1);
+            $c->set(CURLOPT_POSTFIELDS, $payload);
+            $c->set(CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+            $resp = $c->exec();
+            $json = json_decode($resp, true);
+            if (is_array($json) && isset($json['errcode']) && (int) $json['errcode'] === 0) {
+                return array('ok' => true, 'detail' => '企业微信 发送成功');
+            }
+            return array('ok' => false, 'detail' => '企业微信 返回: ' . substr((string) $resp, 0, 200));
+        } catch (Exception $e) {
+            return array('ok' => false, 'detail' => '企业微信 异常: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 飞书群机器人
+     */
+    public static function sendFeiShu($webhook, $title, $content)
+    {
+        try {
+            $c = new wcurl($webhook);
+            $c->set(CURLOPT_TIMEOUT, 15);
+            $payload = json_encode(array(
+                'msg_type' => 'text',
+                'content' => array('text' => $title . "\n" . $content),
+            ), JSON_UNESCAPED_UNICODE);
+            $c->set(CURLOPT_POST, 1);
+            $c->set(CURLOPT_POSTFIELDS, $payload);
+            $c->set(CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+            $resp = $c->exec();
+            $json = json_decode($resp, true);
+            if (is_array($json) && ((isset($json['code']) && (int) $json['code'] === 0) || (isset($json['StatusCode']) && (int) $json['StatusCode'] === 0))) {
+                return array('ok' => true, 'detail' => '飞书 发送成功');
+            }
+            return array('ok' => false, 'detail' => '飞书 返回: ' . substr((string) $resp, 0, 200));
+        } catch (Exception $e) {
+            return array('ok' => false, 'detail' => '飞书 异常: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * WxPusher (微信推送服务 https://wxpusher.zjiecode.com)
+     */
+    public static function sendWxPusher($appToken, $uid, $title, $content)
+    {
+        try {
+            $c = new wcurl('https://wxpusher.zjiecode.com/api/send/message');
+            $c->set(CURLOPT_TIMEOUT, 15);
+            $payload = json_encode(array(
+                'appToken' => $appToken,
+                'content' => $title . "\n" . $content,
+                'summary' => mb_substr($title, 0, 99, 'UTF-8'),
+                'contentType' => 1,
+                'uids' => array($uid),
+            ), JSON_UNESCAPED_UNICODE);
+            $c->set(CURLOPT_POST, 1);
+            $c->set(CURLOPT_POSTFIELDS, $payload);
+            $c->set(CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+            $resp = $c->exec();
+            $json = json_decode($resp, true);
+            if (is_array($json) && isset($json['code']) && (int) $json['code'] === 1000) {
+                return array('ok' => true, 'detail' => 'WxPusher 发送成功');
+            }
+            return array('ok' => false, 'detail' => 'WxPusher 返回: ' . substr((string) $resp, 0, 200));
+        } catch (Exception $e) {
+            return array('ok' => false, 'detail' => 'WxPusher 异常: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * ntfy 通知（默认公共服务器，也支持自托管 HTTPS 实例）
+     */
+    public static function sendNtfy($server, $topic, $title, $content)
+    {
+        try {
+            $server = rtrim(trim((string) $server), '/');
+            $parts = parse_url($server);
+            if (empty($parts['scheme']) || strtolower($parts['scheme']) !== 'https' || empty($parts['host'])) {
+                return array('ok' => false, 'detail' => 'ntfy 服务器必须是 HTTPS 地址');
+            }
+            $c = new wcurl($server . '/' . rawurlencode($topic));
+            $c->set(CURLOPT_TIMEOUT, 15);
+            $c->set(CURLOPT_POST, 1);
+            $c->set(CURLOPT_POSTFIELDS, $content);
+            $c->set(CURLOPT_HTTPHEADER, array(
+                'Title: ' . base64_encode($title),
+                'Content-Type: text/plain; charset=utf-8',
+                'Accept: application/json'
+            ));
+            $resp = $c->exec();
+            $json = json_decode($resp, true);
+            if (is_array($json) && isset($json['event']) && $json['event'] === 'message') {
+                return array('ok' => true, 'detail' => 'ntfy 发送成功');
+            }
+            return array('ok' => false, 'detail' => 'ntfy 返回: ' . substr((string) $resp, 0, 200));
+        } catch (Exception $e) {
+            return array('ok' => false, 'detail' => 'ntfy 异常: ' . $e->getMessage());
+        }
+    }
 
     /**
      * 邮件 (发往管理员邮箱)

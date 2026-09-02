@@ -32,7 +32,9 @@ function cron_system_health_check()
         option::set('cron_health_invalid', $invalid);
         $msg .= "。请及时更新已失效的 BDUSS！";
         SignManager::log(0, 'health_check', 'invalid', $msg, $duration);
-        Notify::send(SYSTEM_FN . ' 账号健康异常', "检测到 $invalid 个百度账号 BDUSS 已失效，请及时更新。", 'health_invalid');
+        if (option::get('health_auto_disable') != '1') {
+            Notify::send(SYSTEM_FN . ' 账号健康异常', "检测到 $invalid 个百度账号 BDUSS 已失效，请及时更新。", 'health_invalid');
+        }
     } else {
         option::set('cron_health_invalid', 0);
         SignManager::log(0, 'health_check', 'ok', $msg, $duration);

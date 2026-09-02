@@ -44,20 +44,20 @@ class LoginGuard
 
     /**
      * 记录一次登录尝试
+     * @param bool $success 是否登录成功
+     * @param string $username 账号标识（调用方传入，函数内不再读取请求）
      */
-    public static function auditLogin($success, $username = null)
+    public static function auditLogin($success, $username = '')
     {
         global $m;
         $table = self::table();
         if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
             return;
         }
-        if ($username === null) {
-            $username = request_scalar_value($_POST, 'user');
-        }
-        $username = self::escapeAuditValue(self::normalizeUsername($username), 100);
-        $ip = self::escapeAuditValue(self::clientIp(), 45);
-        $ua = self::escapeAuditValue(isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '', 255);
+        //规范化（白名单字符集 + 截断）后内联转义，避免跨方法传递削弱静态可见性
+        $username = $m->real_escape_string(self::normalizeUsername($username));
+        $ip = $m->real_escape_string(substr(self::clientIp(), 0, 45));
+        $ua = $m->real_escape_string(substr((string) (isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : ''), 0, 255));
         $successValue = $success ? 1 : 0;
         $m->query("INSERT INTO `{$table}` (`username`, `ip`, `ua`, `success`, `ts`) VALUES ('{$username}', '{$ip}', '{$ua}', {$successValue}, UNIX_TIMESTAMP());");
     }
@@ -68,12 +68,6 @@ class LoginGuard
             return '';
         }
         return substr(trim(preg_replace('/[^a-zA-Z0-9@._-]/', '', (string) $username)), 0, 100);
-    }
-
-    private static function escapeAuditValue($value, $limit)
-    {
-        global $m;
-        return $m->real_escape_string(substr((string) $value, 0, (int) $limit));
     }
 
     /**
