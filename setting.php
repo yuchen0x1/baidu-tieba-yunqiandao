@@ -20,22 +20,29 @@ switch (SYSTEM_PAGE) {
     case 'admin:plugins':
         doAction('plugin_setting_1');
         if (isset($_GET['dis'])) {
-            inactivePlugin($_GET['dis']);
+            inactivePlugin(valid_plugin_id((string) $_GET['dis']) ? (string) $_GET['dis'] : '');
         } elseif (isset($_GET['act'])) {
-            activePlugin($_GET['act']);
+            activePlugin(valid_plugin_id((string) $_GET['act']) ? (string) $_GET['act'] : '');
         } elseif (isset($_GET['upd'])) {
-            if (updatePlugin($_GET['upd']) == false) {
+            if (!valid_plugin_id((string) $_GET['upd'])) {
+                msg('插件标识不合法');
+            }
+            if (updatePlugin((string) $_GET['upd']) == false) {
                 Redirect('index.php?mod=admin:plugins&error_msg=' . urlencode("插件更新失败"));
             }
         } elseif (isset($_GET['uninst'])) {
-            uninstallPlugin($_GET['uninst']);
+            uninstallPlugin(valid_plugin_id((string) $_GET['uninst']) ? (string) $_GET['uninst'] : '');
         } elseif (isset($_GET['clean'])) {
-            uninstallPlugin($_GET['clean'], false);
+            uninstallPlugin(valid_plugin_id((string) $_GET['clean']) ? (string) $_GET['clean'] : '', false);
         } elseif (isset($_GET['install'])) {
-            if (!empty($_REQUEST['ver'])) {
-                msg('该插件仅适用于 V' . $_REQUEST['ver'] . ' 及以上的版本，您的云签到版本低于插件所需最低版本，是否强制安装（强制安装可能造成云签到损坏）<br/><br/><a href="setting.php?mod=admin:plugins&install=' . $_GET['install'] . '">强制安装</a>　　<a href="setting.php?mod=admin:plugins">取消安装</a><br/>', false, true);
+            $installPlug = (string) $_GET['install'];
+            if (!valid_plugin_id($installPlug)) {
+                msg('插件标识不合法');
             }
-            installPlugin($_GET['install']);
+            if (!empty($_REQUEST['ver'])) {
+                msg('该插件仅适用于 V' . htmlspecialchars((string) $_REQUEST['ver'], ENT_QUOTES, 'UTF-8') . ' 及以上的版本，您的云签到版本低于插件所需最低版本，是否强制安装（强制安装可能造成云签到损坏）<br/><br/><a href="setting.php?mod=admin:plugins&install=' . urlencode($installPlug) . '">强制安装</a>　　<a href="setting.php?mod=admin:plugins">取消安装</a><br/>', false, true);
+            }
+            installPlugin($installPlug);
         } elseif (isset($_GET['xorder'])) {
             global $m;
             foreach ($_POST as $id => $order) {
@@ -130,10 +137,14 @@ switch (SYSTEM_PAGE) {
                 $n = 0;
                 foreach ($fb_tables as $value) {
                     $n++;
-                    $value = strtolower($value);
-                    $sql = str_ireplace('{VAR-DB}', DB_NAME, str_ireplace('{VAR-TABLE}', trim(DB_PREFIX . $value), file_get_contents(SYSTEM_ROOT . '/setup/template.table.sql')));
+                    $value = strtolower(trim($value));
+                    //表名进入建表语句前做白名单校验，杜绝拼接注入
+                    if (!preg_match('/^[a-z0-9_]{1,64}$/', $value)) {
+                        msg('分表名不合法：' . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . '<br/><br/>只允许小写字母、数字、下划线，长度不超过 64');
+                    }
+                    $sql = str_ireplace('{VAR-DB}', DB_NAME, str_ireplace('{VAR-TABLE}', DB_PREFIX . $value, file_get_contents(SYSTEM_ROOT . '/setup/template.table.sql')));
                     $m->query($sql);
-                    $fb_tab[$n] .= trim($value);
+                    $fb_tab[$n] .= $value;
                 }
                 @option::set('fb_tables', serialize($fb_tab));
             }
@@ -230,14 +241,6 @@ switch (SYSTEM_PAGE) {
                 option::set('cron_sign_again', '');
 
                 break;
-            case 'runsql':
-                global $m;
-                if (!empty($_POST['sql'])) {
-                    $sql = str_ireplace('{VAR-DBNAME}', DB_NAME, str_ireplace('{VAR-PREFIX}', DB_PREFIX, $_POST['sql']));
-                    $m->query($sql);
-                }
-
-                break;
             case 'backup':
                 global $m;
                 $list  = !empty($_POST['tab']) ? array_map('addslashes', $_POST['tab']) : msg('请至少选择一个需要导出的表');
@@ -290,11 +293,6 @@ switch (SYSTEM_PAGE) {
                         continue;
                     }
                     $m->query('TRUNCATE TABLE `' . $tab . '`');
-                }
-
-                break;
-                if (!empty($_POST['tab'])) {
-                    $m->query('TRUNCATE TABLE `' . $_POST['tab'] . '`');
                 }
 
                 break;
@@ -490,6 +488,7 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
                 }
 
                 foreach ($_POST['user'] as $value) {
+                    $value = (int) $value;
                     doAction('admin_users_crole_process', $value, $role);
                     $m->query("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "users` SET `role` = '{$role}' WHERE `" . DB_PREFIX . "users`.`id` = {$value}");
                 }
@@ -514,6 +513,13 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
                 if (empty($name) || empty($mail) || empty($pw)) {
                     msg('添加用户失败：请正确填写用户名、密码或邮箱');
                 }
+                //与注册流程一致的白名单校验：用户名字符集与长度、邮箱格式
+                if (!preg_match('/^[A-Za-z0-9_\x{4e00}-\x{9fa5}]{1,20}$/u', $name)) {
+                    msg('添加用户失败：用户名只允许字母、数字、下划线、中文，长度不超过 20');
+                }
+                if (!checkMail($mail)) {
+                    msg('添加用户失败：邮箱格式不正确');
+                }
                 $name = sqladds($name);
                 $mail = sqladds($mail);
                 $x = $m->once_fetch_array("SELECT COUNT(*) AS total FROM `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE name='{$name}' OR `email`='{$mail}'");
@@ -535,11 +541,11 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
         break;
     case 'admin:cron':
         doAction('cron_setting_1');
-        if (!empty($_GET['act'])) {
+        if (!empty($_GET['act']) && preg_match('/^[A-Za-z0-9_]+$/', (string) $_GET['act'])) {
             cron::aset($_GET['act'], array('no' => 0));
-        } elseif (!empty($_GET['dis'])) {
+        } elseif (!empty($_GET['dis']) && preg_match('/^[A-Za-z0-9_]+$/', (string) $_GET['dis'])) {
             cron::aset($_GET['dis'], array('no' => 1));
-        } elseif (isset($_GET['uninst'])) {
+        } elseif (isset($_GET['uninst']) && preg_match('/^[A-Za-z0-9_]+$/', (string) $_GET['uninst'])) {
             cron::del($_GET['uninst']);
         } elseif (isset($_GET['add'])) {
             $cronName = isset($_POST['name']) ? trim((string) $_POST['name']) : '';
@@ -551,12 +557,16 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
             } else {
                 cron::set($cronName, $cronFile, $_POST['no'], $_POST['desc'], $_POST['freq'], $_POST['lastdo'], $_POST['log']);
             }
-        } elseif (isset($_GET['run'])) {
+        } elseif (isset($_GET['run']) && isset($_GET['file'])
+            && preg_match('/^[A-Za-z0-9_]+$/', (string) $_GET['run'])) {
             $return = cron::run($_GET['file'], $_GET['run']);
             cron::aset($_GET['run'], array('lastdo' => time() , 'log' => $return));
         } elseif (isset($_GET['xorder'])) {
             foreach ($_POST['order'] as $key => $value) {
-                cron::aset($key, array('orde' => $value));
+                if (!preg_match('/^[A-Za-z0-9_]+$/', (string) $key)) {
+                    continue;
+                }
+                cron::aset($key, array('orde' => (int) $value));
             }
         }
         doAction('cron_setting_2');

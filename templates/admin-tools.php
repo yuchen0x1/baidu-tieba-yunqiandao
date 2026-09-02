@@ -44,8 +44,6 @@ if (isset($_GET['ok'])) {
 
 <br/><br/><input type="button" onclick="location = '<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=optim'" class="btn btn-primary" value="优化所有的数据表" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;可清除所有数据表的多余数据
 
-<br/><br/><input type="button" data-toggle="modal" data-target="#RunSql" class="btn btn-primary" value="运行 SQL 语句" style="width:170px">
-
 <br/><br/><input type="button" onclick="location = '<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=fixdoing'" class="btn btn-primary" value="修复计划任务状态" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;可解决运行计划任务始终提示已经有一个计划任务正在运行中的问题
 
 <br/><br/><input type="button" onclick="location = '<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=reftable'" class="btn btn-primary" value="扫描空闲的签到表" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;扫描空闲的签到数据表，用户注册时系统会自动扫描
@@ -88,29 +86,6 @@ if (empty($auditRows)) {
 </table>
 </div>
 <br/><br/><?php echo SYSTEM_FN ?> V<?php echo SYSTEM_VER  . ' ' . SYSTEM_VER_NOTE ?> // 作者: <a href="https://kenvix.com" target="_blank">Kenvix</a>  &amp; <a href="http://www.mokeyjay.com/" target="_blank">mokeyjay</a> &amp;  <a href="http://fyy1999.lofter.com/" target="_blank">FYY</a>
-
-<div class="modal fade" id="RunSql" tabindex="-1" role="dialog" aria-labelledby="RunSqlLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
-        <h4 class="modal-title" id="RunSqlLabel">运行 SQL 语句 - 请输入 SQL 语句</h4>
-      </div>
-      <form action="<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=runsql" onsubmit="if (!confirm('确定要运行这段 SQL 语句吗？')) { return false; } $('#runsql_button').attr('disabled',true);" method="post">
-<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
-      <div class="modal-body">
-        支持这些变量：<b>{VAR-PREFIX}</b> - 当前数据表前缀 | <b>{VAR-DBNAME}</b> - 当前数据库名称
-        <br/><br/>
-        <textarea name="sql" class="form-control" style="height:150px"></textarea>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
-        <button type="submit" class="btn btn-primary" id="runsql_button">提交并运行</button>
-      </div>
-      </form>
-    </div><!-- /.modal-content -->
-  </div><!-- /.modal-dialog -->
-</div><!-- /.modal -->
 
 <div class="modal fade" id="BackupTable" tabindex="-1" role="dialog" aria-labelledby="BackupTableLabel" aria-hidden="true">
   <div class="modal-dialog">
