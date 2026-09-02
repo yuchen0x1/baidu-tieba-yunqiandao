@@ -7,6 +7,49 @@ if (!defined('SYSTEM_ROOT')) {
  * 全局用户控制
  */
 
+/**
+ * 校验找回密码令牌，返回 array(uid, expire) 或 false
+ */
+if (!function_exists('lostpw_token_info')) {
+    function lostpw_token_info($token)
+    {
+        global $m;
+        $token = trim((string) $token);
+        if ($token === '' || strlen($token) > 64 || !ctype_xdigit($token)) {
+            return false;
+        }
+        $row = $m->once_fetch_array("SELECT `value` FROM `" . DB_NAME . "`.`" . DB_PREFIX . "options` WHERE `name` = 'lostpw:token:{$token}' LIMIT 1");
+        if (empty($row['value'])) {
+            return false;
+        }
+        $info = json_decode((string) $row['value'], true);
+        if (!is_array($info) || empty($info['uid']) || empty($info['expire']) || $info['expire'] < time()) {
+            return false;
+        }
+        return $info;
+    }
+}
+
+/**
+ * 生成注册验证令牌并发送验证邮件
+ * @return bool 邮件是否发送成功
+ */
+if (!function_exists('send_regverify_mail')) {
+    function send_regverify_mail($uid, $mail)
+    {
+        $uid = (int) $uid;
+        $token = bin2hex(random_bytes(20));
+        option::set('regverify:token:' . $token, json_encode(array('uid' => $uid, 'expire' => time() + 86400)));
+        option::set('regverify:uid:' . $uid, $token);
+        $link = SYSTEM_URL . 'index.php?mod=verify&token=' . $token;
+        $site = htmlspecialchars(SYSTEM_NAME, ENT_QUOTES, 'UTF-8');
+        $body = '<p>您好！</p><p>您正在注册 <strong>' . $site . '</strong>，请点击以下链接完成邮箱验证（24小时内有效）：</p><p><a href="' . $link . '">' . $link . '</a></p><p>若非本人操作，请忽略本邮件。</p>';
+        $ok = misc::mail($mail, $site . ' - 邮箱验证', $body);
+        option::set('regverify:last:' . $uid, (string) time());
+        return $ok === true;
+    }
+}
+
 doAction('globals');
 if (isset($_COOKIE['uid']) && isset($_COOKIE['pwd'])) {
     if (!empty($_COOKIE['con_pwd']) && !empty($_COOKIE['con_uid'])) {
@@ -72,6 +115,7 @@ if (isset($_COOKIE['uid']) && isset($_COOKIE['pwd'])) {
                 $i['user']['baidu'][$bdspid] = $bd['name'];
                 $i['user']['baidu_portrait'][$bdspid] = $bd['portrait'];
                 $i['user']['stoken'][$bdspid] = P::decrypt($bd['stoken']);
+                $i['user']['bduss_proxy'][$bdspid] = isset($bd['proxy']) ? $bd['proxy'] : '';
             }
             $optss = $m->query("SELECT * FROM  `" . DB_NAME . "`.`" . DB_PREFIX . "users_options` WHERE uid = " . UID);
     //$GLOBALS = $i['user'];
@@ -151,6 +195,12 @@ if (SYSTEM_PAGE == 'admin:login') {
         ReDirect("index.php?mod=login&error_msg=" . urlencode('密码错误'));
         die;
     } else {
+        //邮箱验证注册：存在未验证标记的账户拦截登录（无标记的老账户不受影响）
+        $verRow = $m->once_fetch_array("SELECT `value` FROM `" . DB_NAME . "`.`" . DB_PREFIX . "users_options` WHERE `uid` = " . (int) $p['id'] . " AND `name` = 'email_verified' LIMIT 1");
+        if (!empty($verRow) && $verRow['value'] != '1') {
+            ReDirect('index.php?mod=verify&resend=' . (int) $p['id']);
+            die;
+        }
         LoginGuard::auditLogin(true, $loginRawName);
         if (P::needsRehash($p['pw'])) {
             $rehash = EncodePwd($pw);
@@ -242,8 +292,138 @@ if (SYSTEM_PAGE == 'admin:login') {
     }
     doAction('admin_reg_2');
     $m->query('INSERT INTO `' . DB_NAME . '`.`' . DB_PREFIX . 'users` (`id`, `name`, `pw`, `email`, `role`, `t`) VALUES (NULL, \'' . $name . '\', \'' . EncodePwd($pw) . '\', \'' . $mail . '\', \'' . $role . '\', \'' . getfreetable() . '\');');
+    $newUid = (int) $m->insert_id();
+    $regMsg = '成功注册，请输入账号信息登录本站 [ 账号为用户名或邮箱地址 ]';
+    //邮箱验证注册：标记未验证并发送验证邮件
+    if (option::get('reg_mail_verify') == '1') {
+        $m->query("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . "users_options` (`id`, `uid`, `name`, `value`) VALUES (NULL, {$newUid}, 'email_verified', '0')");
+        if (send_regverify_mail($newUid, $mail)) {
+            $regMsg = '注册成功！验证邮件已发送至您的邮箱，请完成邮箱验证后再登录';
+        } else {
+            $regMsg = '注册成功，但验证邮件发送失败；请在登录页按提示重新发送验证邮件';
+        }
+    }
     doAction('admin_reg_3');
-    ReDirect('index.php?mod=login&msg=' . urlencode('成功注册，请输入账号信息登录本站 [ 账号为用户名或邮箱地址 ]'));
+    ReDirect('index.php?mod=login&msg=' . urlencode($regMsg));
+} elseif (SYSTEM_PAGE == 'lostpw') {
+//访客可访问的找回密码页面
+    if (defined('ROLE')) {
+        ReDirect('index.php');
+    }
+    define('ROLE', 'visitor');
+    $i['user']['role'] = 'visitor';
+    doAction('lostpw_page_1');
+    $token = isset($_GET['token']) ? trim((string) $_GET['token']) : '';
+    if ($token !== '' && lostpw_token_info($token) === false) {
+        msg('重置链接无效或已过期，请重新申请');
+    }
+    template('lostpw');
+    doAction('lostpw_page_2');
+    die;
+} elseif (SYSTEM_PAGE == 'lostpw:do') {
+//找回密码的提交处理（申请重置 / 执行重置）
+    if (defined('ROLE')) {
+        ReDirect('index.php');
+    }
+    define('ROLE', 'visitor');
+    doAction('lostpw_do_1');
+    $action = request_scalar_value($_POST, 'action');
+    if ($action === 'request') {
+        $mailIn = trim((string) request_scalar_value($_POST, 'mail'));
+        if ($mailIn === '' || !checkMail($mailIn)) {
+            msg('请输入正确的邮箱地址');
+        }
+        if ((string) option::get('mail_name') === '') {
+            msg('本站未配置邮件服务，无法自助找回密码，请联系管理员');
+        }
+        $mailEsc = sqladds($mailIn);
+        $u = $m->once_fetch_array("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE `email` = '{$mailEsc}' LIMIT 1");
+        if (!empty($u['id'])) {
+            $lastKey = 'lostpw:last:' . (int) $u['id'];
+            $last = (int) option::get($lastKey);
+            if ($last > 0 && (time() - $last) < 300) {
+                msg('重置请求过于频繁，请 5 分钟后再试');
+            }
+            $token = bin2hex(random_bytes(20));
+            option::set('lostpw:token:' . $token, json_encode(array('uid' => (int) $u['id'], 'expire' => time() + 1800)));
+            option::set($lastKey, (string) time());
+            $link = SYSTEM_URL . 'index.php?mod=lostpw&token=' . $token;
+            $site = htmlspecialchars(SYSTEM_NAME, ENT_QUOTES, 'UTF-8');
+            $mailBody = '<p>您好！</p><p>我们收到了您在 <strong>' . $site . '</strong> 的密码重置请求（链接30分钟内有效）。请点击以下链接设置新密码：</p><p><a href="' . $link . '">' . $link . '</a></p><p>若非本人操作，请忽略本邮件，账户不会受影响。</p>';
+            $sent = misc::mail($u['email'], $site . ' - 密码重置', $mailBody);
+            if ($sent !== true) {
+                msg('邮件发送失败：' . strip_tags((string) $sent));
+            }
+        }
+        msg('如果该邮箱已注册，重置邮件已发出，请查收（包括垃圾邮件箱）');
+    } elseif ($action === 'reset') {
+        $token = trim((string) request_scalar_value($_POST, 'token'));
+        $info = lostpw_token_info($token);
+        if ($info === false) {
+            msg('重置链接无效或已过期，请重新申请');
+        }
+        $pw = (string) request_scalar_value($_POST, 'pw');
+        $rpw = (string) request_scalar_value($_POST, 'rpw');
+        if ($pw === '' || $pw !== $rpw) {
+            msg('两次输入的密码不一致或为空');
+        }
+        $m->query("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "users` SET `pw` = '" . $m->real_escape_string(EncodePwd($pw)) . "' WHERE `id` = " . (int) $info['uid']);
+        option::del('lostpw:token:' . $token);
+        ReDirect('index.php?mod=login&msg=' . urlencode('密码重置成功，请使用新密码登录'));
+    }
+    msg('无效的请求');
+} elseif (SYSTEM_PAGE == 'verify') {
+//邮箱验证（注册后）
+    if (defined('ROLE')) {
+        ReDirect('index.php');
+    }
+    define('ROLE', 'visitor');
+    $i['user']['role'] = 'visitor';
+    if (option::get('reg_mail_verify') != '1') {
+        ReDirect('index.php?mod=login');
+    }
+    doAction('verify_page_1');
+    $token = isset($_GET['token']) ? trim((string) $_GET['token']) : '';
+    $resendUid = isset($_GET['resend']) ? (int) $_GET['resend'] : 0;
+    if ($token !== '') {
+        $row = $m->once_fetch_array("SELECT `value` FROM `" . DB_NAME . "`.`" . DB_PREFIX . "options` WHERE `name` = 'regverify:token:{$token}' LIMIT 1");
+        $info = !empty($row['value']) ? json_decode((string) $row['value'], true) : false;
+        if (!is_array($info) || empty($info['uid']) || empty($info['expire']) || $info['expire'] < time()) {
+            msg('验证链接无效或已过期，请通过登录页的提示重新发送验证邮件');
+        }
+        $vUid = (int) $info['uid'];
+        $m->query("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "users_options` SET `value` = '1' WHERE `uid` = {$vUid} AND `name` = 'email_verified'");
+        $chk = $m->once_fetch_array("SELECT COUNT(*) AS c FROM `" . DB_NAME . "`.`" . DB_PREFIX . "users_options` WHERE `uid` = {$vUid} AND `name` = 'email_verified' AND `value` = '1'");
+        if (empty($chk['c'])) {
+            //UPDATE 因行不存在而未生效时兜底插入
+            $m->query("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . "users_options` (`id`, `uid`, `name`, `value`) VALUES (NULL, {$vUid}, 'email_verified', '1')");
+        }
+        option::del('regverify:token:' . $token);
+        option::del('regverify:uid:' . $vUid);
+        msg('邮箱验证成功，现在可以使用账号登录了', SYSTEM_URL . 'index.php?mod=login');
+    }
+    if ($resendUid > 0) {
+        $u = $m->once_fetch_array("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE `id` = {$resendUid} LIMIT 1");
+        if (empty($u['id'])) {
+            msg('账户不存在，请返回注册页重新操作');
+        }
+        $verRow = $m->once_fetch_array("SELECT `value` FROM `" . DB_NAME . "`.`" . DB_PREFIX . "users_options` WHERE `uid` = {$resendUid} AND `name` = 'email_verified' LIMIT 1");
+        if (empty($verRow) || $verRow['value'] == '1') {
+            msg('该账户已验证或无需验证，请直接登录', SYSTEM_URL . 'index.php?mod=login');
+        }
+        $last = (int) option::get('regverify:last:' . $resendUid);
+        if ($last > 0 && (time() - $last) < 300) {
+            msg('验证邮件发送过于频繁，请 5 分钟后再试');
+        }
+        if ((string) option::get('mail_name') === '') {
+            msg('本站未配置邮件服务，请联系管理员完成验证');
+        }
+        if (!send_regverify_mail($resendUid, $u['email'])) {
+            msg('验证邮件发送失败，请稍后重试或联系管理员');
+        }
+        msg('验证邮件已重新发送至 ' . htmlspecialchars($u['email'], ENT_QUOTES, 'UTF-8') . '，请查收（包括垃圾邮件箱）', SYSTEM_URL . 'index.php?mod=login');
+    }
+    msg('无效的访问');
 } elseif (SYSTEM_PAGE == 'captcha') {
 // 防止恶意用户通过get参数临时修改验证码等级使其更易于被识别
     // 只有管理员才能通过get参数临时修改验证码等级（用于设置页预览）

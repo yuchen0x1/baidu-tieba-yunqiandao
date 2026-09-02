@@ -60,7 +60,7 @@ loadhead();
             <button type="submit" class="btn btn-primary auth-submit">进入工作台</button>
             <?php doAction('login_page_3'); ?>
         </form>
-        <div class="auth-footer">还没有账号？<a href="index.php?mod=reg">创建一个账号</a></div>
+        <div class="auth-footer">还没有账号？<a href="index.php?mod=reg">创建一个账号</a>　<a href="index.php?mod=lostpw">忘记密码？</a></div>
     </section>
 </div>
 <?php loadfoot(); ?>
