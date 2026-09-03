@@ -14,12 +14,14 @@
 - 解除条件：获得可用的消息数据源（如新版客户端协议签名、OAuth 体系或抓包出的新端点）
 - 注意：消息拉取计划任务当前禁用，重新启用后需将 `tc_cron.system_message_pull.enable` 置 1
 
-## Phase 2：关注/粉丝管理
+## Phase 2（暂缓）：关注/粉丝管理 —— 数据源被百度封锁
 
-- 数据源：关注/粉丝列表接口（BDUSS）——与 Phase 1 同类风险，开发前需先探针验证可用性
-- 功能：列表展示（头像、吧龄、等级）、搜索、批量取关/特别关注
-- 存储：`tc_baidu_friends`（uid, pid, type[follow/fan], fid, info json, updated_at）
-- 风控：分页间隔与请求限速复用 `sign_sleep`/客户端指纹轮换
+- 探针结论（2026-09-04，本机住宅 IP + 有效 BDUSS，只读测试）：
+  - 客户端 `c/f/follow/followList`、`c/f/fan/fanList` 返回 HTTP 200 空 body（带 STOKEN 相同）
+  - `c/u/user/getsocialdata` 返回 302；web 端 `i/sys/user_json` 返回 HTML 页（原 JSON 接口已死）；`home/main` 个人主页 403
+  - 阳性对照：`c/s/sync` 同一 BDUSS 正常返回 228KB JSON——协议通道本身健康，是关注/粉丝接口被针对性封锁
+- 解除条件：获得可用的关注/粉丝列表数据源（同 Phase 1）
+- 已完成的存储设计保留：`tc_users_oauth` 类似的懒建表模式可复用（`tc_baidu_friends`：uid, pid, type[follow/fan], fid, info json, updated_at）
 
 ## Phase 3（已完成，2026-09-04）：签到数据深度分析
 
@@ -30,8 +32,12 @@
 - 附带修复 V6.0 遗留缺陷：`components.js` 为 defer 加载，此前所有页面（工作台/日历/排行/统计）的 `CS.chart` 图表初始化时 `CS` 尚不存在导致图表从不渲染；统一改为 DOMContentLoaded 后初始化，浏览器实测全部恢复
 - 说明：路线图原列的「等级/成长值变化」本地无数据源（百度接口封锁期间无法获取），暂不实现，待数据源可用后再评估
 
-## Phase 4：第三方登录
+## Phase 4（已完成，2026-09-04）：第三方登录
 
-- GitHub OAuth：无需企业资质，可先行落地（`tc_users_oauth`：uid, provider, openid, bound_at）
-- QQ 互联 / 微信：需用户自行申请开发者资质后接入，预留 provider 抽象层
-- 绑定流程：已有账号绑定 + 新用户自动注册（需开启注册开关）
+- GitHub OAuth 已落地：`lib/class.OAuth.php`（Provider 抽象层 + `tc_users_oauth` 绑定表：uid, provider, openid, info, bound_at，provider+openid 唯一）
+- 流程：`index.php?mod=oauth:start`（生成一次性 state 存会话）→ GitHub 授权 → `index.php?mod=oauth:callback`（state 校验 → 换 Token → 拉取用户）
+- 已登录用户绑定（账号中心「第三方账号绑定」面板，`setting.php?mod=oauth:unbind` 解绑）；访客按绑定直接登录；未绑定时若开启「自动注册」（需同时开启站点注册，跳过邀请码）自动创建账号（用户名取 GitHub login 清洗+去重，随机密码）
+- 安全：state 防重放（hash_equals）、openid 占用检测、解绑走 CSRF 表单；授权跳转经硬编码主机 + client_id/state 白名单校验、0 秒 meta-refresh 中转（不带 redirect_uri，GitHub 强制使用注册回调，杜绝开放重定向）；OAuth 回调路由豁免常规 Referer CSRF（跨站跳回必然携带外部 Referer，该流程由 state 防护）——E2E 实测带 github.com Referer 的回调不再被误杀
+- 配置：设置中心新增「第三方登录（GitHub OAuth）」区块（启用开关、Client ID/Secret、自动注册开关、回调地址展示）
+- QQ 互联 / 微信：按 `OAuth::providers()` 抽象层扩展，需用户自行申请开发者资质后接入
+- 已知边界：完整授权回环需真实 GitHub OAuth App（本地 E2E 已验证 start/state/错误路径/绑定数据层 11 项；真实 GitHub 登录需管理员在 GitHub 创建应用并填入凭据后自测）
