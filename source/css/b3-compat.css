@@ -197,3 +197,36 @@
 .glyphicon-zoom-out:before { content: "\e016"; }
 .glyphicon-file:before { content: "\e022"; }
 .glyphicon-folder-open:before { content: "\e118"; }
+
+/* ---- BS3 JS 与 BS5 CSS 的过渡类名桥接 ----
+ * 本站 JS 为 Bootstrap 3（切换时写 .in），CSS 为 Bootstrap 5（认 .show，
+ * 且 .fade:not(.show){opacity:0} 会把仅带 .in 的元素完全透明化）。
+ * 以下规则以更高特异性桥接，修复标签面板/模态框"内容存在但不可见"的问题。 */
+.tab-pane.fade.in { opacity: 1; }
+.tab-pane.fade.in.active { display: block; }
+.modal.fade.in { opacity: 1; }
+.modal.fade.in .modal-dialog { transform: none; }
+.tooltip.fade.in { opacity: 1; }
+
+/* BS5 的 .nav-tabs 仅修饰 .nav-link，这里桥接 BS3 的 li>a 结构 */
+.nav-tabs > li { margin-bottom: -1px; }
+.nav-tabs > li > a {
+    display: block;
+    padding: 0.5rem 1rem;
+    margin-right: 2px;
+    color: var(--color-muted);
+    text-decoration: none;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+.nav-tabs > li > a:hover,
+.nav-tabs > li > a:focus {
+    color: var(--color-primary);
+    border-color: var(--color-border) var(--color-border) var(--color-surface);
+}
+.nav-tabs > li.active > a {
+    color: var(--color-primary);
+    background: var(--color-surface);
+    border-color: var(--color-border) var(--color-border) transparent;
+    font-weight: 600;
+}
