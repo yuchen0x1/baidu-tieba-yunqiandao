@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 if (!defined('SYSTEM_ROOT')) {
     die('Insufficient Permissions');
 }
@@ -34,7 +34,7 @@ $token = isset($_GET['token']) ? trim((string) $_GET['token']) : '';
                 <label for="lostpw-repeat">确认新密码</label>
                 <input id="lostpw-repeat" type="password" class="form-control" name="rpw" required>
             </div>
-            <button type="submit" class="btn btn-primary auth-submit">重置密码</button>
+            <button type="submit" class="cs-btn cs-btn-primary auth-submit">重置密码</button>
         </form>
         <?php } else { ?>
         <div class="eyebrow">Forgot Password</div>
@@ -47,7 +47,7 @@ $token = isset($_GET['token']) ? trim((string) $_GET['token']) : '';
                 <label for="lostpw-mail">注册邮箱</label>
                 <input id="lostpw-mail" type="email" class="form-control" name="mail" placeholder="注册时填写的邮箱地址" required>
             </div>
-            <button type="submit" class="btn btn-primary auth-submit">发送重置邮件</button>
+            <button type="submit" class="cs-btn cs-btn-primary auth-submit">发送重置邮件</button>
         </form>
         <?php } ?>
         <div class="auth-footer">想起密码了？<a href="index.php?mod=login">返回登录</a></div>

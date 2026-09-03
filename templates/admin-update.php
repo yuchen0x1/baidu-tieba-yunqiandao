@@ -1,4 +1,4 @@
-<?php if (!defined('SYSTEM_ROOT')) {
+﻿<?php if (!defined('SYSTEM_ROOT')) {
     die('Insufficient Permissions');
 }  if (ROLE != 'admin') {
     msg('权限不足！');
@@ -12,7 +12,7 @@ doAction('admin_update_1');
       <option value="0">Gitee Releases（国内主通道，获取最新正式版本）</option>
   </select>
   <!--<span class="input-group-btn">
-     <input id="save_btn" type="button" value="保存并应用" class="btn btn-info" onclick="save_server()">
+     <input id="save_btn" type="button" value="保存并应用" class="cs-btn cs-btn-info" onclick="save_server()">
  </span>-->
 </div>
 <br/>

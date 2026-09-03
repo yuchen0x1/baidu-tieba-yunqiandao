@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 if (!defined('SYSTEM_ROOT')) {
     die('Insufficient Permissions');
 }
@@ -51,7 +51,7 @@ $week = SignManager::calendar(7, UID);
     </div>
     <?php } else { ?>
     <div class="table-responsive">
-        <table class="table table-hover table-bordered table-striped">
+        <table class="cs-table">
             <thead><tr>
                 <th>账号</th><th>PID</th><th>健康状态</th><th>连续失败</th>
                 <th>贴吧数</th><th>今日已签</th><th>今日出错</th><th>已忽略</th><th>代理</th><th>操作</th>
@@ -63,7 +63,7 @@ $week = SignManager::calendar(7, UID);
                 $portrait = htmlspecialchars($acc['portrait'], ENT_QUOTES, 'UTF-8');
                 $name = $acc['name'] !== '' ? htmlspecialchars($acc['name'], ENT_QUOTES, 'UTF-8') : '<span class="text-muted">未记录</span>';
                 $proxy = $acc['proxy'] !== '' ? htmlspecialchars($acc['proxy'], ENT_QUOTES, 'UTF-8') : '<span class="text-muted">跟随全局</span>';
-                $restore = $acc['hstatus'] == 'invalid' ? '<form action="setting.php?mod=showtb" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="' . htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') . '"><input type="hidden" name="restore_pid" value="' . $acc['id'] . '"><button type="submit" class="btn btn-default btn-xs">恢复签到</button></form>' : '-';
+                $restore = $acc['hstatus'] == 'invalid' ? '<form action="setting.php?mod=showtb" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="' . htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') . '"><input type="hidden" name="restore_pid" value="' . $acc['id'] . '"><button type="submit" class="cs-btn cs-btn-secondary btn-xs">恢复签到</button></form>' : '-';
                 echo '<tr>'
                     . '<td>' . ($portrait !== '' ? '<img src="https://himg.bdimg.com/sys/portrait/item/' . $portrait . '" width="24" height="24" style="border-radius:50%;vertical-align:middle" alt=""> ' : '') . $name . '</td>'
                     . '<td>' . $acc['id'] . '</td>'
@@ -91,9 +91,9 @@ $week = SignManager::calendar(7, UID);
     <?php if (empty($week)) { ?>
     <div class="panel-body text-muted">暂无历史记录。签到历史自 V5.12 起开始积累，也可在<a href="index.php?mod=calendar">签到日历</a>查看完整视图。</div>
     <?php } else { ?>
-    <ul class="list-group">
+    <ul class="cs-list">
         <?php foreach ($week as $w) { ?>
-        <li class="list-group-item">
+        <li class="cs-list-item">
             <?php echo htmlspecialchars($w['day'], ENT_QUOTES, 'UTF-8'); ?> ——
             成功 <strong><?php echo (int) $w['success']; ?></strong>，
             失败 <strong style="color:<?php echo $w['error'] > 0 ? '#e05252' : 'inherit'; ?>"><?php echo (int) $w['error']; ?></strong>，

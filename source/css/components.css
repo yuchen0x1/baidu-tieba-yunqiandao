@@ -1,0 +1,1345 @@
+/*! Cloud Sign Studio · Components v4 — 八大原语
+ *  独立于 Bootstrap 3 的现代化组件库，全部基于 v4 tokens
+ *  命名空间：cs-（Cloud Sign Studio）避免与 BS3 冲突
+ *  支持：dark theme / focus-visible / reduced-motion / a11y
+ */
+
+/* ============================================================
+   1. Button — 按钮原语
+   ============================================================ */
+.cs-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 38px;
+  padding: 0 var(--space-4);
+  font-family: var(--font-sans);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  line-height: 1;
+  color: var(--color-ink-soft);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: transform var(--motion-base) var(--ease-productive),
+    background-color var(--motion-base) var(--ease-productive),
+    border-color var(--motion-base) var(--ease-productive),
+    box-shadow var(--motion-base) var(--ease-productive);
+  user-select: none;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.cs-btn:hover,
+.cs-btn:focus {
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+.cs-btn:active { transform: translateY(0); }
+.cs-btn:disabled,
+.cs-btn[aria-disabled="true"] {
+  opacity: .55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.cs-btn-primary {
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-brand), var(--color-brand-deep));
+  border-color: var(--color-brand-deep);
+  box-shadow: 0 6px 18px rgba(91, 58, 255, .28);
+}
+.cs-btn-primary:hover,
+.cs-btn-primary:focus {
+  color: #fff;
+  background: linear-gradient(135deg, #6f4dff, var(--color-brand));
+  border-color: var(--color-brand);
+  box-shadow: 0 8px 24px rgba(91, 58, 255, .4);
+}
+
+.cs-btn-secondary {
+  color: var(--color-ink-soft);
+  background: var(--glass-bg-strong);
+  border-color: var(--color-line-strong);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7);
+}
+.cs-btn-secondary:hover,
+.cs-btn-secondary:focus {
+  color: var(--color-brand-deep);
+  background: rgba(255, 255, 255, .92);
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px rgba(91, 58, 255, .14);
+}
+
+.cs-btn-success {
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-success), var(--color-success-deep));
+  border-color: var(--color-success-deep);
+  box-shadow: 0 6px 16px rgba(91, 138, 114, .22);
+}
+.cs-btn-warning {
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-warning), var(--color-warning-deep));
+  border-color: var(--color-warning-deep);
+  box-shadow: 0 6px 16px rgba(168, 132, 44, .26);
+}
+.cs-btn-danger {
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-danger), var(--color-danger-deep));
+  border-color: var(--color-danger-deep);
+  box-shadow: 0 6px 16px rgba(192, 85, 79, .2);
+}
+.cs-btn-ghost {
+  color: var(--color-ink-soft);
+  background: transparent;
+  border-color: transparent;
+}
+.cs-btn-ghost:hover,
+.cs-btn-ghost:focus {
+  color: var(--color-brand-deep);
+  background: var(--color-brand-soft);
+}
+
+.cs-btn-sm { min-height: 32px; padding: 0 var(--space-3); font-size: var(--fs-xs); }
+.cs-btn-lg { min-height: 46px; padding: 0 var(--space-5); font-size: var(--fs-md); }
+.cs-btn-block { display: flex; width: 100%; }
+
+/* loading 态 */
+.cs-btn[data-loading="true"] {
+  position: relative;
+  color: transparent !important;
+  pointer-events: none;
+}
+.cs-btn[data-loading="true"]::after {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: cs-spin var(--motion-slower) linear infinite;
+}
+@keyframes cs-spin { to { transform: rotate(360deg); } }
+
+/* ============================================================
+   2. Tabs — 标签页原语（替换 BS3 nav-tabs）
+   ============================================================ */
+.cs-tabs {
+  border-bottom: 1px solid var(--color-line);
+}
+.cs-tablist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cs-tablist li { margin: 0; }
+.cs-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 10px var(--space-4);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--color-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  cursor: pointer;
+  transition: color var(--motion-base) var(--ease-productive),
+    background-color var(--motion-base) var(--ease-productive),
+    border-color var(--motion-base) var(--ease-productive);
+}
+.cs-tab:hover {
+  color: var(--color-brand-deep);
+  background: var(--color-brand-soft);
+}
+.cs-tab[aria-selected="true"] {
+  color: var(--color-brand);
+  background: var(--color-surface);
+  border-color: var(--color-line) var(--color-line) var(--color-surface);
+  border-bottom-color: var(--color-brand);
+}
+.cs-tab[aria-selected="true"] .cs-tab-count {
+  background: var(--color-brand);
+  color: #fff;
+}
+.cs-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  color: var(--color-muted);
+  background: var(--color-surface-soft);
+  border-radius: var(--radius-pill);
+}
+.cs-tabpanel {
+  padding: var(--space-5) 0;
+  animation: cs-fade-in var(--motion-slow) var(--ease-entrance);
+}
+.cs-tabpanel[hidden] { display: none; }
+@keyframes cs-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   3. Toast — 通知原语（替换 alert modal）
+   ============================================================ */
+.cs-toast-container {
+  position: fixed;
+  top: var(--space-5);
+  right: var(--space-5);
+  z-index: 1080;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 360px;
+  pointer-events: none;
+}
+.cs-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  border-left: 4px solid var(--color-info);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  pointer-events: auto;
+  animation: cs-toast-in var(--motion-slow) var(--ease-entrance);
+}
+.cs-toast.cs-leaving { animation: cs-toast-out var(--motion-base) var(--ease-exit) forwards; }
+@keyframes cs-toast-in {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes cs-toast-out {
+  to { opacity: 0; transform: translateX(20px); }
+}
+.cs-toast-icon {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  color: var(--color-info);
+  margin-top: 1px;
+}
+.cs-toast-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--color-ink);
+  line-height: var(--lh-snug);
+}
+.cs-toast-title {
+  display: block;
+  font-weight: var(--fw-bold);
+  margin-bottom: 2px;
+}
+.cs-toast-close {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--color-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background-color var(--motion-base);
+}
+.cs-toast-close:hover { background: var(--color-surface-soft); color: var(--color-ink); }
+
+.cs-toast-success .cs-toast-icon,
+.cs-toast-success { border-left-color: var(--color-success); }
+.cs-toast-success .cs-toast-icon { color: var(--color-success); }
+.cs-toast-warning .cs-toast-icon,
+.cs-toast-warning { border-left-color: var(--color-warning); }
+.cs-toast-warning .cs-toast-icon { color: var(--color-warning); }
+.cs-toast-error .cs-toast-icon,
+.cs-toast-error { border-left-color: var(--color-danger); }
+.cs-toast-error .cs-toast-icon { color: var(--color-danger); }
+
+/* ============================================================
+   4. Modal — 对话框原语
+   ============================================================ */
+.cs-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+}
+.cs-modal[data-open="true"] { display: flex; }
+.cs-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 25, 30, .55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: cs-backdrop-in var(--motion-slow) var(--ease-entrance);
+}
+@keyframes cs-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+.cs-modal-dialog {
+  position: relative;
+  width: 100%;
+  max-width: 540px;
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  animation: cs-modal-in var(--motion-slow) var(--ease-expressive);
+}
+@keyframes cs-modal-in {
+  from { opacity: 0; transform: translateY(-12px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.cs-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-line);
+}
+.cs-modal-title {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
+  color: var(--color-ink);
+}
+.cs-modal-close {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--color-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background-color var(--motion-base);
+}
+.cs-modal-close:hover { background: var(--color-surface-soft); color: var(--color-ink); }
+.cs-modal-body {
+  padding: var(--space-5);
+  overflow-y: auto;
+  font-size: var(--fs-md);
+  color: var(--color-ink-soft);
+  line-height: var(--lh-snug);
+}
+.cs-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--color-line);
+}
+.cs-modal-dialog[data-size="sm"] { max-width: 380px; }
+.cs-modal-dialog[data-size="lg"] { max-width: 760px; }
+
+/* ============================================================
+   5. Skeleton — 骨架屏原语
+   ============================================================ */
+.cs-skeleton {
+  display: inline-block;
+  background: linear-gradient(90deg,
+    var(--color-surface-soft) 0%,
+    var(--color-line) 50%,
+    var(--color-surface-soft) 100%);
+  background-size: 200% 100%;
+  border-radius: var(--radius-sm);
+  animation: cs-shimmer 1.4s var(--ease-productive) infinite;
+}
+.cs-skeleton-text { display: block; height: 12px; margin: 6px 0; }
+.cs-skeleton-text:last-child { width: 60%; }
+.cs-skeleton-title { height: 22px; width: 50%; }
+.cs-skeleton-circle { border-radius: 50%; }
+.cs-skeleton-block { display: block; width: 100%; height: 80px; }
+.cs-skeleton-card { display: block; width: 100%; height: 120px; border-radius: var(--radius-md); }
+@keyframes cs-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cs-skeleton { animation: none; opacity: .6; }
+}
+
+/* ============================================================
+   6. EmptyState — 空状态原语
+   ============================================================ */
+.cs-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-5);
+  text-align: center;
+}
+.cs-empty-icon {
+  width: 56px;
+  height: 56px;
+  color: var(--color-muted-light);
+  opacity: .55;
+}
+.cs-empty-title {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
+  color: var(--color-ink-soft);
+}
+.cs-empty-desc {
+  margin: 0;
+  max-width: 420px;
+  font-size: var(--fs-sm);
+  color: var(--color-muted);
+  line-height: var(--lh-snug);
+}
+.cs-empty-action { margin-top: var(--space-2); }
+
+/* ============================================================
+   7. DataTable — 数据表原语
+   ============================================================ */
+.cs-table-wrap {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.cs-table-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-surface-soft);
+}
+.cs-table-toolbar-spacer { flex: 1 1 auto; }
+.cs-table-search {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 32px;
+  padding: 0 var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+}
+.cs-table-search input {
+  width: 180px;
+  padding: 0;
+  font-size: var(--fs-sm);
+  color: var(--color-ink);
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+.cs-table-scroll { overflow-x: auto; }
+.cs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+  color: var(--color-ink-soft);
+}
+.cs-table thead th {
+  position: sticky;
+  top: 0;
+  padding: 11px var(--space-4);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  background: var(--color-surface-soft);
+  border-bottom: 1px solid var(--color-line-strong);
+  text-align: left;
+  white-space: nowrap;
+}
+.cs-table tbody td {
+  padding: 11px var(--space-4);
+  border-top: 1px solid var(--color-line);
+  vertical-align: middle;
+}
+.cs-table tbody tr {
+  transition: background-color var(--motion-base) var(--ease-productive);
+}
+.cs-table tbody tr:hover { background: rgba(91, 58, 255, .04); }
+.cs-table-empty { text-align: center; padding: var(--space-6) 0; color: var(--color-muted); }
+.cs-table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-line);
+  background: var(--color-surface-soft);
+  font-size: var(--fs-xs);
+  color: var(--color-muted);
+}
+.cs-table-pagination-info { color: var(--color-muted); }
+.cs-table-pagination-controls { display: flex; gap: var(--space-1); }
+.cs-table-pagination button {
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink-soft);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+  transition: all var(--motion-base) var(--ease-productive);
+}
+.cs-table-pagination button:hover:not(:disabled) {
+  border-color: var(--color-brand);
+  color: var(--color-brand);
+}
+.cs-table-pagination button[aria-current="page"] {
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+  color: #fff;
+}
+.cs-table-pagination button:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ============================================================
+   8. Drawer — 抽屉原语（移动端导航/筛选）
+   ============================================================ */
+.cs-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 1060;
+  display: none;
+}
+.cs-drawer[data-open="true"] { display: block; }
+.cs-drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 25, 30, .55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: cs-backdrop-in var(--motion-slow) var(--ease-entrance);
+}
+.cs-drawer-panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(320px, 84vw);
+  background: var(--glass-bg-strong);
+  border-right: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  animation: cs-drawer-in var(--motion-slow) var(--ease-expressive);
+}
+.cs-drawer[data-position="left"] .cs-drawer-panel { left: 0; border-right: 1px solid var(--glass-border); }
+.cs-drawer[data-position="right"] .cs-drawer-panel { right: 0; border-left: 1px solid var(--glass-border); border-right: 0; }
+.cs-drawer[data-position="bottom"] .cs-drawer-panel {
+  top: auto; left: 0; right: 0; bottom: 0;
+  width: 100%;
+  max-height: 70vh;
+  border-top: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  animation: cs-drawer-up var(--motion-slow) var(--ease-expressive);
+}
+@keyframes cs-drawer-in { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+@keyframes cs-drawer-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.cs-drawer[data-position="right"] .cs-drawer-panel { animation-name: cs-drawer-in-right; }
+@keyframes cs-drawer-in-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.cs-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-line);
+}
+.cs-drawer-title { margin: 0; font-size: var(--fs-md); font-weight: var(--fw-bold); color: var(--color-ink); }
+.cs-drawer-body { flex: 1 1 auto; overflow-y: auto; padding: var(--space-4) var(--space-5); }
+.cs-drawer-footer {
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--color-line);
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+/* ============================================================
+   通用工具类
+   ============================================================ */
+.cs-icon {
+  display: inline-flex;
+  vertical-align: middle;
+  color: inherit;
+}
+.cs-icon use { width: 100%; height: 100%; display: block; }
+.cs-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  color: var(--color-ink-soft);
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+}
+.cs-badge-success { color: var(--color-success-deep); background: var(--color-success-soft); border-color: var(--color-success); }
+.cs-badge-warning { color: var(--color-warning-deep); background: var(--color-warning-soft); border-color: var(--color-warning); }
+.cs-badge-danger { color: var(--color-danger-deep); background: var(--color-danger-soft); border-color: var(--color-danger); }
+.cs-badge-info { color: var(--color-info-deep); background: var(--color-info-soft); border-color: var(--color-info); }
+.cs-badge-brand { color: var(--color-brand-deep); background: var(--color-brand-soft); border-color: var(--color-brand); }
+
+/* ============================================================
+   9. Alert — 提示条原语（替代 BS3 .alert）
+   ============================================================ */
+.cs-alert {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-left: 4px solid var(--color-info);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sm);
+  color: var(--color-ink-soft);
+  line-height: var(--lh-snug);
+}
+.cs-alert-icon { flex: 0 0 18px; width: 18px; height: 18px; color: var(--color-info); margin-top: 1px; }
+.cs-alert-body { flex: 1 1 auto; min-width: 0; }
+.cs-alert-body strong { color: var(--color-ink); font-weight: var(--fw-bold); }
+.cs-alert-body a { color: var(--color-brand); }
+.cs-alert-info { border-left-color: var(--color-info); background: var(--color-info-soft); }
+.cs-alert-info .cs-alert-icon { color: var(--color-info); }
+.cs-alert-success { border-left-color: var(--color-success); background: var(--color-success-soft); }
+.cs-alert-success .cs-alert-icon { color: var(--color-success); }
+.cs-alert-warning { border-left-color: var(--color-warning); background: var(--color-warning-soft); }
+.cs-alert-warning .cs-alert-icon { color: var(--color-warning); }
+.cs-alert-danger { border-left-color: var(--color-danger); background: var(--color-danger-soft); }
+.cs-alert-danger .cs-alert-icon { color: var(--color-danger); }
+
+/* ============================================================
+   10. List — 描述列表原语（替代 BS3 .list-group）
+   ============================================================ */
+.cs-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.cs-list-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-line);
+}
+.cs-list-item:last-child { border-bottom: 0; }
+.cs-list-item strong { color: var(--color-ink); font-weight: var(--fw-bold); font-size: var(--fs-sm); }
+.cs-list-item .text-muted { color: var(--color-muted); font-size: var(--fs-xs); }
+
+/* ============================================================
+   11. Collapse — 折叠原语（原生 <details> 增强）
+   ============================================================ */
+.cs-collapse {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: var(--space-3);
+}
+.cs-collapse > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  font-weight: var(--fw-bold);
+  color: var(--color-ink);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  transition: background-color var(--motion-base) var(--ease-productive);
+}
+.cs-collapse > summary::-webkit-details-marker { display: none; }
+.cs-collapse > summary::after {
+  content: "";
+  margin-left: auto;
+  width: 0; height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--color-muted);
+  transition: transform var(--motion-base) var(--ease-productive);
+}
+.cs-collapse[open] > summary::after { transform: rotate(180deg); }
+.cs-collapse > summary:hover { background: var(--color-surface-soft); }
+.cs-collapse-body { padding: var(--space-4); border-top: 1px solid var(--color-line); font-size: var(--fs-sm); color: var(--color-ink-soft); line-height: var(--lh-snug); }
+
+/* ============================================================
+   12. Form 组合（替代 BS3 .input-group）
+   ============================================================ */
+.cs-input-group {
+  display: flex;
+  align-items: stretch;
+  margin-bottom: var(--space-3);
+}
+.cs-input-group label,
+.cs-input-group .cs-input-addon {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-3);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--color-ink-soft);
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-line-strong);
+  border-right: 0;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  white-space: nowrap;
+}
+.cs-input-group .form-control,
+.cs-input-group input[type="text"],
+.cs-input-group input[type="password"],
+.cs-input-group select,
+.cs-input-group textarea {
+  flex: 1 1 auto;
+  min-width: 0;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0 !important;
+}
+.cs-input-group + .cs-input-group { margin-top: 0; }
+
+/* ============================================================
+   13. Sign Calendar — 签到日历可视化
+   ============================================================ */
+.sign-calendar-legend {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+  font-size: var(--fs-xs);
+  color: var(--color-muted);
+}
+.sign-calendar-legend .calendar-cell { width: 12px; height: 12px; }
+.sign-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(18, 14px);
+  gap: 5px;
+  align-items: center;
+  overflow-x: auto;
+  padding: var(--space-2) 0;
+}
+.calendar-cell {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-line);
+  transition: transform var(--motion-fast) var(--ease-productive),
+    box-shadow var(--motion-fast) var(--ease-productive);
+  cursor: pointer;
+}
+.calendar-cell:hover {
+  transform: scale(1.4);
+  box-shadow: 0 0 0 2px var(--color-brand);
+  z-index: 1;
+}
+.calendar-cell.level-1 { background: var(--color-success-soft); border-color: var(--color-success); }
+.calendar-cell.level-2 { background: #73c69a; border-color: var(--color-success); }
+.calendar-cell.level-3 { background: var(--color-success); border-color: var(--color-success-deep); }
+.calendar-cell.level-4 { background: var(--color-success-deep); border-color: var(--color-success-deep); }
+.calendar-cell.has-error {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 1px rgba(192, 85, 79, .35);
+}
+[data-theme="dark"] .calendar-cell { background: rgba(255, 255, 255, .06); }
+[data-theme="dark"] .calendar-cell.level-1 { background: rgba(115, 198, 154, .35); }
+[data-theme="dark"] .calendar-cell.level-2 { background: rgba(115, 198, 154, .6); }
+[data-theme="dark"] .calendar-cell.level-3 { background: rgba(91, 138, 114, .9); }
+[data-theme="dark"] .calendar-cell.level-4 { background: var(--color-success-deep); }
+
+/* ============================================================
+   14. Metric Card 增强
+   ============================================================ */
+.metric-card {
+  position: relative;
+  overflow: hidden;
+}
+.metric-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0;
+  width: 3px; height: 100%;
+  background: linear-gradient(180deg, var(--color-brand), var(--color-brand-deep));
+  opacity: .85;
+}
+.metric-card .metric-value {
+  background: linear-gradient(135deg, var(--color-brand), var(--color-brand-deep));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+
+[data-theme="dark"] .cs-btn-secondary,
+[data-theme="dark"] .cs-btn-ghost {
+  background: rgba(255, 255, 255, .06);
+  border-color: var(--glass-border-dark);
+}
+[data-theme="dark"] .cs-btn-secondary:hover,
+[data-theme="dark"] .cs-btn-ghost:hover {
+  background: rgba(91, 58, 255, .14);
+}
+[data-theme="dark"] .cs-tab {
+  color: var(--color-muted-light);
+}
+[data-theme="dark"] .cs-tab[aria-selected="true"] {
+  color: #c4b8ff;
+  background: var(--color-surface);
+}
+[data-theme="dark"] .cs-table tbody tr:hover {
+  background: rgba(120, 132, 146, .08);
+}
+[data-theme="dark"] .cs-skeleton {
+  background: linear-gradient(90deg,
+    rgba(255, 255, 255, .04) 0%,
+    rgba(255, 255, 255, .09) 50%,
+    rgba(255, 255, 255, .04) 100%);
+  background-size: 200% 100%;
+}
+
+/* ============================================================
+   降级动效
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .cs-btn,
+  .cs-tab,
+  .cs-toast,
+  .cs-modal-backdrop,
+  .cs-modal-dialog,
+  .cs-drawer-backdrop,
+  .cs-drawer-panel,
+  .cs-table tbody tr {
+    animation: none !important;
+    transition: none !important;
+  }
+  .cs-tabpanel { animation: none; }
+}
+
+/* ============================================================
+   15. Chart Card — 图表容器卡片
+   ============================================================ */
+.cs-chart-card {
+  background: var(--glass-bg, var(--color-surface));
+  backdrop-filter: var(--glass-blur, blur(12px));
+  -webkit-backdrop-filter: var(--glass-blur, blur(12px));
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  transition: box-shadow var(--motion-base) var(--ease-productive);
+}
+.cs-chart-card:hover {
+  box-shadow: var(--shadow-md);
+}
+.cs-chart-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.cs-chart-card-title {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  color: var(--color-ink);
+  margin: 0;
+}
+.cs-chart-card-subtitle {
+  font-size: var(--fs-2xs);
+  color: var(--color-muted);
+}
+.cs-chart-container {
+  width: 100%;
+  min-height: 200px;
+  position: relative;
+}
+.cs-chart-container[data-loading="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--color-surface-soft);
+  border-radius: var(--radius-sm);
+  background-image: linear-gradient(90deg,
+    rgba(91, 58, 255, .04) 0%,
+    rgba(91, 58, 255, .08) 50%,
+    rgba(91, 58, 255, .04) 100%);
+  background-size: 200% 100%;
+  animation: cs-skeleton-shimmer 1.6s var(--ease-productive) infinite;
+}
+.cs-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: var(--fs-2xs);
+  color: var(--color-muted);
+}
+.cs-chart-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  transition: background var(--motion-fast) var(--ease-productive);
+}
+.cs-chart-legend-item:hover {
+  background: var(--color-surface-soft);
+}
+.cs-chart-legend-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+}
+
+/* ============================================================
+   16. Stat Pill — 小型统计药丸
+   ============================================================ */
+.cs-stat-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-sm);
+}
+.cs-stat-pill-value {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
+  background: linear-gradient(135deg, var(--color-brand), var(--color-brand-deep));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.cs-stat-pill-label {
+  font-size: var(--fs-2xs);
+  color: var(--color-muted);
+}
+.cs-stat-pill-brand { border-color: var(--color-brand); background: var(--color-brand-soft); }
+.cs-stat-pill-brand .cs-stat-pill-value {
+  background: linear-gradient(135deg, var(--color-brand-deep), var(--color-brand));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.cs-stat-pill-success { border-color: var(--color-success); background: var(--color-success-soft); }
+.cs-stat-pill-success .cs-stat-pill-value { color: var(--color-success-deep); background: none; -webkit-text-fill-color: var(--color-success-deep); }
+.cs-stat-pill-warning { border-color: var(--color-warning); background: var(--color-warning-soft); }
+.cs-stat-pill-warning .cs-stat-pill-value { color: var(--color-warning-deep); background: none; -webkit-text-fill-color: var(--color-warning-deep); }
+.cs-stat-pill-danger { border-color: var(--color-danger); background: var(--color-danger-soft); }
+.cs-stat-pill-danger .cs-stat-pill-value { color: var(--color-danger-deep); background: none; -webkit-text-fill-color: var(--color-danger-deep); }
+
+/* 深色主题图表卡片 */
+[data-theme="dark"] .cs-chart-card {
+  background: rgba(30, 32, 40, .65);
+  border-color: rgba(255, 255, 255, .08);
+}
+[data-theme="dark"] .cs-chart-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .4);
+}
+
+/* ============================================================
+   Round 2 新增原语：表单 / 徽标 / 分页 / 卡片 / 成就 / 排行榜
+   ============================================================ */
+
+/* —— Form 表单原语 —— */
+.cs-form { display: grid; gap: var(--space-3); }
+.cs-form-label {
+  display: block;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  color: var(--color-ink-soft);
+  margin-bottom: 4px;
+}
+.cs-form-control {
+  display: block;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 12px;
+  font-family: var(--font-sans);
+  font-size: var(--fs-sm);
+  color: var(--color-ink);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--motion-base) var(--ease-productive),
+    box-shadow var(--motion-base) var(--ease-productive);
+}
+.cs-form-control:focus {
+  outline: none;
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px var(--color-brand-soft);
+}
+.cs-form-control:disabled { opacity: .55; cursor: not-allowed; }
+textarea.cs-form-control { min-height: 80px; resize: vertical; }
+
+/* —— Card 通用卡片 —— */
+.cs-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+}
+
+/* —— Badge 徽标 —— */
+.cs-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  line-height: 1.6;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-soft);
+  color: var(--color-ink-soft);
+  border: 1px solid var(--color-line);
+}
+.cs-badge-success { background: var(--color-success-soft); color: var(--color-success-deep); border-color: var(--color-success); }
+.cs-badge-error { background: var(--color-danger-soft); color: var(--color-danger-deep); border-color: var(--color-danger); }
+.cs-badge-warning { background: var(--color-warning-soft); color: var(--color-warning-deep); border-color: var(--color-warning); }
+.cs-badge-neutral { background: var(--color-surface-soft); color: var(--color-muted); }
+.cs-badge-brand { background: var(--color-brand-soft); color: var(--color-brand-deep); border-color: var(--color-brand); }
+
+/* —— Pagination 分页 —— */
+.cs-pagination { gap: 6px; }
+.cs-page {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 10px;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  color: var(--color-ink-soft);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  transition: all var(--motion-base) var(--ease-productive);
+}
+.cs-page:hover { color: var(--color-brand-deep); border-color: var(--color-brand); transform: translateY(-1px); }
+.cs-page-current {
+  background: linear-gradient(135deg, var(--color-brand), var(--color-brand-deep));
+  color: #fff;
+  border-color: var(--color-brand-deep);
+  cursor: default;
+}
+.cs-page-current:hover { transform: none; color: #fff; }
+.cs-page-disabled { opacity: .45; cursor: not-allowed; pointer-events: none; }
+.cs-page-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  color: var(--color-muted);
+}
+
+/* —— Achievement 成就卡片 —— */
+.cs-achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-4);
+}
+.cs-achievement-card {
+  position: relative;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  transition: transform var(--motion-base) var(--ease-productive),
+    box-shadow var(--motion-base) var(--ease-productive);
+}
+.cs-achievement-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(15, 23, 42, .08); }
+.cs-achievement-card.cs-unlocked {
+  background: linear-gradient(180deg, var(--color-brand-soft), var(--color-surface));
+  border-color: var(--color-brand);
+}
+.cs-achievement-card.cs-locked { opacity: .65; filter: saturate(.5); }
+.cs-achievement-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto var(--space-2);
+  border-radius: 50%;
+  background: var(--color-surface-soft);
+  color: var(--color-muted);
+}
+.cs-achievement-card.cs-unlocked .cs-achievement-icon {
+  background: linear-gradient(135deg, var(--color-brand), var(--color-brand-deep));
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(91, 58, 255, .3);
+}
+.cs-achievement-title { font-size: var(--fs-sm); font-weight: var(--fw-bold); color: var(--color-ink); margin-bottom: 4px; }
+.cs-achievement-desc { font-size: var(--fs-2xs); color: var(--color-muted); margin-bottom: var(--space-2); }
+.cs-achievement-progress {
+  height: 6px;
+  background: var(--color-surface-soft);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+.cs-achievement-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-brand), var(--color-brand-deep));
+  transition: width .6s var(--ease-productive);
+}
+.cs-achievement-date {
+  font-size: var(--fs-2xs);
+  color: var(--color-success-deep);
+  margin-top: var(--space-2);
+}
+
+/* 成就网格容器 */
+.cs-achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+
+/* 卡片内部结构 */
+.cs-achievement-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.cs-achievement-header .cs-achievement-icon {
+  margin: 0;
+  flex-shrink: 0;
+}
+.cs-achievement-icon svg {
+  width: 28px;
+  height: 28px;
+}
+.cs-achievement-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  font-size: var(--fs-2xs);
+  line-height: 1.3;
+}
+.cs-achievement-tier {
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-weight: var(--fw-bold);
+  letter-spacing: .04em;
+  background: var(--color-surface-soft);
+  color: var(--color-muted);
+}
+.cs-achievement-tier.tier-bronze   { background: rgba(205, 127, 50, .18);  color: #b87333; }
+.cs-achievement-tier.tier-silver   { background: rgba(120, 120, 140, .18); color: #6b6b7b; }
+.cs-achievement-tier.tier-gold     { background: rgba(255, 196, 0, .18);  color: #b8860b; }
+.cs-achievement-tier.tier-platinum { background: rgba(91, 58, 255, .18);  color: var(--color-brand); }
+
+.cs-achievement-status {
+  font-size: var(--fs-2xs);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+}
+.cs-achievement-status-unlocked { background: rgba(34, 197, 94, .12); color: var(--color-success-deep); }
+.cs-achievement-status-locked   { background: var(--color-surface-soft); color: var(--color-muted); }
+
+.cs-achievement-progress-text {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--space-1);
+  font-size: var(--fs-2xs);
+  color: var(--color-muted);
+}
+.cs-achievement-progress-text strong {
+  color: var(--color-ink);
+  font-weight: var(--fw-bold);
+}
+
+/* 已解锁卡片按 tier 加强描边 */
+.cs-achievement-card.tier-bronze.cs-unlocked   { border-color: #b87333; box-shadow: 0 2px 8px rgba(184, 115, 51, .15); }
+.cs-achievement-card.tier-silver.cs-unlocked   { border-color: #6b6b7b; box-shadow: 0 2px 8px rgba(107, 107, 123, .15); }
+.cs-achievement-card.tier-gold.cs-unlocked     { border-color: #d4a017; box-shadow: 0 2px 8px rgba(212, 160, 23, .18); }
+.cs-achievement-card.tier-platinum.cs-unlocked {
+  border-color: var(--color-brand);
+  box-shadow: 0 4px 14px rgba(91, 58, 255, .25);
+  background: linear-gradient(180deg, rgba(91, 58, 255, .08), var(--color-surface));
+}
+
+/* tier 限定 icon 配色 */
+.cs-achievement-card.tier-bronze.cs-unlocked .cs-achievement-icon   { background: linear-gradient(135deg, #cd7f32, #8b5a2b); color: #fff; }
+.cs-achievement-card.tier-silver.cs-unlocked .cs-achievement-icon   { background: linear-gradient(135deg, #c0c0c0, #707080); color: #fff; }
+.cs-achievement-card.tier-gold.cs-unlocked .cs-achievement-icon     { background: linear-gradient(135deg, #ffd700, #b8860b); color: #fff; }
+.cs-achievement-card.tier-platinum.cs-unlocked .cs-achievement-icon { background: linear-gradient(135deg, var(--color-brand), var(--color-brand-deep)); color: #fff; }
+
+/* 尊重 reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  .cs-achievement-card,
+  .cs-achievement-progress-bar { transition: none; }
+  .cs-achievement-card:hover { transform: none; }
+}
+
+/* 导航栏未读徽章 */
+.nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: var(--fw-bold);
+  line-height: 1;
+  vertical-align: middle;
+}
+.nav-badge-show {
+  animation: badgePulse 2.4s var(--ease-standard) infinite;
+}
+@keyframes badgePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, .4); }
+  50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-badge-show { animation: none; }
+}
+
+/* 通知行高亮 */
+.cs-row-highlight {
+  background: rgba(91, 58, 255, .04);
+}
+:root[data-theme="dark"] .cs-row-highlight {
+  background: rgba(91, 58, 255, .12);
+}
+
+/* 暗色主题适配 */
+:root[data-theme="dark"] .cs-achievement-card.tier-bronze.cs-unlocked   { box-shadow: 0 2px 8px rgba(184, 115, 51, .25); }
+:root[data-theme="dark"] .cs-achievement-card.tier-silver.cs-unlocked   { box-shadow: 0 2px 8px rgba(160, 160, 180, .2); }
+:root[data-theme="dark"] .cs-achievement-card.tier-gold.cs-unlocked     { box-shadow: 0 2px 8px rgba(212, 160, 23, .3); }
+:root[data-theme="dark"] .cs-achievement-tier.tier-bronze   { color: #d4a017; }
+:root[data-theme="dark"] .cs-achievement-tier.tier-silver   { color: #a8a8b8; }
+:root[data-theme="dark"] .cs-achievement-tier.tier-gold     { color: #ffd700; }
+:root[data-theme="dark"] .cs-achievement-tier.tier-platinum { color: #a78bfa; }
+
+/* —— Ranking 排行榜 —— */
+.cs-ranking-table { width: 100%; border-collapse: collapse; }
+.cs-ranking-table th { padding: 12px 8px; text-align: left; font-size: var(--fs-2xs); color: var(--color-muted); border-bottom: 1px solid var(--color-line); }
+.cs-ranking-table td { padding: 12px 8px; border-bottom: 1px solid var(--color-line); }
+.cs-rank-position {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-surface-soft);
+  color: var(--color-ink-soft);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-xs);
+}
+.cs-rank-position.rank-1 { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #fff; }
+.cs-rank-position.rank-2 { background: linear-gradient(135deg, #cbd5e1, #94a3b8); color: #fff; }
+.cs-rank-position.rank-3 { background: linear-gradient(135deg, #d97706, #b45309); color: #fff; }
+
+/* —— Heatmap 热力图 —— */
+.cs-heatmap {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+}
+.cs-heatmap-grid {
+  display: grid;
+  grid-template-rows: repeat(7, 12px);
+  grid-auto-columns: 12px;
+  grid-auto-flow: column;
+  gap: 3px;
+  padding: 4px;
+}
+.cs-heatmap-cell {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-line);
+}
+.cs-heatmap-cell[data-level="1"] { background: rgba(91, 58, 255, .25); }
+.cs-heatmap-cell[data-level="2"] { background: rgba(91, 58, 255, .45); }
+.cs-heatmap-cell[data-level="3"] { background: rgba(91, 58, 255, .65); }
+.cs-heatmap-cell[data-level="4"] { background: rgba(91, 58, 255, .85); }
+.cs-heatmap-cell[data-level="5"] { background: var(--color-brand); }
+.cs-heatmap-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-2xs);
+  color: var(--color-muted);
+}
+.cs-heatmap-legend .cs-heatmap-cell { width: 10px; height: 10px; }
+
+/* —— Notifier/Reminder 提醒卡片 —— */
+.cs-reminder-list { display: grid; gap: var(--space-2); }
+.cs-reminder-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 10px 12px;
+  background: var(--color-surface-soft);
+  border-radius: var(--radius-sm);
+}
+.cs-reminder-toggle { margin-right: auto; }
+
+/* —— dark theme for new components —— */
+[data-theme="dark"] .cs-form-control { background: rgba(30, 32, 40, .65); border-color: rgba(255, 255, 255, .1); color: var(--color-ink); }
+[data-theme="dark"] .cs-form-control:focus { box-shadow: 0 0 0 3px rgba(91, 58, 255, .25); }
+[data-theme="dark"] .cs-card { background: rgba(30, 32, 40, .65); border-color: rgba(255, 255, 255, .08); }
+[data-theme="dark"] .cs-achievement-card { background: rgba(30, 32, 40, .55); }
+[data-theme="dark"] .cs-achievement-card.cs-unlocked { background: linear-gradient(180deg, rgba(91, 58, 255, .15), rgba(30, 32, 40, .55)); }
+[data-theme="dark"] .cs-heatmap-cell { background: rgba(255, 255, 255, .04); border-color: rgba(255, 255, 255, .06); }
+[data-theme="dark"] .cs-reminder-item { background: rgba(255, 255, 255, .04); }
+[data-theme="dark"] .cs-ranking-table th { color: rgba(255, 255, 255, .55); }
+[data-theme="dark"] .cs-ranking-table td { border-color: rgba(255, 255, 255, .06); }
+
+@media (prefers-reduced-motion: reduce) {
+  .cs-achievement-card, .cs-page, .cs-form-control { transition: none; }
+  .cs-achievement-progress-bar { transition: none; }
+}

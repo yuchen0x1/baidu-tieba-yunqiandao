@@ -1,4 +1,4 @@
-<?php if (!defined('SYSTEM_ROOT')) {
+﻿<?php if (!defined('SYSTEM_ROOT')) {
     die('Insufficient Permissions');
 }
 global $i;
@@ -20,19 +20,19 @@ loadhead('双因素认证'); ?>
                 <div class="form-group">
                     <input type="text" name="code" class="form-control" maxlength="6" pattern="[0-9]{6}" placeholder="6 位验证码" style="width:180px;" required>
                 </div>
-                <button type="submit" class="btn btn-primary">校验并启用</button>
+                <button type="submit" class="cs-btn cs-btn-primary">校验并启用</button>
             </form>
             <hr/>
             <form method="post" action="setting.php?mod=admin:totp&setting=disable" style="display:inline;">
                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
-                <button type="submit" class="btn btn-danger" onclick="return confirm('确定关闭双因素认证吗？');">关闭双因素认证</button>
+                <button type="submit" class="cs-btn cs-btn-danger" onclick="return confirm('确定关闭双因素认证吗？');">关闭双因素认证</button>
             </form>
         <?php else: ?>
             <p>当前状态：<font color="gray"><b>未开启</b></font></p>
             <p>开启后，管理员登录需在密码之外再输入认证器应用的 6 位动态验证码，可显著提升后台安全性。</p>
             <form method="post" action="setting.php?mod=admin:totp&setting=gen">
                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
-                <button type="submit" class="btn btn-primary">生成密钥并启用</button>
+                <button type="submit" class="cs-btn cs-btn-primary">生成密钥并启用</button>
             </form>
         <?php endif; ?>
     </div>

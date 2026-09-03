@@ -1,4 +1,4 @@
-<?php if (!defined('SYSTEM_ROOT')) {
+﻿<?php if (!defined('SYSTEM_ROOT')) {
     die('Insufficient Permissions');
 } if (ROLE != 'admin') {
     msg('权限不足！');
@@ -64,21 +64,21 @@ foreach ($x as $key => $val) {
         if ($i['plugins']['info'][$val['plugin']['id']]['status'] == '1') {
             $status = '<font color="green">已激活</font> | <a href="setting.php?mod=admin:plugins&dis=' . htmlspecialchars($val['plugin']['id'], ENT_QUOTES, 'UTF-8') . '">禁用插件</a>';
             if (isset($val['core']) && ($val['core']['setting'] && $val['view']['setting']) || (isset($val['plugin']['old']) && file_exists(SYSTEM_ROOT . '/plugins/' . $val['plugin']['id'] . '/' . $val['plugin']['id'] . '_setting.php'))) {
-                $action .= '<a href="index.php?mod=admin:setplug&plug=' . htmlspecialchars($val['plugin']['id'], ENT_QUOTES, 'UTF-8') . '" title="查看设置"><span class="glyphicon glyphicon-cog"></span><span style="padding:0 3px">设置</span></a> ';
+                $action .= '<a href="index.php?mod=admin:setplug&plug=' . htmlspecialchars($val['plugin']['id'], ENT_QUOTES, 'UTF-8') . '" title="查看设置"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span style="padding:0 3px">设置</span></a> ';
             }
             if (isset($val['core']) && $val['core']['show'] && $val['view']['show']) {
-                $action .= '<a href="index.php?plugin=' . htmlspecialchars($val['plugin']['id'], ENT_QUOTES, 'UTF-8') . '" title="查看页面"><span class="glyphicon glyphicon-eye-open"></span><span style="padding:0 3px">页面</span></a> ';
+                $action .= '<a href="index.php?plugin=' . htmlspecialchars($val['plugin']['id'], ENT_QUOTES, 'UTF-8') . '" title="查看页面"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span style="padding:0 3px">页面</span></a> ';
             }
         } else {
             $status = '<font color="black">已禁用</font> | <a href="setting.php?mod=admin:plugins&act=' . htmlspecialchars($val['plugin']['id'], ENT_QUOTES, 'UTF-8') . '">激活插件</a>';
         }
-        $action .= '<br/><a data-plugin-name="' . htmlspecialchars($val['plugin']['name'], ENT_QUOTES, 'UTF-8') . '" data-plugin-version="' . htmlspecialchars($val['plugin']['version'], ENT_QUOTES, 'UTF-8') . '" onclick="return confirm(\'你想要清除此插件的数据吗？文件会得到保留。\\n\' + this.getAttribute(\'data-plugin-name\') + \' V\' + this.getAttribute(\'data-plugin-version\'));" href="setting.php?mod=admin:plugins&clean=' . htmlspecialchars($val['plugin']['id'], ENT_QUOTES, 'UTF-8') . '" style="color:#FF6A00;" title="清除数据"><span class="glyphicon glyphicon-remove"></span><span style="padding:0 3px">重置</span></a> ';
+        $action .= '<br/><a data-plugin-name="' . htmlspecialchars($val['plugin']['name'], ENT_QUOTES, 'UTF-8') . '" data-plugin-version="' . htmlspecialchars($val['plugin']['version'], ENT_QUOTES, 'UTF-8') . '" onclick="return confirm(\'你想要清除此插件的数据吗？文件会得到保留。\\n\' + this.getAttribute(\'data-plugin-name\') + \' V\' + this.getAttribute(\'data-plugin-version\'));" href="setting.php?mod=admin:plugins&clean=' . htmlspecialchars($val['plugin']['id'], ENT_QUOTES, 'UTF-8') . '" style="color:#FF6A00;" title="清除数据"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg><span style="padding:0 3px">重置</span></a> ';
     } else {
         $status = '<font color="#977C00">未安装</font> | <a href="setting.php?mod=admin:plugins&install=' . htmlspecialchars($val['plugin']['id'], ENT_QUOTES, 'UTF-8') . $for . '">安装插件</a>';
     }
 
     $plugins .= '<tr><td>' . $pluginfo . '</td><td>' . $authinfo . '<br/>' . htmlspecialchars($val['plugin']['id'], ENT_QUOTES, 'UTF-8') . $fortc . '</td><td>' . $status . '<br/>';
-    $plugins .= $action . '<a data-plugin-name="' . htmlspecialchars($val['plugin']['name'], ENT_QUOTES, 'UTF-8') . '" data-plugin-version="' . htmlspecialchars($val['plugin']['version'], ENT_QUOTES, 'UTF-8') . '" onclick="return confirm(\'你想要要卸载此插件吗？这将删除相关文件。\\n\' + this.getAttribute(\'data-plugin-name\') + \' V\' + this.getAttribute(\'data-plugin-version\'));" href="setting.php?mod=admin:plugins&uninst=' . htmlspecialchars($val['plugin']['id'], ENT_QUOTES, 'UTF-8') . '" style="color:red;" title="卸载插件"><span class="glyphicon glyphicon-trash"></span><span style="padding:0 3px">卸载</span></a></td> ';
+    $plugins .= $action . '<a data-plugin-name="' . htmlspecialchars($val['plugin']['name'], ENT_QUOTES, 'UTF-8') . '" data-plugin-version="' . htmlspecialchars($val['plugin']['version'], ENT_QUOTES, 'UTF-8') . '" onclick="return confirm(\'你想要要卸载此插件吗？这将删除相关文件。\\n\' + this.getAttribute(\'data-plugin-name\') + \' V\' + this.getAttribute(\'data-plugin-version\'));" href="setting.php?mod=admin:plugins&uninst=' . htmlspecialchars($val['plugin']['id'], ENT_QUOTES, 'UTF-8') . '" style="color:red;" title="卸载插件"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg><span style="padding:0 3px">卸载</span></a></td> ';
     $plugins .= '</tr>';
 }
 
@@ -91,7 +91,7 @@ doAction('admin_plugins');
 <form action="setting.php?mod=admin:plugins&xorder" method="post">
 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
 <div class="table-responsive">
-<table class="table table-hover">
+<table class="cs-table">
     <thead>
         <tr>
            <th>插件信息</th>
@@ -103,7 +103,7 @@ doAction('admin_plugins');
         <?php echo $plugins; ?>
     </tbody>
 </table>
-</div><input type="submit" class="btn btn-primary" value="提交更改">
+</div><input type="submit" class="cs-btn cs-btn-primary" value="提交更改">
 </form>
 <br/><br/><?php echo SYSTEM_FN ?> V<?php echo SYSTEM_VER  . ' ' . SYSTEM_VER_NOTE ?> // 作者: <a href="https://kenvix.com" target="_blank">Kenvix</a>  &amp; <a href="http://www.mokeyjay.com/" target="_blank">mokeyjay</a> &amp;  <a href="http://fyy1999.lofter.com/" target="_blank">FYY</a>
 
@@ -122,8 +122,8 @@ doAction('admin_plugins');
         <br/><br/>您的主机必须支持写入才能安装插件，若不支持，请手工安装
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
-        <button type="submit" class="btn btn-primary" id="installplugin_button">上传插件</button>
+        <button type="button" class="cs-btn cs-btn-secondary" data-dismiss="modal">取消</button>
+        <button type="submit" class="cs-btn cs-btn-primary" id="installplugin_button">上传插件</button>
       </div>
       </form>
     </div><!-- /.modal-content -->
@@ -145,8 +145,8 @@ doAction('admin_plugins');
         <br/><br/>下载后自动解压到 /plugins/，随后请回到插件列表点击「安装插件」完成注册
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
-        <button type="submit" class="btn btn-primary" id="installplugin_online_button">下载并安装</button>
+        <button type="button" class="cs-btn cs-btn-secondary" data-dismiss="modal">取消</button>
+        <button type="submit" class="cs-btn cs-btn-primary" id="installplugin_online_button">下载并安装</button>
       </div>
       </form>
     </div><!-- /.modal-content -->

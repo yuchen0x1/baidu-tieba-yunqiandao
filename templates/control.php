@@ -20,6 +20,64 @@ switch ($i['mode'][0]) {
         template('calendar');
 
         break;
+    case 'signlogs':
+                      loadhead('签到日志详情');
+        template('sign-logs');
+
+        break;
+    case 'signlogs_export':
+        // 会话级 CSV 导出：复用 sign-logs 的筛选逻辑，直接流式输出
+        if (ROLE === 'visitor' || ROLE === 'banned') {
+            msg('请先登录');
+        }
+        require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
+        $exportFilters = array(
+            'uid'       => ISADMIN && defined('CON_UID') && CON_UID > 0 ? (int) CON_UID : (int) UID,
+            'date_from' => isset($_GET['date_from']) ? trim((string) $_GET['date_from']) : '',
+            'date_to'   => isset($_GET['date_to'])   ? trim((string) $_GET['date_to'])   : '',
+            'tieba'     => isset($_GET['tieba'])     ? trim((string) $_GET['tieba'])     : '',
+            'status'    => isset($_GET['status'])    ? trim((string) $_GET['status'])    : '',
+        );
+        $exportResult = SignManager::logs($exportFilters, 1, 5000);
+        $exportRows   = $exportResult['rows'];
+        $stamp = date('Ymd_His');
+        $filename = 'sign-logs-' . $stamp . '.csv';
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        $out = fopen('php://output', 'w');
+        // UTF-8 BOM 让 Excel 正确识别编码
+        fwrite($out, "\xEF\xBB\xBF");
+        fputcsv($out, array('时间', '贴吧', '状态', '错误码', '信息', 'PID'));
+        foreach ($exportRows as $r) {
+            fputcsv($out, array(
+                date('Y-m-d H:i:s', $r['created_at']),
+                $r['tieba'],
+                $r['status'],
+                $r['error_code'] ? (string) $r['error_code'] : '',
+                $r['message'],
+                (string) $r['pid'],
+            ));
+        }
+        fclose($out);
+        exit;
+
+        break;
+    case 'ranking':
+                      loadhead('签到排行榜');
+        template('ranking');
+
+        break;
+    case 'achievements':
+                      loadhead('成就勋章');
+        template('achievements');
+
+        break;
+    case 'notices':
+                      loadhead('站内通知');
+        template('notices');
+
+        break;
     case 'log':
         //兼容老版本插件，重定向到showtb
 

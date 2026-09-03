@@ -1,4 +1,4 @@
-<?php if (!defined('SYSTEM_ROOT')) {
+﻿<?php if (!defined('SYSTEM_ROOT')) {
     die('Insufficient Permissions');
 }
 global $i;
@@ -12,7 +12,7 @@ loadhead('双因素认证'); ?>
             <div class="form-group">
                 <input type="text" name="code" class="form-control" maxlength="6" pattern="[0-9]{6}" placeholder="6 位验证码" autocomplete="one-time-code" style="width:180px;" required>
             </div>
-            <button type="submit" class="btn btn-primary">验证并登录</button>
+            <button type="submit" class="cs-btn cs-btn-primary">验证并登录</button>
         </form>
         <p style="margin-top:12px;color:#999;">提示：若无法获取验证码，请联系站点管理员重置双因素安全设置。</p>
     </div>

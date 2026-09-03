@@ -11,6 +11,9 @@
  *   POST /api.php?action=health_check  执行健康检查
  *   GET /api.php?action=logs&limit=50  最近日志
  *   GET /api.php?action=calendar&days=90  个人签到日历
+ *   GET /api.php?action=streak         连续签到（当前/最大连签）
+ *   GET /api.php?action=ranking&limit=20 用户签到排行榜
+ *   GET /api.php?action=failures&limit=10 失败原因分布
  *   GET /api.php?action=update       在线版本检查
  */
 
@@ -210,6 +213,69 @@ switch ($action) {
         echo json_encode(array('ok' => true, 'data' => SignManager::calendar($days, $apiUserId)), JSON_UNESCAPED_UNICODE);
         break;
 
+    case 'streak':
+        require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
+        echo json_encode(array('ok' => true, 'data' => SignManager::streak($apiUserId)), JSON_UNESCAPED_UNICODE);
+        break;
+
+    case 'ranking':
+        require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
+        $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 20;
+        echo json_encode(array('ok' => true, 'data' => SignManager::ranking($limit, $apiUserId)), JSON_UNESCAPED_UNICODE);
+        break;
+
+    case 'failures':
+        require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
+        $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 10;
+        echo json_encode(array('ok' => true, 'data' => SignManager::failureBreakdown($apiUserId, $limit)), JSON_UNESCAPED_UNICODE);
+        break;
+
+    case 'trend':
+        require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
+        $days = isset($_GET['days']) ? max(1, min(365, (int) $_GET['days'])) : 30;
+        echo json_encode(array('ok' => true, 'data' => SignManager::trend($days, $apiUserId)), JSON_UNESCAPED_UNICODE);
+        break;
+
+    case 'tieba_health':
+        require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
+        $days = isset($_GET['days']) ? max(1, min(365, (int) $_GET['days'])) : 30;
+        echo json_encode(array('ok' => true, 'data' => SignManager::tiebaHealth($apiUserId, $days)), JSON_UNESCAPED_UNICODE);
+        break;
+
+    case 'export':
+        // CSV 导出（API Token 访问）。用户 Token 仅导出本人；全局 Token 导出全站。
+        require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
+        $exportFilters = array(
+            'uid'       => $apiUserId,
+            'date_from' => isset($_GET['date_from']) ? trim((string) $_GET['date_from']) : '',
+            'date_to'   => isset($_GET['date_to'])   ? trim((string) $_GET['date_to'])   : '',
+            'tieba'     => isset($_GET['tieba'])     ? trim((string) $_GET['tieba'])     : '',
+            'status'    => isset($_GET['status'])    ? trim((string) $_GET['status'])    : '',
+        );
+        $exportResult = SignManager::logs($exportFilters, 1, 5000);
+        $exportRows   = $exportResult['rows'];
+        $stamp = date('Ymd_His');
+        $filename = 'sign-logs-' . $stamp . '.csv';
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        $out = fopen('php://output', 'w');
+        fwrite($out, "\xEF\xBB\xBF");
+        fputcsv($out, array('时间', '贴吧', '状态', '错误码', '信息', 'PID', 'UID'));
+        foreach ($exportRows as $r) {
+            fputcsv($out, array(
+                date('Y-m-d H:i:s', $r['created_at']),
+                $r['tieba'],
+                $r['status'],
+                $r['error_code'] ? (string) $r['error_code'] : '',
+                $r['message'],
+                (string) $r['pid'],
+                (string) $r['uid'],
+            ));
+        }
+        fclose($out);
+        exit;
+
 
     case 'webhook_test':
         if ($apiUserId > 0) {
@@ -235,6 +301,9 @@ switch ($action) {
                 array('action' => 'health_check', 'method' => 'POST', 'desc' => '执行健康检查'),
                 array('action' => 'logs', 'method' => 'GET', 'desc' => '最近日志'),
                 array('action' => 'calendar', 'method' => 'GET', 'desc' => '个人签到日历'),
+                array('action' => 'trend', 'method' => 'GET', 'desc' => '签到趋势（每日成功/失败）'),
+                array('action' => 'tieba_health', 'method' => 'GET', 'desc' => '每个贴吧的健康度统计'),
+                array('action' => 'export', 'method' => 'GET', 'desc' => '导出签到日志 CSV'),
                 array('action' => 'update', 'method' => 'GET', 'desc' => '在线版本检查'),
                 array('action' => 'webhook_test', 'method' => 'GET', 'desc' => '测试 Webhook 推送（管理员）'),
             ),
@@ -244,6 +313,6 @@ switch ($action) {
 
     default:
         http_response_code(400);
-        echo json_encode(array('error' => '未知 action', 'available' => array('update', 'status', 'health', 'sign', 'retry', 'health_check', 'logs', 'calendar', 'webhook_test', 'openapi')), JSON_UNESCAPED_UNICODE);
+        echo json_encode(array('error' => '未知 action', 'available' => array('update', 'status', 'health', 'sign', 'retry', 'health_check', 'logs', 'calendar', 'export', 'streak', 'ranking', 'failures', 'trend', 'tieba_health', 'webhook_test', 'openapi')), JSON_UNESCAPED_UNICODE);
         break;
 }

@@ -23,7 +23,7 @@ function addset($name, $type, $x, $other = '', $text = '')
 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
 <?php doAction('set_1'); ?>
 <div class="table-responsive">
-<table class="table table-hover">
+<table class="cs-table">
     <thead>
         <tr>
             <th style="width:40%">参数</th>
@@ -60,14 +60,87 @@ function addset($name, $type, $x, $other = '', $text = '')
                 $hasApiToken = !empty($tokenRow['api_token_hash']);
                 ?>
                 <span class="label <?php echo $hasApiToken ? 'label-success' : 'label-default'; ?>"><?php echo $hasApiToken ? '已启用' : '未生成'; ?></span>
-                <button type="submit" class="btn btn-default btn-sm" name="api_action" value="generate" onclick="return confirm('生成新 Token 会立即使旧 Token 失效，确定继续吗？');"><?php echo $hasApiToken ? '重新生成 Token' : '生成 Token'; ?></button>
-                <?php if ($hasApiToken) { ?><button type="submit" class="btn btn-danger btn-sm" name="api_action" value="revoke" onclick="return confirm('确定撤销个人 API Token 吗？');">撤销 Token</button><?php } ?>
+                <button type="submit" class="cs-btn cs-btn-secondary btn-sm" name="api_action" value="generate" onclick="return confirm('生成新 Token 会立即使旧 Token 失效，确定继续吗？');"><?php echo $hasApiToken ? '重新生成 Token' : '生成 Token'; ?></button>
+                <?php if ($hasApiToken) { ?><button type="submit" class="cs-btn cs-btn-danger btn-sm" name="api_action" value="revoke" onclick="return confirm('确定撤销个人 API Token 吗？');">撤销 Token</button><?php } ?>
                 <div class="text-muted" style="margin-top:8px">接口：<code>api.php?action=status</code>、<code>calendar</code>、<code>logs</code>；写操作使用 POST。</div>
+            </td>
+        </tr>
+        <tr>
+            <td>签到排行榜隐私<br/>默认在「签到排行」页面公开展示你的昵称</td>
+            <td>
+                <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
+                    <input type="checkbox" name="hide_from_ranking" value="1" <?php if (option::uget('hide_from_ranking') == 1) echo 'checked'; ?>>
+                    <span>在排行榜中隐藏我的昵称（显示为「用户#<?php echo (int) UID; ?>」）</span>
+                </label>
+            </td>
+        </tr>
+        <tr>
+            <td>签到失败提醒<br/>当今日有贴吧签到失败时，向本站邮箱推送提醒邮件</td>
+            <td>
+                <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
+                    <input type="checkbox" name="remind_sign_fail" value="1" <?php if (option::uget('remind_sign_fail') == 1) echo 'checked'; ?>>
+                    <span>启用签到失败提醒</span>
+                </label>
+                <div style="margin-top:6px;display:flex;align-items:center;gap:6px">
+                    <label for="remind_fail_threshold" style="margin:0">失败次数达到</label>
+                    <input type="number" id="remind_fail_threshold" name="remind_sign_fail_threshold" min="1" max="20" value="<?php $t = (int) option::uget('remind_sign_fail_threshold'); echo $t > 0 ? $t : 1; ?>" style="width:60px">
+                    <span>次时提醒（1-20）</span>
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <td>每日签到摘要<br/>每天签到结束后向本站邮箱发送当日成功/失败汇总</td>
+            <td>
+                <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
+                    <input type="checkbox" name="remind_daily_summary" value="1" <?php if (option::uget('remind_daily_summary') == 1) echo 'checked'; ?>>
+                    <span>启用每日签到摘要</span>
+                </label>
+            </td>
+        </tr>
+        <?php
+        // 阶段 R：签到策略配置（用户级 + 全局只读信息）
+        $globalSignHour = (int) option::get('sign_hour');
+        $globalRetryMax = (int) option::get('retry_max');
+        $globalCronLimit = (int) option::get('cron_limit');
+        $userRetryMax = (int) option::uget('sign_retry_max');
+        $userSignDelay = (int) option::uget('sign_delay_minutes');
+        $userShuffle = option::uget('sign_shuffle') == 1;
+        ?>
+        <tr>
+            <td>签到策略 — 自动重试<br/>签到失败后自动重试的最大次数（用户级，覆盖全局设置）</td>
+            <td>
+                <select name="sign_retry_max" class="cs-form-control" style="width:auto;display:inline-block">
+                    <option value="0" <?php if ($userRetryMax == 0) echo 'selected'; ?>>跟随全局（<?php echo $globalRetryMax > 0 ? $globalRetryMax . ' 次' : '未启用'; ?>）</option>
+                    <?php for ($i = 1; $i <= 5; $i++) { ?>
+                    <option value="<?php echo $i; ?>" <?php if ($userRetryMax == $i) echo 'selected'; ?>>重试 <?php echo $i; ?> 次</option>
+                    <?php } ?>
+                </select>
+                <div style="font-size:12px;color:var(--color-muted);margin-top:4px">
+                    全局签到时间：<?php echo $globalSignHour; ?>:00 后开始，单次批次限制 <?php echo $globalCronLimit > 0 ? $globalCronLimit : '不限' ?> 个贴吧
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <td>签到策略 — 随机延迟<br/>签到开始前随机延迟 0-N 分钟，避免同时刻集中请求被封</td>
+            <td>
+                <div style="display:flex;align-items:center;gap:6px">
+                    <input type="number" name="sign_delay_minutes" min="0" max="60" value="<?php echo $userSignDelay > 0 ? $userSignDelay : 0; ?>" style="width:60px">
+                    <span>分钟（0 表示不延迟，建议 5-15）</span>
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <td>签到策略 — 随机排序<br/>打乱贴吧签到顺序，避免每次以固定顺序请求</td>
+            <td>
+                <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
+                    <input type="checkbox" name="sign_shuffle" value="1" <?php if ($userShuffle) echo 'checked'; ?>>
+                    <span>启用随机排序</span>
+                </label>
             </td>
         </tr>
         <?php doAction('set_2'); ?>
     </tbody>
-</table></div><input type="submit" class="btn btn-primary" value="提交更改">
+</table></div><input type="submit" class="cs-btn cs-btn-primary" value="提交更改">
 </form>
 
 <h3>修改密码</h3>
@@ -75,7 +148,7 @@ function addset($name, $type, $x, $other = '', $text = '')
 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
 <input type="hidden" name="pw_action" value="change">
 <div class="table-responsive">
-<table class="table table-hover">
+<table class="cs-table">
     <thead>
         <tr>
             <th style="width:40%">参数</th>
@@ -97,7 +170,7 @@ function addset($name, $type, $x, $other = '', $text = '')
         </tr>
     </tbody>
 </table></div>
-<input type="submit" class="btn btn-primary" value="修改密码">
+<input type="submit" class="cs-btn cs-btn-primary" value="修改密码">
 </form>
 <br/><?php echo SYSTEM_FN ?> V<?php echo SYSTEM_VER  . ' ' . SYSTEM_VER_NOTE ?> // 作者: <a href="https://kenvix.com" target="_blank">Kenvix</a>  &amp; <a href="http://www.mokeyjay.com/" target="_blank">mokeyjay</a> &amp;  <a href="http://fyy1999.lofter.com/" target="_blank">FYY</a>
 

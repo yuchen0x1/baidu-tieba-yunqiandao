@@ -1,4 +1,4 @@
-<?php if (!defined('SYSTEM_ROOT')) {
+﻿<?php if (!defined('SYSTEM_ROOT')) {
     die('Insufficient Permissions');
 }
 if (ROLE != 'admin') {
@@ -25,7 +25,7 @@ if(!empty($stat)){
             <span class="input-group-addon">工具箱独立密码</span>
             <input type="password" name="toolpw" class="form-control"/>
         </div><br/>
-        <button type="submit" class="btn btn-primary">提交</button>
+        <button type="submit" class="cs-btn cs-btn-primary">提交</button>
     </form>
 </div>
 <br/><br/><?php echo SYSTEM_FN ?> V<?php echo SYSTEM_VER  . ' ' . SYSTEM_VER_NOTE ?> // 作者: <a href="https://kenvix.com" target="_blank">Kenvix</a>  &amp; <a href="http://www.mokeyjay.com/" target="_blank">mokeyjay</a> &amp;  <a href="http://fyy1999.lofter.com/" target="_blank">FYY</a> &amp; <a href="http://fyy1999.lofter.com/" target="_blank">FYY</a>
@@ -42,17 +42,17 @@ if (isset($_GET['ok'])) {
 <div id="comsys"></div>
 <!--Part 1 Primary-->
 
-<br/><br/><input type="button" onclick="location = '<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=optim'" class="btn btn-primary" value="优化所有的数据表" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;可清除所有数据表的多余数据
+<br/><br/><input type="button" onclick="location = '<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=optim'" class="cs-btn cs-btn-primary" value="优化所有的数据表" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;可清除所有数据表的多余数据
 
-<br/><br/><input type="button" onclick="location = '<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=fixdoing'" class="btn btn-primary" value="修复计划任务状态" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;可解决运行计划任务始终提示已经有一个计划任务正在运行中的问题
+<br/><br/><input type="button" onclick="location = '<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=fixdoing'" class="cs-btn cs-btn-primary" value="修复计划任务状态" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;可解决运行计划任务始终提示已经有一个计划任务正在运行中的问题
 
-<br/><br/><input type="button" onclick="location = '<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=reftable'" class="btn btn-primary" value="扫描空闲的签到表" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;扫描空闲的签到数据表，用户注册时系统会自动扫描
+<br/><br/><input type="button" onclick="location = '<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=reftable'" class="cs-btn cs-btn-primary" value="扫描空闲的签到表" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;扫描空闲的签到数据表，用户注册时系统会自动扫描
 
-<br/><br/><input type="button" onclick="location = '<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=cron_sign_again'" class="btn btn-primary" value="清空签到重试次数统计" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;[ 当前重试次数：<?php require_once SYSTEM_ROOT . '/lib/security.php'; $sign_again = safe_retry_state(option::get('cron_sign_again')); echo $sign_again_num = empty($sign_again['num']) ? 0 : $sign_again['num'] ?> ] 本操作将清除目前的签到重试次数统计
+<br/><br/><input type="button" onclick="location = '<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=cron_sign_again'" class="cs-btn cs-btn-primary" value="清空签到重试次数统计" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;[ 当前重试次数：<?php require_once SYSTEM_ROOT . '/lib/security.php'; $sign_again = safe_retry_state(option::get('cron_sign_again')); echo $sign_again_num = empty($sign_again['num']) ? 0 : $sign_again['num'] ?> ] 本操作将清除目前的签到重试次数统计
 
-<br/><br/><input type="button" data-toggle="modal" data-target="#BackupTable" class="btn btn-primary" value="导出数据库" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;导出数据库备份
+<br/><br/><input type="button" data-toggle="modal" data-target="#BackupTable" class="cs-btn cs-btn-primary" value="导出数据库" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;导出数据库备份
 <!--
-<br/><br/><input type="button" onclick="if(confirm('将花费较长时间，请确认此操作')) location = '<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=updatefid'" class="btn btn-primary" value="更新未记录的 FID" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;签到时会自动将没有被缓存的 FID 缓存下来，您也可以手动更新 FID 提高签到效率
+<br/><br/><input type="button" onclick="if(confirm('将花费较长时间，请确认此操作')) location = '<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=updatefid'" class="cs-btn cs-btn-primary" value="更新未记录的 FID" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;签到时会自动将没有被缓存的 FID 缓存下来，您也可以手动更新 FID 提高签到效率
 -->
 <?php doAction('admin_tools_3'); ?>
 
@@ -69,7 +69,7 @@ $bkCount = is_array($bkFiles) ? count($bkFiles) : 0;
 <form action="<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=dbbackup_save" method="post">
 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
 <div class="table-responsive">
-<table class="table table-striped">
+<table class="cs-table">
     <tbody>
         <tr>
             <td style="width:20%">启用定时备份</td>
@@ -88,30 +88,30 @@ $bkCount = is_array($bkFiles) ? count($bkFiles) : 0;
     </tbody>
 </table>
 </div>
-<input type="submit" class="btn btn-primary" value="保存备份设置">
+<input type="submit" class="cs-btn cs-btn-primary" value="保存备份设置">
 </form>
 <form style="display:inline" action="<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=dbbackup_init" method="post">
 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
-<button type="submit" class="btn btn-default" onclick="return confirm('确定注册定时备份计划任务吗？已注册时无副作用。');">注册定时备份任务<?php echo (int) $bkCron['c'] > 0 ? '（已注册）' : '（未注册）'; ?></button>
+<button type="submit" class="cs-btn cs-btn-secondary" onclick="return confirm('确定注册定时备份计划任务吗？已注册时无副作用。');">注册定时备份任务<?php echo (int) $bkCron['c'] > 0 ? '（已注册）' : '（未注册）'; ?></button>
 </form>
 &nbsp;&nbsp;
 <form style="display:inline" action="<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=dbbackup_run" method="post">
 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
-<button type="submit" class="btn btn-default" onclick="return confirm('立即执行一次备份吗？');">立即备份一次</button>
+<button type="submit" class="cs-btn cs-btn-secondary" onclick="return confirm('立即执行一次备份吗？');">立即备份一次</button>
 </form>
 &nbsp;&nbsp;&nbsp;&nbsp;当前已有 <b><?php echo $bkCount; ?></b> 份备份存于 data/backups 目录（Apache 已由 .htaccess 拦截直接下载，Nginx 等环境请自行屏蔽该目录）
 
 <br/><br/>
 <!--Part 2 Warning-->
-<br/><br/><input type="button" data-toggle="modal" data-target="#TruncateTableLabel" class="btn btn-warning" value="清空指定数据表" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;请慎用此功能，一般用于清空无用的分表
+<br/><br/><input type="button" data-toggle="modal" data-target="#TruncateTableLabel" class="cs-btn cs-btn-warning" value="清空指定数据表" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;请慎用此功能，一般用于清空无用的分表
 
-<br/><br/><input type="button" data-toggle="modal" data-target="#RemoveTable" class="btn btn-warning" value="删除指定数据表" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;请慎用此功能，一般用于删除无用的分表
+<br/><br/><input type="button" data-toggle="modal" data-target="#RemoveTable" class="cs-btn cs-btn-warning" value="删除指定数据表" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;请慎用此功能，一般用于删除无用的分表
 
 <?php doAction('admin_tools_2'); ?>
 
 <h3>最近登录记录（最近50条）</h3>
 <div class="table-responsive">
-<table class="table table-hover table-bordered table-striped">
+<table class="cs-table">
     <thead><tr><th>#</th><th>账号</th><th>IP</th><th>结果</th><th>UA</th><th>时间</th></tr></thead>
     <tbody>
 <?php
@@ -155,8 +155,8 @@ if (empty($auditRows)) {
         <input type="checkbox" name="zip" value="1" checked> 如果支持，压缩导出的文件 [ Zip ]
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
-        <button type="submit" class="btn btn-primary" id="backup_button">开始导出</button>
+        <button type="button" class="cs-btn cs-btn-secondary" data-dismiss="modal">取消</button>
+        <button type="submit" class="cs-btn cs-btn-primary" id="backup_button">开始导出</button>
       </div>
       </form>
     </div><!-- /.modal-content -->
@@ -184,8 +184,8 @@ if (empty($auditRows)) {
         </select>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
-        <button type="submit" class="btn btn-danger" id="remtab_button">提交更改</button>
+        <button type="button" class="cs-btn cs-btn-secondary" data-dismiss="modal">取消</button>
+        <button type="submit" class="cs-btn cs-btn-danger" id="remtab_button">提交更改</button>
       </div>
       </form>
     </div><!-- /.modal-content -->
@@ -213,8 +213,8 @@ if (empty($auditRows)) {
         </select>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
-        <button type="submit" class="btn btn-danger" id="truntab_button">提交更改</button>
+        <button type="button" class="cs-btn cs-btn-secondary" data-dismiss="modal">取消</button>
+        <button type="submit" class="cs-btn cs-btn-danger" id="truntab_button">提交更改</button>
       </div>
       </form>
     </div><!-- /.modal-content -->

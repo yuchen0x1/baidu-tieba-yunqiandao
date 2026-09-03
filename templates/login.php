@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 if (!defined('SYSTEM_ROOT')) {
     die('Insufficient Permissions');
 }
@@ -57,7 +57,7 @@ loadhead();
             <?php } ?>
             <label class="checkbox-inline"><input type="checkbox" name="ispersis" value="1"> <?php echo I18N::t('login.remember'); ?></label>
             <?php doAction('login_page_2'); ?>
-            <button type="submit" class="btn btn-primary auth-submit">进入工作台</button>
+            <button type="submit" class="cs-btn cs-btn-primary auth-submit">进入工作台</button>
             <?php doAction('login_page_3'); ?>
         </form>
         <div class="auth-footer"><?php echo I18N::t('login.no_account'); ?><a href="index.php?mod=reg">创建一个账号</a>　<a href="index.php?mod=lostpw">忘记密码？</a></div>

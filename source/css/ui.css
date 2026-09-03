@@ -1026,9 +1026,15 @@ textarea.form-control {
   background: var(--glass-bg-dark);
 }
 
+/* v4: 双层 focus-visible 焦点态（紫罗兰 + 外圈光晕） */
 :focus-visible {
-  outline: 3px solid rgba(245, 158, 11, .72);
-  outline-offset: 2px;
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-outline-offset);
+  box-shadow: var(--focus-ring-outer);
+  border-radius: inherit;
+}
+:focus:not(:focus-visible) {
+  outline: none;
 }
 
 [data-theme="dark"] .panel-heading,
@@ -1038,4 +1044,483 @@ textarea.form-control {
 
 [data-theme="dark"] .app-topbar {
   background: rgba(21, 37, 34, .78);
+}
+
+/* ============================================================
+   Glass v2 强化层 —— 透明玻璃拟态
+   覆盖 ui.css 基础层，提供更强的玻璃质感与背景光斑
+   ============================================================ */
+
+/* 1. 页面背景光斑 —— 玻璃感的核心：背后有可透的光 */
+body.app-body {
+  background-color: var(--color-canvas);
+  background-image:
+    radial-gradient(1000px 640px at 10% -12%, rgba(120, 132, 146, .15), transparent 58%),
+    radial-gradient(860px 600px at 104% 10%, rgba(74, 111, 165, .09), transparent 60%),
+    radial-gradient(760px 560px at 90% 102%, rgba(168, 132, 44, .09), transparent 58%),
+    radial-gradient(680px 520px at -4% 96%, rgba(91, 138, 114, .07), transparent 60%),
+    radial-gradient(460px 360px at 55% 40%, rgba(255, 255, 255, .55), transparent 60%);
+  background-attachment: fixed;
+}
+
+[data-theme="dark"] body.app-body {
+  background-image:
+    radial-gradient(1000px 640px at 10% -12%, rgba(120, 132, 146, .18), transparent 58%),
+    radial-gradient(860px 600px at 104% 10%, rgba(74, 111, 165, .12), transparent 60%),
+    radial-gradient(760px 560px at 90% 102%, rgba(168, 132, 44, .11), transparent 58%),
+    radial-gradient(680px 520px at -4% 96%, rgba(91, 138, 114, .09), transparent 60%),
+    radial-gradient(460px 360px at 55% 40%, rgba(255, 255, 255, .03), transparent 60%);
+}
+
+/* 2. 玻璃工具类 */
+.glass-card {
+  background: var(--glass-bg) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--glass-highlight), var(--glass-shadow) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+/* 3. 侧边栏 —— 深色玻璃 */
+.app-sidebar {
+  background: var(--glass-bg-dark);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border-right: 1px solid var(--glass-border-dark);
+  box-shadow: inset -1px 0 0 rgba(255,255,255,.04), 14px 0 46px rgba(21,35,33,.10);
+}
+
+/* 4. 顶栏 —— 半透玻璃 */
+.app-topbar {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: 0 10px 30px rgba(21,35,33,.06);
+}
+
+/* 5. 玻璃卡片（面板/列表/指标卡） */
+.panel,
+.well,
+.thumbnail,
+.list-group,
+.metric-card,
+.auth-layout,
+.bs-callout {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+.panel-heading {
+  background: rgba(255,255,255,.28);
+  border-bottom: 1px solid rgba(255,255,255,.5);
+}
+
+/* 6. 表格 —— 玻璃化 */
+.table-responsive {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  overflow-x: auto;
+}
+
+.table {
+  background: transparent;
+}
+
+.table > thead > tr > th {
+  background: rgba(255,255,255,.32);
+  border-bottom: 1px solid rgba(255,255,255,.55);
+  color: var(--color-muted);
+}
+
+.table > tbody > tr > td,
+.table > thead > tr > th {
+  border-top: 1px solid rgba(255,255,255,.35);
+}
+
+.table-hover > tbody > tr:hover > td {
+  background: rgba(47,54,64,.06);
+}
+
+[data-theme="dark"] .table > thead > tr > th {
+  background: rgba(255,255,255,.05);
+}
+
+[data-theme="dark"] .table-hover > tbody > tr:hover > td {
+  background: rgba(120,132,146,.1);
+}
+
+/* 7. 按钮 —— 渐变玻璃 */
+.btn {
+  border-radius: var(--radius-sm);
+  border-width: 1px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #2f3640, #1f252d);
+  border-color: rgba(47,54,64,.6);
+  box-shadow: 0 6px 18px rgba(23,29,36,.28);
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+  background: linear-gradient(135deg, #3b4450, #252d36);
+  box-shadow: 0 8px 24px rgba(23,29,36,.4);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #5b8a72, #446852);
+  border-color: rgba(91,138,114,.5);
+  box-shadow: 0 6px 16px rgba(91,138,114,.22);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #c0554f, #97413c);
+  border-color: rgba(192,85,79,.5);
+  box-shadow: 0 6px 16px rgba(192,85,79,.2);
+}
+
+.btn-warning {
+  background: linear-gradient(135deg, #a8842c, #7c611f);
+  border-color: rgba(168,132,44,.55);
+  box-shadow: 0 6px 16px rgba(168,132,44,.26);
+  color: #fff;
+}
+
+.btn-default,
+.btn-info {
+  background: var(--glass-bg-strong);
+  border-color: var(--glass-border);
+  color: var(--color-ink-soft);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+}
+
+.btn-default:hover,
+.btn-default:focus,
+.btn-info:hover,
+.btn-info:focus {
+  background: rgba(255,255,255,.92);
+  border-color: var(--color-brand);
+  color: var(--color-brand-deep);
+  box-shadow: 0 0 0 3px rgba(15,118,110,.14);
+}
+
+[data-theme="dark"] .btn-default,
+[data-theme="dark"] .btn-info {
+  background: rgba(255,255,255,.08);
+  border-color: var(--glass-border-dark);
+  box-shadow: none;
+}
+
+/* 8. 表单 —— 半透明输入 + 聚焦发光 */
+.form-control,
+select.form-control,
+textarea.form-control {
+  background: var(--glass-bg-strong);
+  border-color: rgba(255,255,255,.6);
+  box-shadow: inset 0 1px 2px rgba(21,35,33,.04);
+}
+
+.form-control:focus,
+select.form-control:focus,
+textarea.form-control:focus {
+  border-color: var(--color-brand);
+  box-shadow: var(--focus-ring), inset 0 1px 2px rgba(21,35,33,.04);
+  background: rgba(255,255,255,.92);
+}
+
+[data-theme="dark"] .form-control:focus {
+  background: rgba(28,48,44,.92);
+}
+
+.input-group-addon {
+  background: var(--glass-bg-strong);
+  border-color: rgba(255,255,255,.6);
+}
+
+/* 9. 提示条 —— 彩色玻璃 */
+.alert {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-left: 4px solid var(--color-info);
+  border-radius: var(--radius-md);
+  box-shadow: var(--glass-highlight), var(--shadow-sm);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+.alert-success {
+  background: rgba(228,239,233,.62);
+  border-left-color: var(--color-success);
+}
+
+.alert-info {
+  background: rgba(230,237,246,.62);
+  border-left-color: var(--color-info);
+}
+
+.alert-warning {
+  background: rgba(243,234,214,.62);
+  border-left-color: var(--color-warning);
+}
+
+.alert-danger {
+  background: rgba(247,231,229,.62);
+  border-left-color: var(--color-danger);
+}
+
+/* 10. 进度条 / 列表组 */
+.progress {
+  background: rgba(255,255,255,.5);
+  border: 1px solid rgba(255,255,255,.5);
+  box-shadow: inset 0 1px 2px rgba(21,35,33,.06);
+}
+
+.list-group-item {
+  background: rgba(255,255,255,.18);
+  border-color: rgba(255,255,255,.4);
+}
+
+.label,
+.badge {
+  border-radius: var(--radius-pill);
+}
+
+/* 11. 标题与链接 */
+h4,
+.panel-title,
+.modal-title {
+  color: var(--color-ink);
+  font-weight: 800;
+}
+
+.page-heading h1,
+.page-heading h2 {
+  letter-spacing: -.02em;
+}
+
+.eyebrow {
+  color: var(--color-brand);
+}
+
+/* 12. 模态框玻璃 */
+.modal-content {
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+.modal-header,
+.modal-footer {
+  background: rgba(255,255,255,.2);
+  border-color: rgba(255,255,255,.4);
+}
+
+/* 13. Dashboard hero 发光 */
+.dashboard-hero {
+  background: linear-gradient(135deg, rgba(31,37,45,.94), rgba(47,54,64,.88));
+  box-shadow: 0 24px 60px rgba(23,29,36,.38), inset 0 1px 0 rgba(255,255,255,.16);
+}
+
+/* 14. 侧边栏 active 项发光 */
+.sidebar-nav .active > a,
+.sidebar-nav a.active {
+  background: linear-gradient(135deg, rgba(47,54,64,.96), rgba(31,37,45,.96));
+  box-shadow: inset 3px 0 0 var(--color-accent), 0 6px 18px rgba(23,29,36,.32);
+}
+
+.sidebar-nav a:hover,
+.sidebar-nav a:focus {
+  background: rgba(255,255,255,.1);
+}
+
+/* 15. 深色主题补强 */
+[data-theme="dark"] .panel-heading,
+[data-theme="dark"] .list-group-item {
+  background: rgba(255,255,255,.05);
+}
+
+[data-theme="dark"] .table-responsive,
+[data-theme="dark"] .panel,
+[data-theme="dark"] .well {
+  background: var(--glass-bg);
+}
+
+/* 16. 滚动条美化 */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(120,132,146,.4);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(120,132,146,.6);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Icon system — inline SVG (Glass v3) */
+.sidebar-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  font-size: 0;
+}
+
+.sidebar-icon svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.icon-inline {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
+  color: inherit;
+}
+
+.topbar-menu svg.icon-inline {
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+}
+
+.topbar-action svg.icon-inline {
+  width: 16px;
+  height: 16px;
+  vertical-align: -3px;
+}
+
+.topbar-user svg.icon-inline {
+  width: 15px;
+  height: 15px;
+  vertical-align: -3px;
+}
+
+.panel-title .icon-inline {
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
+  margin-right: 2px;
+}
+
+/* ============================================================
+   Glass v4 扩展层 —— icon sprite / 主题切换 / 工具类
+   ============================================================ */
+
+/* SVG <use> 引用 sprite 时的渲染 */
+.icon-inline use {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* 主题切换按钮：light 显示月亮（点击转深），dark 显示太阳 */
+.topbar-theme-toggle .icon-sun,
+.topbar-theme-toggle .icon-moon {
+  display: none;
+}
+[data-theme="light"] .topbar-theme-toggle .icon-moon,
+:root:not([data-theme="dark"]) .topbar-theme-toggle .icon-moon {
+  display: inline-block;
+}
+[data-theme="dark"] .topbar-theme-toggle .icon-sun {
+  display: inline-block;
+}
+
+/* v4: 按钮 hover 抬升更细腻 */
+.btn {
+  transition: transform var(--motion-base) var(--ease-productive),
+    background-color var(--motion-base) var(--ease-productive),
+    border-color var(--motion-base) var(--ease-productive),
+    box-shadow var(--motion-base) var(--ease-productive);
+}
+
+/* v4: 紫罗兰主按钮渐变 */
+.btn-primary {
+  background: linear-gradient(135deg, var(--color-brand), var(--color-brand-deep));
+  border-color: var(--color-brand-deep);
+  box-shadow: 0 6px 18px rgba(91, 58, 255, .28);
+}
+.btn-primary:hover,
+.btn-primary:focus {
+  background: linear-gradient(135deg, #6f4dff, var(--color-brand));
+  border-color: var(--color-brand);
+  box-shadow: 0 8px 24px rgba(91, 58, 255, .4);
+}
+
+/* v4: 玻璃卡片光斑增强 */
+.dashboard-hero {
+  background: linear-gradient(135deg, rgba(91, 58, 255, .94), rgba(61, 29, 156, .88));
+  box-shadow: 0 24px 60px rgba(91, 58, 255, .38), inset 0 1px 0 rgba(255, 255, 255, .16);
+}
+
+.sidebar-nav .active > a,
+.sidebar-nav a.active {
+  background: linear-gradient(135deg, rgba(91, 58, 255, .96), rgba(61, 29, 156, .96));
+  box-shadow: inset 3px 0 0 var(--color-accent), 0 6px 18px rgba(91, 58, 255, .32);
+}
+
+/* v4: 链接 brand 色 */
+a {
+  color: var(--color-brand);
+}
+a:hover,
+a:focus {
+  color: var(--color-brand-deep);
+}
+
+/* v4: 强调色 eyebrow */
+.eyebrow {
+  color: var(--color-brand);
+}
+
+/* v4: brand mark 紫罗兰 */
+.brand-mark {
+  background: var(--color-brand);
+}
+.user-chip {
+  background: var(--color-brand);
+}
+
+/* v4: 进度条 brand 渐变 */
+.progress-bar {
+  background: linear-gradient(90deg, var(--color-brand), var(--color-brand-deep));
+}
+
+/* v4: 表单聚焦光环 */
+.form-control:focus {
+  border-color: var(--color-brand);
+  box-shadow: var(--focus-ring), inset 0 1px 2px rgba(21, 35, 33, .04);
+}
+
+/* v4: reduced-motion 强化（已在 tokens.css 处理，此处兜底） */
+@media (prefers-reduced-motion: reduce) {
+  .btn:hover,
+  .btn:focus {
+    transform: none;
+  }
 }

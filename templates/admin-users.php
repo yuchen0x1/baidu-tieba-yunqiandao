@@ -1,4 +1,4 @@
-<?php if (!defined('SYSTEM_ROOT')) {
+﻿<?php if (!defined('SYSTEM_ROOT')) {
     die('Insufficient Permissions');
 }  if (ROLE != 'admin') {
     msg('权限不足！');
@@ -13,7 +13,7 @@ if (isset($_GET['add'])) {  ?>
 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
 <input type="hidden" name="do" value="add">
 <div class="table-responsive">
-<table class="table table-hover">
+<table class="cs-table">
     <thead>
         <tr>
             <th>参数</th>
@@ -44,7 +44,7 @@ if (isset($_GET['add'])) {  ?>
     </tbody>
 </table>
 </div>
-<input type="submit" class="btn btn-primary" value="提交更改">
+<input type="submit" class="cs-btn cs-btn-primary" value="提交更改">
 </form>
 
 <?php } else {
@@ -61,7 +61,7 @@ if (isset($_GET['add'])) {  ?>
 <form action="setting.php?mod=admin:users" method="post" onsubmit="return userAdminSubmit();">
 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
 <div class="table-responsive">
-<table class="table table-hover">
+<table class="cs-table">
     <thead>
         <tr>
             <th>UID</th>
@@ -88,9 +88,9 @@ if (isset($_GET['add'])) {  ?>
     <option value="admin">管理员</option>
     <option value="banned">禁止访问</option>
 </select>
-<br/><br/><input type="submit" class="btn btn-primary" value="执行操作">
+<br/><br/><input type="submit" class="cs-btn cs-btn-primary" value="执行操作">
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-<button type="button" class="btn btn-default" onclick="location = 'index.php?mod=admin:users&add'">添加用户</button>
+<button type="button" class="cs-btn cs-btn-secondary" onclick="location = 'index.php?mod=admin:users&add'">添加用户</button>
 </form>
 
 <h4>邮件群发</h4>
@@ -98,7 +98,7 @@ if (isset($_GET['add'])) {  ?>
 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
 <input type="hidden" name="do" value="mailblast">
 <div class="table-responsive">
-<table class="table table-hover">
+<table class="cs-table">
     <tbody>
         <tr>
             <td style="width:20%">邮件主题</td>
@@ -111,7 +111,7 @@ if (isset($_GET['add'])) {  ?>
     </tbody>
 </table>
 </div>
-<input type="submit" class="btn btn-primary" value="群发邮件">
+<input type="submit" class="cs-btn cs-btn-primary" value="群发邮件">
 </form>
 <?php } ?>
 <script>

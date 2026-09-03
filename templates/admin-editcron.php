@@ -1,4 +1,4 @@
-<?php if (!defined('SYSTEM_ROOT')) {
+﻿<?php if (!defined('SYSTEM_ROOT')) {
     die('Insufficient Permissions');
 }  if (ROLE != 'admin') {
     msg('权限不足!');
@@ -17,7 +17,7 @@ global $i;
         <?php if (isset($edit)) {
             echo '<input type="hidden" name="edit" value="' . $edit . '">';
         } ?>
-        <table class="table table-hover">
+        <table class="cs-table">
             <thead>
             <tr>
                 <th style="width:25%">参数</th>
@@ -92,7 +92,7 @@ global $i;
             </tbody>
         </table>
     </div>
-    <br/><button type="submit" class="btn btn-primary">提交更改</button>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-    <button type="button" class="btn btn-default" onclick="location = 'index.php?mod=admin:cron'">取消</button>
+    <br/><button type="submit" class="cs-btn cs-btn-primary">提交更改</button>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    <button type="button" class="cs-btn cs-btn-secondary" onclick="location = 'index.php?mod=admin:cron'">取消</button>
 </form>
 <br/><br/><?php echo SYSTEM_FN ?> V<?php echo SYSTEM_VER  . ' ' . SYSTEM_VER_NOTE ?> // 作者: <a href="https://kenvix.com" target="_blank">Kenvix</a>  &amp; <a href="http://www.mokeyjay.com/" target="_blank">mokeyjay</a> &amp;  <a href="http://fyy1999.lofter.com/" target="_blank">FYY</a>

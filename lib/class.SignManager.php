@@ -125,8 +125,8 @@ class SignManager
         $tables = array_values(array_unique(array_merge(array('tieba'), safe_table_names(option::get('fb_tables')))));
         $affected = 0;
         foreach ($tables as $table) {
-            $m->query("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` SET `no` = '1' WHERE `pid` = " . intval($pid) . " AND `no` = '0';");
-            $affected += $m->affected_rows();
+            $m->pquery("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` SET `no` = '1' WHERE `pid` = ? AND `no` = '0'", array((int) $pid));
+            $affected += (int) $m->affected_rows();
         }
         if ($affected > 0 && class_exists('Notify')) {
             require_once SYSTEM_ROOT . '/lib/class.notify.php';
@@ -301,6 +301,334 @@ class SignManager
             $waiting += isset($row['waiting_count']) ? (int) $row['waiting_count'] : 0;
         }
         return array('signed' => $signed, 'error' => $error, 'waiting' => $waiting);
+    }
+
+    /**
+     * 连签天数统计（基于 sign_history 表）
+     * @param int $uid 0 表示全局
+     * @return array {current_streak, max_streak, last_sign_day}
+     */
+    public static function streak($uid = 0)
+    {
+        global $m;
+        self::ensureHistoryTable();
+        $since = time() - 86400 * 366;
+        $sql = "SELECT DATE(FROM_UNIXTIME(`created_at`)) AS `day`,
+            SUM(`status` = 'success') AS `success_count`
+            FROM `" . DB_PREFIX . self::HISTORY_TABLE . "`
+            WHERE `created_at` >= ?";
+        $params = array($since);
+        if ($uid > 0) {
+            $sql .= ' AND `uid` = ?';
+            $params[] = (int) $uid;
+        }
+        $sql .= ' GROUP BY `day` HAVING `success_count` > 0 ORDER BY `day` DESC';
+        $result = $m->pquery($sql, $params);
+        $days = array();
+        while ($row = $m->fetch_array($result)) {
+            $days[] = $row['day'];
+        }
+        if (empty($days)) {
+            return array('current_streak' => 0, 'max_streak' => 0, 'last_sign_day' => null);
+        }
+        // 计算当前连签（从最近一天往前找连续）
+        $current_streak = 0;
+        $today = date('Y-m-d');
+        $yesterday = date('Y-m-d', strtotime('-1 day'));
+        // 如果今天或昨天有签到记录，开始计数
+        if ($days[0] === $today || $days[0] === $yesterday) {
+            $current_streak = 1;
+            $expected = date('Y-m-d', strtotime($days[0] . ' -1 day'));
+            for ($i = 1; $i < count($days); $i++) {
+                if ($days[$i] === $expected) {
+                    $current_streak++;
+                    $expected = date('Y-m-d', strtotime($days[$i] . ' -1 day'));
+                } else {
+                    break;
+                }
+            }
+        }
+        // 计算最长连签
+        $max_streak = 1;
+        $run = 1;
+        for ($i = 1; $i < count($days); $i++) {
+            $expected = date('Y-m-d', strtotime($days[$i - 1] . ' -1 day'));
+            if ($days[$i] === $expected) {
+                $run++;
+                $max_streak = max($max_streak, $run);
+            } else {
+                $run = 1;
+            }
+        }
+        $max_streak = max($max_streak, $current_streak, count($days) > 0 ? 1 : 0);
+        return array(
+            'current_streak' => $current_streak,
+            'max_streak' => $max_streak,
+            'last_sign_day' => $days[0],
+        );
+    }
+
+    /**
+     * 签到排行榜（基于 sign_history 表按用户聚合）
+     * @param int $limit
+     * @param int $uid 0 表示全局（仅本人）
+     * @return array [{uid, name, success_count, total_count}]
+     */
+    public static function ranking($limit = 20, $uid = 0)
+    {
+        global $m;
+        self::ensureHistoryTable();
+        $limit = max(1, min(100, (int) $limit));
+        $since = time() - 86400 * 30; // 最近 30 天
+        $sql = "SELECT h.`uid`, u.`name`,
+            SUM(h.`status` = 'success') AS `success_count`,
+            COUNT(*) AS `total_count`
+            FROM `" . DB_PREFIX . self::HISTORY_TABLE . "` h
+            LEFT JOIN `" . DB_PREFIX . "users` u ON h.`uid` = u.`id`
+            WHERE h.`created_at` >= ?";
+        $params = array($since);
+        if ($uid > 0) {
+            $sql .= ' AND h.`uid` = ?';
+            $params[] = (int) $uid;
+        }
+        $sql .= ' GROUP BY h.`uid`, u.`name` ORDER BY `success_count` DESC, `total_count` DESC LIMIT ?';
+        $params[] = $limit;
+        $rows = array();
+        $result = $m->pquery($sql, $params);
+        while ($row = $m->fetch_array($result)) {
+            $rows[] = array(
+                'uid' => (int) $row['uid'],
+                'name' => $row['name'] ? $row['name'] : 'UID:' . (int) $row['uid'],
+                'success_count' => (int) $row['success_count'],
+                'total_count' => (int) $row['total_count'],
+            );
+        }
+        return $rows;
+    }
+
+    /**
+     * 失败原因分布（基于 sign_history.message 聚合 Top N）
+     * @param int $uid 0 表示全局
+     * @param int $limit
+     * @return array [{reason, count}]
+     */
+    public static function failureBreakdown($uid = 0, $limit = 10)
+    {
+        global $m;
+        self::ensureHistoryTable();
+        $limit = max(1, min(50, (int) $limit));
+        $since = time() - 86400 * 30;
+        $sql = "SELECT COALESCE(NULLIF(`message`, ''), '未知错误') AS `reason`, COUNT(*) AS `count`
+            FROM `" . DB_PREFIX . self::HISTORY_TABLE . "`
+            WHERE `status` != 'success' AND `created_at` >= ?";
+        $params = array($since);
+        if ($uid > 0) {
+            $sql .= ' AND `uid` = ?';
+            $params[] = (int) $uid;
+        }
+        $sql .= ' GROUP BY `reason` ORDER BY `count` DESC LIMIT ?';
+        $params[] = $limit;
+        $rows = array();
+        $result = $m->pquery($sql, $params);
+        while ($row = $m->fetch_array($result)) {
+            $rows[] = array(
+                'reason' => (string) $row['reason'],
+                'count' => (int) $row['count'],
+            );
+        }
+        return $rows;
+    }
+
+    /**
+     * 分页查询用户签到日志（带筛选条件）。
+     *
+     * @param array $filters ['uid'=>, 'pid'=>, 'date_from'=>, 'date_to'=>, 'tieba'=>, 'status'=>]
+     * @param int $page     1-based
+     * @param int $pageSize 默认 30
+     * @return array ['rows'=>[{id,pid,uid,tieba,status,error_code,message,created_at}], 'total'=>, 'page'=>, 'pages'=>, 'page_size'=>]
+     */
+    public static function logs($filters = array(), $page = 1, $pageSize = 30)
+    {
+        global $m;
+        self::ensureHistoryTable();
+        $filters = is_array($filters) ? $filters : array();
+        $page = max(1, (int) $page);
+        $pageSize = max(5, min(200, (int) $pageSize));
+
+        $where = array('1=1');
+        $params = array();
+
+        if (!empty($filters['uid'])) {
+            $where[] = '`uid` = ?';
+            $params[] = (int) $filters['uid'];
+        }
+        if (!empty($filters['pid'])) {
+            $where[] = '`pid` = ?';
+            $params[] = (int) $filters['pid'];
+        }
+        if (!empty($filters['tieba'])) {
+            $where[] = '`tieba` LIKE ?';
+            $params[] = '%' . $m->real_escape_string($filters['tieba']) . '%';
+        }
+        if (!empty($filters['status']) && in_array($filters['status'], array('success', 'error', 'skipped'), true)) {
+            $where[] = '`status` = ?';
+            $params[] = $filters['status'];
+        }
+        if (!empty($filters['date_from'])) {
+            $ts = strtotime($filters['date_from'] . ' 00:00:00');
+            if ($ts > 0) {
+                $where[] = '`created_at` >= ?';
+                $params[] = $ts;
+            }
+        }
+        if (!empty($filters['date_to'])) {
+            $ts = strtotime($filters['date_to'] . ' 23:59:59');
+            if ($ts > 0) {
+                $where[] = '`created_at` <= ?';
+                $params[] = $ts;
+            }
+        }
+
+        $whereSql = implode(' AND ', $where);
+
+        // 总数
+        $countSql = "SELECT COUNT(*) AS c FROM `" . DB_PREFIX . self::HISTORY_TABLE . "` WHERE " . $whereSql;
+        $countResult = $m->pquery($countSql, $params);
+        $countRow = $m->fetch_array($countResult);
+        $total = (int) ($countRow['c'] ?? 0);
+        $pages = max(1, (int) ceil($total / $pageSize));
+        if ($page > $pages) { $page = $pages; }
+        $offset = ($page - 1) * $pageSize;
+
+        $sql = "SELECT `id`, `pid`, `uid`, `tieba`, `status`, `error_code`, `message`, `created_at`
+            FROM `" . DB_PREFIX . self::HISTORY_TABLE . "`
+            WHERE " . $whereSql . "
+            ORDER BY `created_at` DESC, `id` DESC
+            LIMIT " . (int) $offset . ", " . (int) $pageSize;
+        $result = $m->pquery($sql, $params);
+        $rows = array();
+        while ($row = $m->fetch_array($result)) {
+            $rows[] = array(
+                'id' => (int) $row['id'],
+                'pid' => (int) $row['pid'],
+                'uid' => (int) $row['uid'],
+                'tieba' => (string) $row['tieba'],
+                'status' => (string) $row['status'],
+                'error_code' => (int) $row['error_code'],
+                'message' => (string) $row['message'],
+                'created_at' => (int) $row['created_at'],
+            );
+        }
+        return array(
+            'rows' => $rows,
+            'total' => $total,
+            'page' => $page,
+            'pages' => $pages,
+            'page_size' => $pageSize,
+        );
+    }
+
+    /**
+     * 签到趋势：近 N 天每天的成功/失败/总数
+     * @param int $days 默认 30，上限 365
+     * @param int $uid 0 表示全局
+     * @return array [{date, success, error, total, rate}]
+     */
+    public static function trend($days = 30, $uid = 0)
+    {
+        global $m;
+        self::ensureHistoryTable();
+        $days = max(1, min(365, (int) $days));
+        $since = strtotime('-' . ($days - 1) . ' days midnight');
+        $sql = "SELECT DATE(FROM_UNIXTIME(`created_at`)) AS `day`,
+            SUM(`status` = 'success') AS `success`,
+            SUM(`status` = 'error')   AS `error`,
+            COUNT(*) AS `total`
+            FROM `" . DB_PREFIX . self::HISTORY_TABLE . "`
+            WHERE `created_at` >= ?";
+        $params = array($since);
+        if ($uid > 0) {
+            $sql .= ' AND `uid` = ?';
+            $params[] = (int) $uid;
+        }
+        $sql .= ' GROUP BY `day` ORDER BY `day` ASC';
+        $result = $m->pquery($sql, $params);
+        $map = array();
+        while ($row = $m->fetch_array($result)) {
+            $map[$row['day']] = $row;
+        }
+        // 填充空白天，保证趋势线连续
+        $rows = array();
+        $stamp = $since;
+        $end = strtotime('today midnight');
+        while ($stamp <= $end) {
+            $day = date('Y-m-d', $stamp);
+            if (isset($map[$day])) {
+                $success = (int) $map[$day]['success'];
+                $error   = (int) $map[$day]['error'];
+                $total   = (int) $map[$day]['total'];
+            } else {
+                $success = 0;
+                $error   = 0;
+                $total   = 0;
+            }
+            $rate = $total > 0 ? round($success / $total * 100, 1) : 0;
+            $rows[] = array(
+                'date'    => $day,
+                'success' => $success,
+                'error'   => $error,
+                'total'   => $total,
+                'rate'    => $rate,
+            );
+            $stamp += 86400;
+        }
+        return $rows;
+    }
+
+    /**
+     * 每个贴吧的历史成功率统计（用于贴吧健康度看板）
+     * @param int $uid
+     * @param int $days 默认 30
+     * @return array [{tieba, success, error, total, rate, last_status, last_time}]
+     */
+    public static function tiebaHealth($uid, $days = 30)
+    {
+        global $m;
+        self::ensureHistoryTable();
+        $uid = (int) $uid;
+        $days = max(1, min(365, (int) $days));
+        if ($uid <= 0) { return array(); }
+        $since = strtotime('-' . ($days - 1) . ' days midnight');
+        // 子查询：每个贴吧的聚合 + 最近一条记录
+        $sql = "SELECT t.`tieba`,
+            SUM(t.`status` = 'success') AS `success`,
+            SUM(t.`status` = 'error')   AS `error`,
+            COUNT(*) AS `total`,
+            MAX(t.`created_at`) AS `last_time`,
+            SUBSTRING_INDEX(GROUP_CONCAT(t.`status` ORDER BY t.`id` DESC), ',', 1) AS `last_status`,
+            SUBSTRING_INDEX(GROUP_CONCAT(COALESCE(t.`message`,'') ORDER BY t.`id` DESC), ',', 1) AS `last_msg`
+            FROM `" . DB_PREFIX . self::HISTORY_TABLE . "` t
+            WHERE t.`uid` = ? AND t.`created_at` >= ?
+            GROUP BY t.`tieba`
+            ORDER BY `total` DESC";
+        $result = $m->pquery($sql, array($uid, $since));
+        $rows = array();
+        while ($row = $m->fetch_array($result)) {
+            $success = (int) $row['success'];
+            $error   = (int) $row['error'];
+            $total   = (int) $row['total'];
+            $rows[] = array(
+                'tieba'       => (string) $row['tieba'],
+                'success'     => $success,
+                'error'       => $error,
+                'total'       => $total,
+                'rate'        => $total > 0 ? round($success / $total * 100, 1) : 0,
+                'last_status' => (string) $row['last_status'],
+                'last_time'   => (int) $row['last_time'],
+                'last_msg'    => (string) $row['last_msg'],
+            );
+        }
+        return $rows;
     }
 }
 

@@ -1,13 +1,16 @@
-document.body.insertAdjacentHTML('beforeend','<button class="btn btn-primary btn-lg" id="wabutton" style="display:none;" data-toggle="modal" data-target="#alert_modal"></button><div class="modal fade" id="alert_modal" tabindex="-1" role="dialog" aria-labelledby="watitle" aria-hidden="true"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button><span class="modal-title" style="font-size:21px;" id="watitle">提示信息</span></div><div class="modal-body" id="watext" style="word-wrap: break-word; white-space: pre-line">未指定的异常</div><div class="modal-footer"><button type="button" class="btn btn-primary" id="waclose" data-dismiss="modal" style="width:100px;">关闭</button></div></div></div></div>');
-function alert(text,title)
-{
-    if (text != null) {
-        document.getElementById('watext').textContent = text; } else {
-        document.getElementById('watext').textContent = '未指定的异常'; }
-        if (title != null) {
-            document.getElementById('watitle').textContent = title;} else {
-                document.getElementById('watitle').textContent = '提示信息'; }
-            $("#wabutton").click();
+// v4: alert() 兜底使用 CS 原语 modal；CS 未就绪时降级原生 alert
+function alert(text, title) {
+    var body = (text != null) ? String(text) : '未指定的异常';
+    var head = (title != null) ? String(title) : '提示信息';
+    if (window.CS && CS.modal && typeof CS.modal.open === 'function') {
+        CS.modal.open({
+            title: head,
+            body: body,
+            actions: [{ label: '关闭', type: 'primary' }]
+        });
+    } else {
+        try { window.alert(head + '\n\n' + body); } catch (e) {}
+    }
 }
 if (window.$) {
     $(document).ajaxSend(function (event, jqXHR, settings) {
@@ -19,22 +22,67 @@ if (window.$) {
 }
 
 $(function () {
+    // v4: 主题切换 + 系统偏好跟随
     var themeToggle = document.querySelector('[data-theme-toggle]');
+    var root = document.documentElement;
+
+    function readSystemPreference() {
+        try {
+            var m = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+            return m && m.matches ? 'dark' : 'light';
+        } catch (e) { return 'light'; }
+    }
+
+    function readStoredPreference() {
+        try {
+            var t = localStorage.getItem('tc-theme');
+            return (t === 'dark' || t === 'light') ? t : null;
+        } catch (e) { return null; }
+    }
+
+    function applyTheme(theme) {
+        var prev = root.getAttribute('data-theme');
+        root.setAttribute('data-theme', theme);
+        if (themeToggle) {
+            var isDark = theme === 'dark';
+            themeToggle.setAttribute('aria-label', isDark ? '切换到浅色模式' : '切换到深色模式');
+            themeToggle.setAttribute('title', isDark ? '切换到浅色模式' : '切换到深色模式');
+            themeToggle.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+        }
+        // v4: 主题切换时派发事件，通知 CS.chart 等订阅方刷新
+        if (prev !== theme) {
+            try { window.dispatchEvent(new Event('cs-theme-change')); } catch (e) {}
+        }
+    }
+
+    // 初始化（与 head 内联脚本保持同步）
+    applyTheme(root.getAttribute('data-theme') || readStoredPreference() || readSystemPreference());
+
     if (themeToggle) {
-        var root = document.documentElement;
-        var updateThemeLabel = function () {
-            var isDark = root.getAttribute('data-theme') === 'dark';
-            themeToggle.setAttribute('aria-label', isDark ? '切换浅色模式' : '切换深色模式');
-            themeToggle.setAttribute('title', isDark ? '切换浅色模式' : '切换深色模式');
-        };
-        updateThemeLabel();
         themeToggle.addEventListener('click', function () {
-            var nextTheme = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-            root.setAttribute('data-theme', nextTheme);
-            try { localStorage.setItem('tc-theme', nextTheme); } catch (e) {}
-            updateThemeLabel();
+            var next = (root.getAttribute('data-theme') === 'dark') ? 'light' : 'dark';
+            applyTheme(next);
+            try { localStorage.setItem('tc-theme', next); } catch (e) {}
         });
     }
+
+    // 系统主题变化时跟随（仅当用户未手动选择）
+    try {
+        var mql = window.matchMedia('(prefers-color-scheme: dark)');
+        if (mql && typeof mql.addEventListener === 'function') {
+            mql.addEventListener('change', function (e) {
+                if (!readStoredPreference()) {
+                    applyTheme(e.matches ? 'dark' : 'light');
+                }
+            });
+        } else if (mql && typeof mql.addListener === 'function') {
+            mql.addListener(function (e) {
+                if (!readStoredPreference()) {
+                    applyTheme(e.matches ? 'dark' : 'light');
+                }
+            });
+        }
+    } catch (e) {}
 
     $('[data-view-status]').on('click', function () {
         view_status(this);

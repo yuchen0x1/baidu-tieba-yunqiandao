@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 if (!defined('SYSTEM_ROOT')) {
     die('Insufficient Permissions');
 }
@@ -76,7 +76,7 @@ loadhead();
             </div>
             <?php } ?>
             <?php doAction('reg_page_2'); ?>
-            <button type="submit" class="btn btn-primary auth-submit">创建我的账号</button>
+            <button type="submit" class="cs-btn cs-btn-primary auth-submit">创建我的账号</button>
             <?php doAction('reg_page_3'); ?>
         </form>
         <div class="auth-footer">已经有账号？<a href="index.php?mod=login">返回登录</a></div>

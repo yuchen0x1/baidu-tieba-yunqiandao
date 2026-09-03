@@ -864,6 +864,39 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
         Redirect("index.php?mod=baiduid");
 
         break;
+    case 'showtb:retry':
+        // 一键复签失败贴吧：支持单条（pid+tieba）与批量（retry_all=1）两种入口
+        if (ROLE === 'visitor' || ROLE === 'banned') {
+            msg('请先登录');
+        }
+        require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
+        require_once SYSTEM_ROOT . '/lib/class.notify.php';
+        $retryUid = ISADMIN && defined('CON_UID') && CON_UID > 0 ? (int) CON_UID : (int) UID;
+        $retryTables = array();
+        if (ISADMIN && defined('CON_UID') && CON_UID > 0) {
+            // 控制模式：用被控用户的表
+            $u = $m->once_fetch_array("SELECT `t` FROM `" . DB_PREFIX . "users` WHERE `id` = " . (int) CON_UID . " LIMIT 1");
+            $candidate = !empty($u['t']) ? strtolower((string) $u['t']) : 'tieba';
+            $retryTables = preg_match('/^[a-z0-9_]{1,64}$/', $candidate) ? array($candidate) : array('tieba');
+        } else {
+            $retryTables = array(TABLE);
+        }
+        $retryMsg = '';
+        $retryFailed = 0;
+        foreach ($retryTables as $retryTable) {
+            $result = misc::DoSign_retry($retryTable, $retryUid);
+            if (is_string($result) && $result !== '') {
+                $retryMsg .= $result . ' ';
+            }
+        }
+        $stat = SignManager::signSummary($retryUid);
+        if ($stat['error'] > 0) {
+            $retryFailed = $stat['error'];
+        }
+        doAction('showtb_retry_done', $retryUid);
+        $msg = '已触发复签：' . (trim($retryMsg) !== '' ? trim($retryMsg) : '本次无符合条件的待重试贴吧') . '。当前状态：成功 ' . (int) $stat['signed'] . '，失败 ' . (int) $stat['error'] . '，等待 ' . (int) $stat['waiting'];
+        Redirect('index.php?mod=showtb&retry_msg=' . urlencode($msg));
+        break;
     case 'showtb':
         if (isset($_POST['restore_pid'])) {
             $restorePidRaw = isset($_POST['restore_pid']) ? $_POST['restore_pid'] : '';
@@ -994,8 +1027,50 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
         $PostArray = array(
             'face_img',
             'face_baiduid',
-            'face_url'
+            'face_url',
+            'hide_from_ranking',
+            'remind_sign_fail',
+            'remind_sign_fail_threshold',
+            'remind_daily_summary',
+            'sign_retry_max',
+            'sign_delay_minutes',
+            'sign_shuffle'
         );
+        // 复选框未勾选时不会出现在 $_POST，强制补 0
+        if (!isset($_POST['hide_from_ranking'])) {
+            $_POST['hide_from_ranking'] = '0';
+            $i['post']['hide_from_ranking'] = '0';
+        }
+        if (!isset($_POST['remind_sign_fail'])) {
+            $_POST['remind_sign_fail'] = '0';
+            $i['post']['remind_sign_fail'] = '0';
+        }
+        if (!isset($_POST['remind_daily_summary'])) {
+            $_POST['remind_daily_summary'] = '0';
+            $i['post']['remind_daily_summary'] = '0';
+        }
+        if (!isset($_POST['sign_shuffle'])) {
+            $_POST['sign_shuffle'] = '0';
+            $i['post']['sign_shuffle'] = '0';
+        }
+        // 失败阈值做范围校验
+        $failThreshold = (int) (isset($_POST['remind_sign_fail_threshold']) ? $_POST['remind_sign_fail_threshold'] : 1);
+        if ($failThreshold < 1) { $failThreshold = 1; }
+        if ($failThreshold > 20) { $failThreshold = 20; }
+        $_POST['remind_sign_fail_threshold'] = (string) $failThreshold;
+        $i['post']['remind_sign_fail_threshold'] = (string) $failThreshold;
+        // 签到策略：重试次数 0-5
+        $retryMax = (int) (isset($_POST['sign_retry_max']) ? $_POST['sign_retry_max'] : 0);
+        if ($retryMax < 0) { $retryMax = 0; }
+        if ($retryMax > 5) { $retryMax = 5; }
+        $_POST['sign_retry_max'] = (string) $retryMax;
+        $i['post']['sign_retry_max'] = (string) $retryMax;
+        // 签到策略：延迟分钟 0-60
+        $signDelay = (int) (isset($_POST['sign_delay_minutes']) ? $_POST['sign_delay_minutes'] : 0);
+        if ($signDelay < 0) { $signDelay = 0; }
+        if ($signDelay > 60) { $signDelay = 60; }
+        $_POST['sign_delay_minutes'] = (string) $signDelay;
+        $i['post']['sign_delay_minutes'] = (string) $signDelay;
         doAction('set_save1');
     //更改邮箱
         if ($_POST['mail'] != $i['user']['email'] && !empty($_POST['mail'])) {

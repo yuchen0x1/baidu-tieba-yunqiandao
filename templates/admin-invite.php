@@ -1,4 +1,4 @@
-<?php if (!defined('SYSTEM_ROOT')) {
+﻿<?php if (!defined('SYSTEM_ROOT')) {
     die('Insufficient Permissions');
 }
 if (ROLE != 'admin') {
@@ -30,7 +30,7 @@ $active = $m->fetch_row($m->query("SELECT COUNT(*) FROM `" . DB_PREFIX . "invite
             <label class="checkbox"><input type="checkbox" name="yr_reg_multi" value="1" <?php if ($multiOn) {
                 echo 'checked="checked"';
                           } ?>> 启用多邀请码注册校验</label>
-            <input type="submit" class="btn btn-primary" value="保存">
+            <input type="submit" class="cs-btn cs-btn-primary" value="保存">
         </form>
     </div>
     <div class="col-md-6">
@@ -44,14 +44,14 @@ $active = $m->fetch_row($m->query("SELECT COUNT(*) FROM `" . DB_PREFIX . "invite
                 <tr><td>有效天数（0=永不过期）</td><td><input type="number" name="days" min="0" max="3650" value="0" class="form-control"></td></tr>
                 <tr><td>备注</td><td><input type="text" name="note" maxlength="255" class="form-control" placeholder="例如：2026 年活动"></td></tr>
             </table>
-            <input type="submit" class="btn btn-primary" value="批量生成" onclick="return confirm('确定生成邀请码吗？');">
+            <input type="submit" class="cs-btn cs-btn-primary" value="批量生成" onclick="return confirm('确定生成邀请码吗？');">
         </form>
     </div>
 </div>
 
 <h4>邀请码列表</h4>
 <div class="table-responsive">
-<table class="table table-hover table-striped">
+<table class="cs-table">
     <thead>
         <tr>
             <th>#</th>
@@ -92,8 +92,8 @@ $active = $m->fetch_row($m->query("SELECT COUNT(*) FROM `" . DB_PREFIX . "invite
             . '<td>' . htmlspecialchars($row['note'], ENT_QUOTES, 'UTF-8') . '</td>'
             . '<td>' . date('Y-m-d H:i', (int) $row['created_at']) . '</td>'
             . '<td>'
-            . '<form style="display:inline" action="setting.php?mod=admin:invite" method="post"><input type="hidden" name="csrf_token" value="' . $csrf . '"><input type="hidden" name="invite_action" value="toggle"><input type="hidden" name="id" value="' . $id . '"><button type="submit" class="btn btn-default btn-xs">' . ((int) $row['status'] === 1 ? '停用' : '启用') . '</button></form> '
-            . '<form style="display:inline" action="setting.php?mod=admin:invite" method="post" onsubmit="return confirm(\'确定删除该邀请码吗？\');"><input type="hidden" name="csrf_token" value="' . $csrf . '"><input type="hidden" name="invite_action" value="delete"><input type="hidden" name="id" value="' . $id . '"><button type="submit" class="btn btn-danger btn-xs">删除</button></form>'
+            . '<form style="display:inline" action="setting.php?mod=admin:invite" method="post"><input type="hidden" name="csrf_token" value="' . $csrf . '"><input type="hidden" name="invite_action" value="toggle"><input type="hidden" name="id" value="' . $id . '"><button type="submit" class="cs-btn cs-btn-secondary btn-xs">' . ((int) $row['status'] === 1 ? '停用' : '启用') . '</button></form> '
+            . '<form style="display:inline" action="setting.php?mod=admin:invite" method="post" onsubmit="return confirm(\'确定删除该邀请码吗？\');"><input type="hidden" name="csrf_token" value="' . $csrf . '"><input type="hidden" name="invite_action" value="delete"><input type="hidden" name="id" value="' . $id . '"><button type="submit" class="cs-btn cs-btn-danger btn-xs">删除</button></form>'
             . '</td>'
             . '</tr>';
     }

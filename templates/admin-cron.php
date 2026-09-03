@@ -1,4 +1,4 @@
-<?php if (!defined('SYSTEM_ROOT')) {
+﻿<?php if (!defined('SYSTEM_ROOT')) {
     die('Insufficient Permissions');
 }  if (ROLE != 'admin') {
     msg('权限不足!');
@@ -94,7 +94,7 @@ foreach ($runs as $r) {
 <form action="setting.php?mod=admin:cron&xorder" method="post">
 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
 <div class="table-responsive">
-<table class="table table-hover">
+<table class="cs-table">
    <thead>
         <tr>
            <th>任务描述/文件</th>
@@ -107,12 +107,12 @@ foreach ($runs as $r) {
     </tbody>
 </table>
 </div>
-<input type="submit" class="btn btn-primary" value="提交更改">
+<input type="submit" class="cs-btn cs-btn-primary" value="提交更改">
 </form>
 <br/>
 <h4>最近任务运行历史（V5.13）</h4>
 <div class="table-responsive">
-<table class="table table-hover">
+<table class="cs-table">
    <thead>
         <tr>
            <th>任务名</th>

@@ -1,4 +1,4 @@
-<?php if (!defined('SYSTEM_ROOT')) {
+﻿<?php if (!defined('SYSTEM_ROOT')) {
     die('Insufficient Permissions');
 }  if (ROLE != 'admin') {
     msg('权限不足！');
@@ -16,7 +16,7 @@ if (isset($_GET['ok'])) {
 if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
     /*准备*/
     ?>
-    <ul class="nav nav-tabs" role="tablist">
+    <ul class="cs-tablist" role="tablist">
       <li><a href="index.php?mod=admin:set">全局设置</a></li>
       <li class="active"><a href="index.php?mod=admin:set:sign">签到设置</a></li>
     </ul>
@@ -82,7 +82,7 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
 	        </td>
 	    </tr>';
     $content2['sign_mode'] = array('html' => $smhtml,'type' => 'else');
-    $content2['sign_scan'] = array('td1' => '<b>贴吧数据表搜寻方法</b><br/><br/><input type="button" class="btn btn-default" onclick="viewSignScanModeHelp();" value="查看帮助">','type' => 'select','text' => '<br/>该设置影响签到效率，不当的设置可能会导致效率降低并漏签');
+    $content2['sign_scan'] = array('td1' => '<b>贴吧数据表搜寻方法</b><br/><br/><input type="button" class="cs-btn cs-btn-secondary" onclick="viewSignScanModeHelp();" value="查看帮助">','type' => 'select','text' => '<br/>该设置影响签到效率，不当的设置可能会导致效率降低并漏签');
     $content2['sign_scan']['select'] = array('0' => '永不随机，按顺序抽取','1' => '随机，使用 JOIN','2' => '随机，使用 ORDER BY RAND()');
     $ft1 = option::get('fb');
     if (!empty($i['tabpart'])) {
@@ -159,7 +159,7 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
 } else {
     /*准备*/
     ?>
-    <ul class="nav nav-tabs" role="tablist">
+    <ul class="cs-tablist" role="tablist">
       <li class="active"><a href="index.php?mod=admin:set">全局设置</a></li>
       <li><a href="index.php?mod=admin:set:sign">签到设置</a></li>
     </ul>
@@ -229,7 +229,7 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
     ob_start();
     ?>
         <tr><td><b>邮件综合设置</b>
-        <br/><br/><input type="button" class="btn btn-default" onclick="location = '<?php echo SYSTEM_URL; ?>setting.php?mod=admin:testmail'" value="测试邮件发送">
+        <br/><br/><input type="button" class="cs-btn cs-btn-secondary" onclick="location = '<?php echo SYSTEM_URL; ?>setting.php?mod=admin:testmail'" value="测试邮件发送">
         <br/><br/>测试前请先保存设置
         <br/><br/>无加密的SMTP服务器端口号通常为 25
         <br/>SSL加密的SMTP服务器端口号通常为 465
@@ -327,7 +327,7 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
     };
     ?>
         <tr><td><b>通知设置</b>
-        <br/><br/><input type="button" class="btn btn-default" onclick="location = '<?php echo SYSTEM_URL; ?>setting.php?mod=admin:testnotify'" value="发送测试通知">
+        <br/><br/><input type="button" class="cs-btn cs-btn-secondary" onclick="location = '<?php echo SYSTEM_URL; ?>setting.php?mod=admin:testnotify'" value="发送测试通知">
         <br/><br/>测试前请先保存设置
         <br/><br/>支持在签到失败、百度账号 BDUSS 失效时主动推送提醒
         </td><td>

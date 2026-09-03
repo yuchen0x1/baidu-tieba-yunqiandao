@@ -1,86 +1,240 @@
-/*! Cloud Sign Studio design tokens */
+/*! Cloud Sign Studio design tokens v4 — 紫罗兰主色 + Glass v4
+ *  兼容策略：v3 变量名作为别名指向 v4 新变量，向后完全兼容
+ *  新增：motion 分级、shadow-lg、focus 双层、系统主题跟随
+ */
 :root {
-  --color-ink: #152321;
-  --color-ink-soft: #334441;
-  --color-muted: #6c7c78;
-  --color-muted-light: #9aa9a5;
-  --color-canvas: #f1f5f3;
+  /* === 色彩 · 品牌层（v4 升级：冷灰 → 紫罗兰） === */
+  --color-brand: #5b3aff;
+  --color-brand-deep: #3d1d9c;
+  --color-brand-soft: #efeaff;
+  --color-brand-contrast: #ffffff;
+  --color-primary: #5b3aff;
+  --color-accent: #a8842c;
+  --color-accent-deep: #7c611f;
+  --color-accent-soft: #f3ead6;
+
+  /* === 色彩 · 中性层 === */
+  --color-ink: #1d232b;
+  --color-ink-soft: #3b454f;
+  --color-muted: #67717d;
+  --color-muted-light: #9aa3ad;
+  --color-canvas: #eef0f3;
   --color-surface: #ffffff;
-  --color-surface-soft: #f8fbfa;
-  --color-line: #dce7e3;
-  --color-line-strong: #c6d6d1;
-  --color-brand: #0f766e;
-  --color-brand-deep: #0a4d49;
-  --color-brand-soft: #d9f1ec;
-  --color-border: #dce7e3;
-  --color-primary: #0f766e;
-  --color-bg: #f1f5f3;
-  --color-text: #152321;
-  --color-text-secondary: #334441;
-  --color-text-disabled: #9aa9a5;
-  --sidebar-active-bg: #d9f1ec;
-  --color-sidebar-active-bg: #d9f1ec;
-  --color-sidebar-active-text: #152321;
-  --color-accent: #f59e0b;
-  --color-accent-soft: #fff4d6;
-  --color-info: #2563eb;
-  --color-info-soft: #e6efff;
-  --color-success: #16805c;
-  --color-success-soft: #dff6eb;
-  --color-danger: #c2413a;
-  --color-danger-soft: #fee9e6;
-  --color-warning: #a16207;
-  --color-warning-soft: #fff4d6;
-  --font-sans: "Inter", "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
-  --font-mono: "Cascadia Code", Consolas, monospace;
+  --color-surface-soft: #f6f7f9;
+  --color-surface-strong: #ffffff;
+  --color-line: #dde1e6;
+  --color-line-strong: #c8cdd4;
+  --color-border: #dde1e6;
+  --color-text: #1d232b;
+  --color-text-secondary: #3b454f;
+  --color-text-disabled: #9aa3ad;
+  --color-bg: #eef0f3;
+  --color-sidebar-active-bg: #efeaff;
+  --color-sidebar-active-text: #3d1d9c;
+
+  /* === 色彩 · 语义层（v4 扩为 9 色 + soft/deep） === */
+  --color-success: #5b8a72;
+  --color-success-soft: #e4efe9;
+  --color-success-deep: #446652;
+  --color-info: #4a6fa5;
+  --color-info-soft: #e6edf6;
+  --color-info-deep: #34548a;
+  --color-warning: #a8842c;
+  --color-warning-soft: #f3ead6;
+  --color-warning-deep: #7c611f;
+  --color-danger: #c0554f;
+  --color-danger-soft: #f7e7e5;
+  --color-danger-deep: #97413c;
+
+  /* === 字体系统（v4：引入 Inter，7 档字号 + 5 档字重） === */
+  --font-sans: "Inter", "Segoe UI", "Microsoft YaHei", "PingFang SC", -apple-system, sans-serif;
+  --font-mono: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  --font-metric: "Inter", "Segoe UI", sans-serif;
+
+  --fs-2xs: 11px;
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --fs-2xl: 24px;
+  --fs-3xl: 28px;
+  --fs-4xl: 30px;
+
+  --lh-tight: 1.2;
+  --lh-snug: 1.45;
+  --lh-normal: 1.65;
+  --lh-relaxed: 1.8;
+
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 750;
+  --fw-black: 850;
+
+  /* === 间距系统（v4：4/8/12/16/20/24/32/48） === */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
-  --space-5: 24px;
-  --space-6: 32px;
-  --space-7: 48px;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --shadow-xs: 0 1px 2px rgba(21, 35, 33, .04);
-  --shadow-sm: 0 5px 18px rgba(21, 35, 33, .06);
-  --shadow-md: 0 14px 34px rgba(21, 35, 33, .10);
-  --glass-bg: rgba(255, 255, 255, .68);
-  --glass-bg-strong: rgba(255, 255, 255, .84);
-  --glass-bg-dark: rgba(21, 35, 33, .86);
-  --glass-border: rgba(255, 255, 255, .58);
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 48px;
+  --spacer-4: 4px;
+  --spacer-8: 8px;
+  --spacer-12: 12px;
+  --spacer-16: 16px;
+  --spacer-20: 20px;
+  --spacer-24: 24px;
+
+  /* === 圆角系统（v4：8/12/16/20/pill） === */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-pill: 999px;
+  --radius-full: 999px;
+
+  /* === 阴影系统（v4：xs/sm/md/lg + focus 双层） === */
+  --shadow-xs: 0 1px 2px rgba(23, 29, 36, .04);
+  --shadow-sm: 0 6px 20px rgba(23, 29, 36, .08);
+  --shadow-md: 0 14px 38px rgba(23, 29, 36, .13);
+  --shadow-lg: 0 22px 55px rgba(23, 29, 36, .18);
+  --shadow-focus: 0 0 0 3px rgba(91, 58, 255, .25);
+  --shadow-focus-outer: 0 0 0 5px rgba(91, 58, 255, .12);
+
+  /* === 动效系统（v4：4 档时长 + 分场景缓动） === */
+  --motion-instant: 0ms;
+  --motion-fast: 80ms;
+  --motion-base: 140ms;
+  --motion-slow: 240ms;
+  --motion-slower: 360ms;
+  --transition-fast: var(--motion-base) var(--ease-productive);
+  --transition-base: var(--motion-slow) var(--ease-productive);
+
+  --ease-productive: cubic-bezier(.2, .0, .0, 1);
+  --ease-expressive: cubic-bezier(.4, .14, .3, 1);
+  --ease-entrance: cubic-bezier(.0, .0, .2, 1);
+  --ease-exit: cubic-bezier(.4, .0, 1, 1);
+
+  /* === 玻璃层（Glass v4） === */
+  --glass-bg: rgba(255, 255, 255, .62);
+  --glass-bg-soft: rgba(255, 255, 255, .42);
+  --glass-bg-strong: rgba(255, 255, 255, .82);
+  --glass-bg-dark: rgba(20, 25, 30, .62);
+  --glass-bg-dark-strong: rgba(15, 19, 23, .84);
+  --glass-border: rgba(255, 255, 255, .72);
   --glass-border-dark: rgba(255, 255, 255, .14);
-  --glass-shadow: 0 18px 48px rgba(21, 35, 33, .12);
-  --glass-blur: 18px;
-  --focus-ring: 0 0 0 3px rgba(15, 118, 110, .18);
-  --transition-fast: 140ms ease;
-  --transition-base: 220ms ease;
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, .9);
+  --glass-shadow: 0 22px 55px rgba(23, 29, 36, .14), 0 3px 10px rgba(23, 29, 36, .05);
+  --glass-blur: 20px;
+  --glass-saturate: 135%;
+
+  /* === 焦点态（v4：双层 focus-visible） === */
+  --focus-ring: 0 0 0 3px rgba(91, 58, 255, .25);
+  --focus-ring-outer: 0 0 0 5px rgba(91, 58, 255, .12);
+  --focus-outline: 3px solid rgba(91, 58, 255, .72);
+  --focus-outline-offset: 2px;
+
+  /* === 发光（v4） === */
+  --glow-brand: 0 0 0 1px rgba(91, 58, 255, .18), 0 8px 26px rgba(91, 58, 255, .22);
+  --glow-accent: 0 6px 20px rgba(168, 132, 44, .3);
+
+  /* === 布局 === */
   --sidebar-width: 264px;
   --content-max: 1440px;
+  --topbar-height: 72px;
 }
 
+/* === 深色主题（v4：保留 v3 别名 + 新增变量） === */
 [data-theme="dark"] {
-  --color-ink: #e8f3ef;
-  --color-ink-soft: #c4d7d1;
-  --color-muted: #91aaa4;
-  --color-muted-light: #718b84;
-  --color-canvas: #0d1917;
-  --color-surface: #152522;
-  --color-surface-soft: #1c302c;
-  --color-line: #2b4841;
-  --color-line-strong: #3c5b53;
-  --color-text: #e8f3ef;
-  --color-text-secondary: #c4d7d1;
-  --glass-bg: rgba(27, 48, 44, .72);
-  --glass-bg-strong: rgba(27, 48, 44, .9);
-  --glass-border: rgba(184, 224, 211, .18);
-  --glass-shadow: 0 18px 48px rgba(0, 0, 0, .24);
+  --color-ink: #e6eaf0;
+  --color-ink-soft: #b8c0ca;
+  --color-muted: #8a95a1;
+  --color-muted-light: #66707c;
+  --color-canvas: #11151a;
+  --color-surface: #1a1f26;
+  --color-surface-soft: #222833;
+  --color-surface-strong: #252b34;
+  --color-line: #2a323c;
+  --color-line-strong: #3a4450;
+  --color-border: #2a323c;
+  --color-text: #e6eaf0;
+  --color-text-secondary: #b8c0ca;
+  --color-text-disabled: #66707c;
+  --color-bg: #11151a;
+  --color-sidebar-active-bg: rgba(91, 58, 255, .18);
+  --color-sidebar-active-text: #c4b8ff;
+
+  --color-brand: #7c63ff;
+  --color-brand-deep: #5b3aff;
+  --color-brand-soft: rgba(91, 58, 255, .18);
+  --color-primary: #7c63ff;
+
+  --glass-bg: rgba(28, 34, 42, .5);
+  --glass-bg-soft: rgba(28, 34, 42, .32);
+  --glass-bg-strong: rgba(30, 37, 46, .82);
+  --glass-bg-dark: rgba(13, 17, 21, .66);
+  --glass-bg-dark-strong: rgba(10, 13, 16, .88);
+  --glass-border: rgba(214, 222, 232, .18);
+  --glass-border-dark: rgba(255, 255, 255, .1);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, .07);
+  --glass-shadow: 0 22px 55px rgba(0, 0, 0, .42), 0 3px 10px rgba(0, 0, 0, .2);
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, .3);
+  --shadow-sm: 0 6px 20px rgba(0, 0, 0, .35);
+  --shadow-md: 0 14px 38px rgba(0, 0, 0, .45);
+  --shadow-lg: 0 22px 55px rgba(0, 0, 0, .55);
+
+  --focus-ring: 0 0 0 3px rgba(190, 150, 60, .3);
+  --focus-ring-outer: 0 0 0 5px rgba(190, 150, 60, .14);
+  --focus-outline: 3px solid rgba(190, 150, 60, .72);
+
+  --glow-brand: 0 0 0 1px rgba(120, 132, 146, .25), 0 8px 30px rgba(0, 0, 0, .35);
+  --glow-accent: 0 6px 22px rgba(168, 132, 44, .35);
 }
 
+/* === 系统主题自动跟随（v4 新增）
+ *  仅当用户未手动设置过主题时，跟随 prefers-color-scheme
+ *  手动选择仍存于 localStorage，优先级最高
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --color-ink: #e6eaf0;
+    --color-ink-soft: #b8c0ca;
+    --color-muted: #8a95a1;
+    --color-muted-light: #66707c;
+    --color-canvas: #11151a;
+    --color-surface: #1a1f26;
+    --color-surface-soft: #222833;
+    --color-surface-strong: #252b34;
+    --color-line: #2a323c;
+    --color-line-strong: #3a4450;
+    --color-text: #e6eaf0;
+    --color-text-secondary: #b8c0ca;
+    --color-bg: #11151a;
+    --color-brand: #7c63ff;
+    --color-brand-deep: #5b3aff;
+    --color-brand-soft: rgba(91, 58, 255, .18);
+    --glass-bg: rgba(28, 34, 42, .5);
+    --glass-bg-strong: rgba(30, 37, 46, .82);
+    --glass-border: rgba(214, 222, 232, .18);
+  }
+}
+
+/* === 降低动效偏好（v4 细化到组件） === */
 @media (prefers-reduced-motion: reduce) {
   :root {
+    --motion-fast: 0ms;
+    --motion-base: 0ms;
+    --motion-slow: 0ms;
+    --motion-slower: 0ms;
     --transition-fast: 0ms;
     --transition-base: 0ms;
+    --ease-productive: linear;
+    --ease-expressive: linear;
+    --ease-entrance: linear;
+    --ease-exit: linear;
   }
 }

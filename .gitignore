@@ -9,6 +9,7 @@ docker/.env
 .reasonix/
 .mimosa/
 .zcode/
+.trae/
 
 vendor/
 

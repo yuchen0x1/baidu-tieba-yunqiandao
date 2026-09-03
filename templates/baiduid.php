@@ -3,59 +3,60 @@
 }
 global $i;
 global $m;
+$allowBind = (option::get('bduss_num') != '-1' || ISVIP);
 ?>
 
+<div class="cs-tabs" id="PageTab">
+    <ul class="cs-tablist" role="tablist">
+        <li><button type="button" class="cs-tab" role="tab" id="tab-adminid" aria-controls="adminid" aria-selected="true">管理账号</button></li>
+        <?php if ($allowBind) { ?>
+            <li><button type="button" class="cs-tab" role="tab" id="tab-newid" aria-controls="newid" aria-selected="false">扫码绑定</button></li>
+            <li><button type="button" class="cs-tab" role="tab" id="tab-newid2" aria-controls="newid2" aria-selected="false">手动绑定</button></li>
+        <?php } ?>
+    </ul>
+</div>
 
-
-<!-- NAVI -->
-<ul class="nav nav-tabs" id="PageTab">
-  <li class="active"><a href="#adminid" data-toggle="tab" onclick="$('#newid2').css('display','none');$('#newid').css('display','none');$('#adminid').css('display','');">管理账号</a></li>
-  <?php if (option::get('bduss_num') != '-1' || ISVIP) {
-        ?><li><a href="#newid" data-toggle="tab" onclick="$('#newid').css('display','');$('#adminid').css('display','none');$('#newid2').css('display','none');">扫码绑定</a></li>
-  <li><a href="#newid2" data-toggle="tab" onclick="$('#newid2').css('display','');$('#adminid').css('display','none');$('#newid').css('display','none');">手动绑定</a></li>
-  <?php } ?>
-</ul>
-<br/>
-<!-- END NAVI -->
-
-<!-- PAGE1: ADMINID-->
-<div class="tab-pane fade in active" id="adminid">
-<a name="#adminid"></a>
+<!-- PAGE1: ADMINID -->
+<div class="cs-tabpanel" id="adminid" role="tabpanel" aria-labelledby="tab-adminid">
 <?php if (option::get('bduss_num') == '-1' && ISVIP != true) {
     ?>
-<div class="alert alert-danger" role="alert">
-  本站禁止绑定百度账号，当前已绑定 <?php echo sizeof($i['user']['bduss']) ?> 个账号，PID 即为 账号ID
+<div class="cs-alert cs-alert-danger" role="alert">
+    <svg class="cs-alert-icon" aria-hidden="true"><use href="#i-alert"/></svg>
+    <div class="cs-alert-body">本站禁止绑定百度账号，当前已绑定 <?php echo sizeof($i['user']['bduss']) ?> 个账号，PID 即为 账号ID</div>
 </div>
     <?php
 } elseif (empty($i['user']['bduss'])) {
     ?>
-<div class="alert alert-warning">
-  无法显示列表，因为当前还没有绑定任何百度账号
-  <br/>若要绑定账号，请点击上方的 [ 绑定新账号 ]
-    <?php if (option::get('bduss_num') != '0' && ISVIP != true) {
-        echo '，您最多能够绑定 ' . option::get('bduss_num') . ' 个账号';
-    } ?>
+<div class="cs-alert cs-alert-warning">
+    <svg class="cs-alert-icon" aria-hidden="true"><use href="#i-alert"/></svg>
+    <div class="cs-alert-body">
+        无法显示列表，因为当前还没有绑定任何百度账号<br/>若要绑定账号，请点击「扫码绑定」或「手动绑定」标签
+        <?php if (option::get('bduss_num') != '0' && ISVIP != true) {
+            echo '，您最多能够绑定 ' . option::get('bduss_num') . ' 个账号';
+        } ?>
+    </div>
 </div>
     <?php
 } else {
     ?>
-<div class="alert alert-info">
-  当前已绑定 <?php echo sizeof($i['user']['bduss']) ?> 个账号，PID 即为 账号ID
+<div class="cs-alert cs-alert-info">
+    <svg class="cs-alert-icon" aria-hidden="true"><use href="#i-info"/></svg>
+    <div class="cs-alert-body">当前已绑定 <?php echo sizeof($i['user']['bduss']) ?> 个账号，PID 即为 账号ID
     <?php if (option::get('bduss_num') != '0' && ISVIP != true) {
         echo '，您最多能够绑定 ' . option::get('bduss_num') . ' 个账号';
-    } ?>
-。</div>
+    } ?>。</div>
+</div>
     <?php
 } if (!empty($i['user']['bduss'])) {
     ?>
-<div class="table-responsive">
-<table class="table table-striped">
+<div class="cs-table-wrap">
+<table class="cs-table">
   <thead>
     <tr>
       <th>PID</th>
       <th style="width:20%">百度名称</th>
       <th style="width:20%">Portrait</th>
-      <th style="width:40%">BDUSS</th>
+      <th style="width:30%">BDUSS</th>
       <th style="width:20%">STOKEN</th>
       <th>操作</th>
     </tr>
@@ -66,12 +67,21 @@ global $m;
         echo '<tr><td>' . $key . '</td>';
         $name = empty($i['user']['baidu'][$key]) ? '未记录百度ID' : htmlspecialchars($i['user']['baidu'][$key], ENT_QUOTES, 'UTF-8');
         if ($name == '[E]') {
-            $name = '<font color="red">已失效</font>';
+            $name = '<span class="cs-badge cs-badge-danger">已失效</span>';
         }
-      //echo '<td><a href="setting.php?mod=baiduid&reget='.$key.'"">'.$name.'</a></td>';
-        echo '<td>' . $name . '</td><td><input type="text" class="form-control" readonly value="' . htmlspecialchars($i['user']['baidu_portrait'][$key], ENT_QUOTES, 'UTF-8') . '"></td>';
+        echo '<td>' . $name . '</td>';
+        echo '<td><input type="text" class="form-control" readonly value="' . htmlspecialchars($i['user']['baidu_portrait'][$key], ENT_QUOTES, 'UTF-8') . '"></td>';
         echo '<td><input type="text" class="form-control" readonly value="' . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . '"></td>';
-        echo '<td><input type="text" class="form-control" readonly value="' . htmlspecialchars($i['user']['stoken'][$key], ENT_QUOTES, 'UTF-8') . '"></td><td><a class="btn btn-default" href="setting.php?mod=baiduid&del=' . htmlspecialchars($key, ENT_QUOTES, 'UTF-8') . '" onclick="return confirm(\'确定要解绑该账号吗？\');">解绑</a><br/><br/><form method="post" action="setting.php"><input type="hidden" name="mod" value="baiduid"><input type="hidden" name="csrf_token" value="' . htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') . '"><input type="hidden" name="proxy_pid" value="' . htmlspecialchars($key, ENT_QUOTES, 'UTF-8') . '"><input type="text" class="form-control input-sm" name="proxy" placeholder="代理(留空跟随全局)" value="' . htmlspecialchars(isset($i['user']['bduss_proxy'][$key]) ? $i['user']['bduss_proxy'][$key] : '', ENT_QUOTES, 'UTF-8') . '" title="格式：http://host:port 或 socks5://user:pass@host:port，off 为禁用"> <button type="submit" class="btn btn-default btn-sm" style="margin-top:5px">保存代理</button></form></td></tr>';
+        echo '<td><input type="text" class="form-control" readonly value="' . htmlspecialchars($i['user']['stoken'][$key], ENT_QUOTES, 'UTF-8') . '"></td>';
+        echo '<td><div style="display:flex;flex-direction:column;gap:6px">';
+        echo '<a class="cs-btn cs-btn-danger cs-btn-sm" href="setting.php?mod=baiduid&del=' . htmlspecialchars($key, ENT_QUOTES, 'UTF-8') . '" onclick="return confirm(\'确定要解绑该账号吗？\');"><svg class="cs-icon" style="width:12px;height:12px" aria-hidden="true"><use href="#i-x"/></svg> 解绑</a>';
+        echo '<form method="post" action="setting.php" style="display:flex;flex-direction:column;gap:4px">';
+        echo '<input type="hidden" name="mod" value="baiduid">';
+        echo '<input type="hidden" name="csrf_token" value="' . htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') . '">';
+        echo '<input type="hidden" name="proxy_pid" value="' . htmlspecialchars($key, ENT_QUOTES, 'UTF-8') . '">';
+        echo '<input type="text" class="form-control input-sm" name="proxy" placeholder="代理(留空跟随全局)" value="' . htmlspecialchars(isset($i['user']['bduss_proxy'][$key]) ? $i['user']['bduss_proxy'][$key] : '', ENT_QUOTES, 'UTF-8') . '" title="格式：http://host:port 或 socks5://user:pass@host:port，off 为禁用">';
+        echo '<button type="submit" class="cs-btn cs-btn-secondary cs-btn-sm">保存代理</button>';
+        echo '</form></div></td></tr>';
     }
     ?>
   </tbody>
@@ -80,10 +90,9 @@ global $m;
     <?php
 } ?>
 </div>
-<!-- END PAGE1 -->
 
 <!-- PAGE2: NEWID -->
-<div class="tab-pane fade" id="newid" style="display:none">
+<div class="cs-tabpanel" id="newid" role="tabpanel" aria-labelledby="tab-newid" hidden>
   <script type="text/javascript">
       $(document).ready(function(){
           $("#addbdid_form").submit(function(e){
@@ -108,6 +117,7 @@ global $m;
                           $('#addbdid_msg').text('成功绑定百度账号：' + x.name);
                           $('#addbdid_pb').css({"width":"100%"});
                           $('#addbdid_prog').fadeOut(500);
+                          if (window.CS && CS.toast) { CS.toast('绑定成功', { type: 'success', body: x.name }); }
                       } else {
                           $('#addbdid_msg').text(x.msg);
                       }
@@ -119,15 +129,7 @@ global $m;
               });
           });
       });
-  /*
-  function addbdid_getbduss() {
-
-    $(document).ready(function(){
-
-    });
-  }
-  */
-</script>
+  </script>
 <div id="addbdid_prog" style="display:none">
   <b><span class="addbdis_text">正在拉取验证信息...</span></b><br/><br/>
   <div class="progress">
@@ -135,8 +137,10 @@ global $m;
     </div>
   </div>
 </div>
-<a name="#newid"></a>
-<div class="alert alert-warning" role="alert" id="addbdid_msg">如果您多次尝试绑定失败，不妨试试 <a href="https://bduss.nest.moe" target="_blank">手动获取</a> 吧！</div>
+<div class="cs-alert cs-alert-warning" id="addbdid_msg">
+    <svg class="cs-alert-icon" aria-hidden="true"><use href="#i-info"/></svg>
+    <div class="cs-alert-body">如果您多次尝试绑定失败，不妨试试 <a href="https://bduss.nest.moe" target="_blank">手动获取</a> 吧！</div>
+</div>
 <form method="post" id="addbdid_form" onsubmit="return false;">
   <?php
   $login_info = misc::get_login_qrcode();
@@ -149,70 +153,71 @@ global $m;
   <div id="addbdid_ver" style="display: none">
     <input type="hidden" id="sign" value="<?php echo $qr_sign; ?>">
   </div>
-  <a href="https://wappass.baidu.com/wp/?qrlogin=&sign=<?php echo $qr_sign; ?>" class="btn btn-default btn-block" target="_blank">网页授权</a>
-  <input type="submit" id="addbdid_submit" class="btn btn-primary btn-block" value="点击绑定">
+  <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+      <a href="https://wappass.baidu.com/wp/?qrlogin=&sign=<?php echo $qr_sign; ?>" class="cs-btn cs-btn-secondary cs-btn-block" target="_blank"><svg class="cs-icon" style="width:14px;height:14px" aria-hidden="true"><use href="#i-log-in"/></svg> 网页授权</a>
+      <input type="submit" id="addbdid_submit" class="cs-btn cs-btn-primary cs-btn-block" value="点击绑定">
+  </div>
   <?php } else { ?>
-  <div class="alert alert-danger" role="alert">
-    <strong>二维码获取失败</strong>：服务器当前无法连接百度的二维码接口（网络原因或接口临时不可用）。<br/>
-    <br/>你可以：
-    <br/>1. 稍后刷新本页重试；
-    <br/>2. 切换到上方「<b>手动绑定</b>」标签，直接粘贴 BDUSS 绑定（页面内有图文教程）。
+  <div class="cs-alert cs-alert-danger" role="alert">
+      <svg class="cs-alert-icon" aria-hidden="true"><use href="#i-alert"/></svg>
+      <div class="cs-alert-body">
+        <strong>二维码获取失败</strong>：服务器当前无法连接百度的二维码接口（网络原因或接口临时不可用）。<br/>
+        <br/>你可以：
+        <br/>1. 稍后刷新本页重试；
+        <br/>2. 切换到「手动绑定」标签，直接粘贴 BDUSS 绑定（页面内有图文教程）。
+      </div>
   </div>
   <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
   <?php } ?>
 </form>
-<br/><br/>
-<div class="panel panel-default">
-    <div class="panel-heading" onclick="$('#win_bduss').fadeToggle();"><h3 class="panel-title"><span class="glyphicon glyphicon-chevron-down"></span> 提示</h3></div>
-    <div class="panel-body" id="win_bduss">
-    <ul>
-      <li>可直接点击 "网页授权" 并在新打开页授权，无需客户端扫码，非移动设备的UA可能会导致无法打开</li>
-      <li>若二维码失效请刷新本页以刷新二维码</li>
-    </ul>
-    </div>
-</div>
-</div>
 
-<!-- END PAGE2 -->
+<details class="cs-collapse">
+    <summary>提示</summary>
+    <div class="cs-collapse-body">
+      <ul>
+        <li>可直接点击 "网页授权" 并在新打开页授权，无需客户端扫码，非移动设备的UA可能会导致无法打开</li>
+        <li>若二维码失效请刷新本页以刷新二维码</li>
+      </ul>
+    </div>
+</details>
+</div>
 
 <!-- PAGE3: NEWID2 -->
-<div class="tab-pane fade" id="newid2" style="display:none">
+<div class="cs-tabpanel" id="newid2" role="tabpanel" aria-labelledby="tab-newid2" hidden>
 <form action="setting.php" method="post">
 <input type="hidden" name="mod" value="baiduid">
 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
-<div class="input-group">
-  <span class="input-group-addon">输入BDUSS</span>
+<div class="cs-input-group">
+  <span class="cs-input-addon">输入BDUSS</span>
   <input type="text" class="form-control" name="bduss" id="bduss_input">
 </div>
-<br>
-<div class="input-group">
-  <span class="input-group-addon">输入STOKEN</span>
+<div class="cs-input-group">
+  <span class="cs-input-addon">输入STOKEN</span>
   <input type="text" class="form-control" name="stoken" id="stoken_input">
 </div>
-<br>
-<input type="submit" class="btn btn-primary" value="点击提交">
+<button type="submit" class="cs-btn cs-btn-primary"><svg class="cs-icon" style="width:14px;height:14px" aria-hidden="true"><use href="#i-check"/></svg> 点击提交</button>
 </form>
 
-<br/><br/>
-<div class="panel panel-default">
-    <div class="panel-heading" onclick="$('#batch_import_box').fadeToggle();"><h3 class="panel-title"><span class="glyphicon glyphicon-chevron-down"></span> 批量导入（多账号粘贴）</h3></div>
-    <div class="panel-body" id="batch_import_box" style="display:none">
+<details class="cs-collapse">
+    <summary>批量导入（多账号粘贴）</summary>
+    <div class="cs-collapse-body">
         <form action="setting.php" method="post">
             <input type="hidden" name="mod" value="baiduid">
             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
             <input type="hidden" name="batch_import" value="1">
             <textarea class="form-control" style="height:150px" name="batch_bduss" placeholder="每行一个账号，支持以下格式：&#10;BDUSS值&#10;BDUSS值----STOKEN值&#10;BDUSS值,STOKEN值&#10;BDUSS=BDUSS值;STOKEN=STOKEN值"></textarea>
-            <br/>
-            <button type="submit" class="btn btn-primary">开始导入</button>
-            <span class="text-muted" style="margin-left:10px">单次最多 50 行；系统会自动校验每个 Cookie 并识别账号名，无效行将被跳过</span>
+            <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <button type="submit" class="cs-btn cs-btn-primary">开始导入</button>
+                <span class="text-muted" style="font-size:12px">单次最多 50 行；系统会自动校验每个 Cookie 并识别账号名，无效行将被跳过</span>
+            </div>
         </form>
     </div>
-</div>
+</details>
 
-<br/><br/><b>以下是贴吧账号手动绑定教程：</b><br/><br/>
-<div class="panel panel-default">
-    <div class="panel-heading" onclick="$('#chrome_bduss').fadeToggle();"><h3 class="panel-title"><span class="glyphicon glyphicon-chevron-down"></span> 点击查看在 Chrome 浏览器下的绑定方法</h3></div>
-    <div class="panel-body" id="chrome_bduss" style="display:none">
+<details class="cs-collapse">
+    <summary>贴吧账号手动绑定教程（Chrome）</summary>
+    <div class="cs-collapse-body">
+        <b>以下是贴吧账号手动绑定教程：</b><br/><br/>
         1.使用 Chrome 或 Chromium 内核的浏览器
         <br/><br/>2.打开百度首页 <a href="http://www.baidu.com" target="_blank">http://www.baidu.com/</a>
            <br/><br/>3.右键，点击 <b>查看网页信息</b>
@@ -220,13 +225,14 @@ global $m;
         <br/><br/>5.如图，依次展开 <b>passport.baidu.com</b> -> <b>Cookie</b> -> <b>BDUSS</b>，stoken获取方式同理
         <br/><br/><picture><source srcset="source/doc/baiduid.webp" type="image/webp"><img src="source/doc/baiduid.png" alt="BDUSS 获取教程" style="max-width:100%"></picture>
         <br/><br/>6.按下 Ctrl+A 全选，然后复制并输入到上面的表单即可
-    <br/><br/>请注意，一旦退出登录，可能导致 BDUSS 失效，因此建议在隐身模式下登录
+        <br/><br/>请注意，一旦退出登录，可能导致 BDUSS 失效，因此建议在隐身模式下登录
     </div>
+</details>
 </div>
-</div>
-<!-- END PAGE3 -->
+
 <?php doAction('baiduid'); ?>
-<br/><br/><br/><br/><br/><br/><?php echo SYSTEM_FN ?> V<?php echo SYSTEM_VER  . ' ' . SYSTEM_VER_NOTE ?> // 作者: <a href="https://kenvix.com" target="_blank">Kenvix</a> &amp; <a href="http://www.mokeyjay.com/" target="_blank">mokeyjay</a> &amp; <a href="http://fyy1999.lofter.com/" target="_blank">FYY</a>
-
-
-
+<script type="text/javascript">
+// v4: 初始化 baiduid tabs（CS.tabs 自动初始化 .cs-tabs，此处兜底）
+if (window.CS && CS.tabs) { CS.tabs.init(document.getElementById('PageTab')); }
+</script>
+<div style="text-align:center;color:var(--color-muted);font-size:12px;padding:24px 0 16px"><?php echo SYSTEM_FN ?> V<?php echo SYSTEM_VER  . ' ' . SYSTEM_VER_NOTE ?> // 作者: <a href="https://kenvix.com" target="_blank">Kenvix</a> &amp; <a href="http://www.mokeyjay.com/" target="_blank">mokeyjay</a> &amp; <a href="http://fyy1999.lofter.com/" target="_blank">FYY</a></div>
