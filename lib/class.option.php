@@ -61,9 +61,9 @@ class option
     /**
      * 直接添加一个设置
      * @param string $name 设置项名称
-     * @param string $value 值
+     * @param string $value 值（缺省为空字符串，兼容仅传名称的旧插件写法）
      */
-    public static function add($name, $value)
+    public static function add($name, $value = '')
     {
 
         global $m,$i;
