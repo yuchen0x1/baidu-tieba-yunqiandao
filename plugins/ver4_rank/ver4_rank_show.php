@@ -19,10 +19,10 @@ if (isset($_GET['save'])) {
     redirect('index.php?plugin=ver4_rank&success=' . urlencode('您的设置已成功保存'));
 }
 if (isset($_GET['duser'])) {
-    $id = isset($_GET['id']) ? sqladds($_GET['id']) : '';
+    $id = isset($_GET['id']) ? $_GET['id'] : '';
     if (!empty($id)) {
         global $m;
-        $m->query("DELETE FROM `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_rank_log` WHERE `id` = '{$id}' AND `uid` = {$uid}");
+        $m->pquery("DELETE FROM `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_rank_log` WHERE `id` = ? AND `uid` = ?", array($id, $uid));
         redirect('index.php?plugin=ver4_rank&success=' . urlencode('已成功删除该名人！'));
     } else {
         redirect('index.php?plugin=ver4_rank&error=' . urlencode('ID不合法'));
@@ -34,10 +34,10 @@ if (isset($_GET['dauser'])) {
     redirect('index.php?plugin=ver4_rank&success=' . urlencode('名人列表已成功清空！'));
 }
 if (isset($_GET['newuser'])) {
-    $pid = isset($_POST['pid']) ? sqladds($_POST['pid']) : '';
+    $pid = isset($_POST['pid']) ? $_POST['pid'] : '';
     $ck = isset($_POST['check']) ? sqladds($_POST['check']) : '';
 
-    $p = $m->fetch_array($m->query("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `id` = '{$pid}'"));
+    $p = $m->fetch_array($m->pquery("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `id` = ?", array($pid)));
     if ($p['uid'] != UID) {
         redirect('index.php?plugin=ver4_rank&error=' . urlencode('你不能替他人添加名人呦'));
     }
@@ -48,9 +48,9 @@ if (isset($_GET['newuser'])) {
     $list = json_decode(file_get_contents(PLUGIN_ROOT . '/ver4_rank/ver4_rank_list.json'), true);
     foreach ($ck as $v) {
         if (isset($list[$v])) {
-            $ux = $m->fetch_array($m->query("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_rank_log` WHERE `pid` = '{$pid}' AND `name` = '{$list[$v]['name']}'"));
+            $ux = $m->fetch_array($m->pquery("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_rank_log` WHERE `pid` = ? AND `name` = ?", array($pid, $list[$v]['name'])));
             if (empty($ux['name'])) {
-                $m->query("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_rank_log` (`uid`,`pid`,`fid`,`nid`,`name`,`tieba`,`date`) VALUES ({$uid},'{$pid}','{$list[$v]['fid']}','{$list[$v]['nid']}','{$list[$v]['name']}','{$list[$v]['tieba']}',0)");
+                $m->pquery("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_rank_log` (`uid`,`pid`,`fid`,`nid`,`name`,`tieba`,`date`) VALUES (?,?,?,?,?,?,0)", array($uid, $pid, $list[$v]['fid'], $list[$v]['nid'], $list[$v]['name'], $list[$v]['tieba']));
             }
         }
     }

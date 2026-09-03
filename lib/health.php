@@ -85,7 +85,8 @@ function project_health_check($root, $mode = 'ready')
             require_once $root . '/config.php';
             if (defined('DB_HOST') && defined('DB_USER') && defined('DB_PASSWD') && defined('DB_NAME') && defined('DB_PREFIX')) {
                 $endpoint = parse_database_endpoint(DB_HOST);
-                $prefix = DB_PREFIX;
+                // 前缀为服务端 config.php 常量，与 HTTP 输入无关；白名单校验后才允许拼进标识符位置
+                $prefixSafe = preg_match('/^[A-Za-z0-9_]+$/', DB_PREFIX) === 1;
                 $connection = @mysqli_init();
                 try {
                     if ($connection) {
@@ -93,22 +94,27 @@ function project_health_check($root, $mode = 'ready')
                     }
                     $flags = defined('DB_SSL') && DB_SSL ? MYSQLI_CLIENT_SSL : 0;
                     if ($connection && @$connection->real_connect($endpoint['host'], DB_USER, DB_PASSWD, DB_NAME, $endpoint['port'], null, $flags)) {
-                        $probe = $connection->query("SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '" . $connection->real_escape_string($prefix . 'task_runs') . "' LIMIT 1");
-                        $checks['task_runs'] = $probe && $probe->num_rows === 1;
+                        $probeStmt = $connection->prepare("SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1");
+                        $probeName = DB_PREFIX . 'task_runs';
+                        $probe = $probeStmt ? ($probeStmt->bind_param('s', $probeName) && $probeStmt->execute() && $probeStmt->store_result()) : false;
+                        $checks['task_runs'] = $probe && $probeStmt->num_rows === 1;
+                        if ($probeStmt) {
+                            $probeStmt->close();
+                        }
 
-                        $row = $connection->query("SELECT MAX(`lastdo`) AS lastdo FROM `" . $prefix . "cron`");
+                        $row = $prefixSafe ? $connection->query("SELECT MAX(`lastdo`) AS lastdo FROM `" . DB_PREFIX . "cron`") : false;
                         if ($row && ($r2 = $row->fetch_assoc())) {
                             $lastdo = (int) $r2['lastdo'];
                             $checks['cron_fresh'] = $lastdo > 0 && (time() - $lastdo) < 86400;
                         }
 
-                        $row = $connection->query("SELECT COUNT(*) AS c FROM `" . $prefix . "cron` WHERE `last_status` = 'error'");
+                        $row = $prefixSafe ? $connection->query("SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "cron` WHERE `last_status` = 'error'") : false;
                         if ($row && ($r2 = $row->fetch_assoc())) {
                             $checks['cron_error'] = ((int) $r2['c']) === 0;
                         }
 
                         if ($checks['task_runs']) {
-                            $row = $connection->query("SELECT COUNT(*) AS c FROM `" . $prefix . "task_runs` WHERE `status` = 'error' AND `started_at` >= " . (time() - 86400));
+                            $row = $prefixSafe ? $connection->query("SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "task_runs` WHERE `status` = 'error' AND `started_at` >= " . (time() - 86400)) : false;
                             if ($row && ($r2 = $row->fetch_assoc())) {
                                 $checks['task_runs_error_24h'] = ((int) $r2['c']) < 10;
                             }

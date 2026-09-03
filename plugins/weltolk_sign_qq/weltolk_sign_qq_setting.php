@@ -34,7 +34,7 @@ switch ($_GET['act']) {
         <tbody>
         <tr>
             <td>单次计划任务连续推送次数<br/>越小效率越低，但太大也可能导致超时</td>
-            <td><input type="number" min="1" step="1" name="limit" value="<?php echo $limit ?>"
+            <td><input type="number" min="1" step="1" name="limit" value="<?php echo htmlspecialchars($limit, ENT_QUOTES, 'UTF-8') ?>"
                        class="form-control" required></td>
         </tr>
         </tbody>

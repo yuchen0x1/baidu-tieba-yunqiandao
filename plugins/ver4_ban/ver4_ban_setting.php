@@ -17,7 +17,7 @@ if (isset($_GET['save'])) {
 <form method="post" action="index.php?mod=admin:setplug&plug=ver4_ban&save">
 <div class="input-group">
         <span class="input-group-addon">添加限制（个）</span>
-        <input type="text" class="form-control" name="limit" placeholder="此处填写用户最多可以添加多少条封禁" value="<?= option::get('ver4_ban_limit') ?>" required>
+        <input type="text" class="form-control" name="limit" placeholder="此处填写用户最多可以添加多少条封禁" value="<?= htmlspecialchars(option::get('ver4_ban_limit'), ENT_QUOTES, 'UTF-8') ?>" required>
     </div>
     <br>
     <label for="break-check">允许跳过权限检查</label>   <input type="checkbox" id="break-check" name="break_check" <?= option::get('ver4_ban_break_check') === '1' ? 'checked' : '' ?>>

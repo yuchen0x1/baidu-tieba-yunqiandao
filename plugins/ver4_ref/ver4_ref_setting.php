@@ -7,7 +7,7 @@ if (isset($_GET['msg'])) {
 }
 if (isset($_GET['id'])) {
     $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
-    $r = $m->fetch_array($m->query("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `id` = {$id}"));
+    $r = $m->fetch_array($m->pquery("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `id` = ?", array($id)));
     if (!empty($r['bduss'])) {
         misc::scanTiebaByValidatedPid((int) $r['id']);
         redirect('index.php?mod=admin:setplug&plug=ver4_ref&msg=' . urlencode('已成功刷新该用户贴吧列表！'));

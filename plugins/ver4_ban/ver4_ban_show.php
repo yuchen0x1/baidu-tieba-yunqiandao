@@ -19,7 +19,7 @@ if (isset($_GET["api"])) {
     } else {
         switch (isset($_GET["m"]) ? $_GET["m"] : "") {
             case "save":
-                $con = isset($_POST['ban_c']) ? sqladds($_POST['ban_c']) : '';
+                $con = isset($_POST['ban_c']) ? $_POST['ban_c'] : '';
                 $open = isset($_POST['open']) ? $_POST['open'] : 0;
                 if (!empty($open)) {
                     option::uset('ver4_ban_open', 1, $uid);
@@ -27,17 +27,17 @@ if (isset($_GET["api"])) {
                     option::uset('ver4_ban_open', 0, $uid);
                 }
                 if (empty($us['uid'])) {
-                    $m->query("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_ban_userset` (`uid`,`c`) VALUES ({$uid},'{$con}')");
+                    $m->pquery("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_ban_userset` (`uid`,`c`) VALUES (?, ?)", array($uid, $con));
                 } else {
-                    $m->query("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_ban_userset` SET `c` = '{$con}' WHERE `uid` = {$uid}");
+                    $m->pquery("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_ban_userset` SET `c` = ? WHERE `uid` = ?", array($con, $uid));
                 }
                 $apiReturnArray["code"] = 200;
                 $apiReturnArray["message"] = "保存成功";
                 break;
             case "add":
-                $pid = isset($_POST['pid']) ? sqladds($_POST['pid']) : '';
+                $pid = isset($_POST['pid']) ? $_POST['pid'] : '';
                 $user = isset($_POST['user']) ? sqladds($_POST['user']) : '';
-                $tieba = isset($_POST['tieba']) ? sqladds($_POST['tieba']) : '';
+                $tieba = isset($_POST['tieba']) ? $_POST['tieba'] : '';
 
                 //判定吧务权限
                 // if (option::get('ver4_ban_break_check') === '0' && !ver4_is_manager($pid, $tieba)["isManager"]) {
@@ -78,7 +78,7 @@ if (isset($_GET["api"])) {
                 }
 
                 global $m;
-                $p = $m->fetch_array($m->query("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `id` = '{$pid}'"));
+                $p = $m->fetch_array($m->pquery("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `id` = ?", array($pid)));
                 if ($p['uid'] != UID) {
                     $apiReturnArray["message"] = "你不能替他人添加帖子";
                     break;
@@ -111,7 +111,7 @@ if (isset($_GET["api"])) {
                         ];
                         $t = $m->fetch_array($m->query("SELECT count(id) AS `c` FROM `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_ban_list` WHERE `uid` = {$uid}"));
                         if ($t['c'] < $limit && !empty($v)) {
-                            $m->query("INSERT IGNORE INTO `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_ban_list` (`uid`,`pid`,`name`,`name_show`,`portrait`,`tieba`,`stime`,`etime`,`date`) VALUES ({$uid},'{$pid}','{$name}','{$name_show}','{$portrait}','{$tieba}','{$stime}','{$etime}',0)");// ON DUPLICATE KEY UPDATE `uid`={$uid},`pid`='{$pid}',`name`='{$name}',`name_show`='{$name_show}',`portrait`='{$portrait}',`tieba`='{$tieba}',`stime`='{$stime}',`etime`='{$etime}'//TODO 插入时更新, 以后说不定用得上
+                            $m->pquery("INSERT IGNORE INTO `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_ban_list` (`uid`,`pid`,`name`,`name_show`,`portrait`,`tieba`,`stime`,`etime`,`date`) VALUES (?,?,?,?,?,?,?,?,0)", array($uid, $pid, $name, $name_show, $portrait, $tieba, $stime, $etime));// ON DUPLICATE KEY UPDATE `uid`={$uid},`pid`='{$pid}',`name`='{$name}',`name_show`='{$name_show}',`portrait`='{$portrait}',`tieba`='{$tieba}',`stime`='{$stime}',`etime`='{$etime}'//TODO 插入时更新, 以后说不定用得上
                         }
                     } else {
                         $callbackData[] = ["name" => $v, "exist" => false];
@@ -123,9 +123,9 @@ if (isset($_GET["api"])) {
                 $apiReturnArray["data"] = $callbackData;
                 break;
             case "delete":
-                $id = isset($_GET['id']) ? sqladds($_GET['id']) : '';
+                $id = isset($_GET['id']) ? $_GET['id'] : '';
                 if (!empty($id)) {
-                    $m->query("DELETE FROM `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_ban_list` WHERE `id` = '{$id}' AND `uid` = {$uid}");
+                    $m->pquery("DELETE FROM `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_ban_list` WHERE `id` = ? AND `uid` = ?", array($id, $uid));
                     $apiReturnArray["code"] = 200;
                     $apiReturnArray["message"] = "已成功删除该被封禁ID，最迟24小时后该ID不会再被封禁";
                     $apiReturnArray["data"] = ["id" => $id, "uid" => $uid];
@@ -183,7 +183,7 @@ if (isset($_GET['error'])) {
 }
 
 if (isset($_GET['save'])) {
-    $con = isset($_POST['ban_c']) ? sqladds($_POST['ban_c']) : '';
+    $con = isset($_POST['ban_c']) ? $_POST['ban_c'] : '';
     $open = isset($_POST['open']) ? $_POST['open'] : 0;
     if (!empty($open)) {
         option::uset('ver4_ban_open', 1, $uid);
@@ -191,19 +191,19 @@ if (isset($_GET['save'])) {
         option::uset('ver4_ban_open', 0, $uid);
     }
     if (empty($us['uid'])) {
-        $m->query("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_ban_userset` (`uid`,`c`) VALUES ({$uid},'{$con}')");
+        $m->pquery("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_ban_userset` (`uid`,`c`) VALUES (?, ?)", array($uid, $con));
     } else {
-        $m->query("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_ban_userset` SET `c` = '{$con}' WHERE `uid` = {$uid}");
+        $m->pquery("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_ban_userset` SET `c` = ? WHERE `uid` = ?", array($con, $uid));
     }
     redirect('index.php?plugin=ver4_ban&success=' . urlencode('您的设置已成功保存'));
 }
 
 if (isset($_GET['duser'])) {
-    $id = isset($_GET['id']) ? sqladds($_GET['id']) : '';
+    $id = isset($_GET['id']) ? $_GET['id'] : '';
     if (!empty($id)) {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             global $m;
-            $m->query("DELETE FROM `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_ban_list` WHERE `id` = '{$id}' AND `uid` = {$uid}");
+            $m->pquery("DELETE FROM `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_ban_list` WHERE `id` = ? AND `uid` = ?", array($id, $uid));
             redirect('index.php?plugin=ver4_ban&success=' . urlencode('已成功删除该被封禁ID，最迟24小时后该ID不会再被封禁！'));
         }else {
             redirect('index.php?plugin=ver4_ban&error=' . urlencode('请求不合法'));
@@ -222,9 +222,9 @@ if (isset($_GET['dauser'])) {
     }
 }
 if (isset($_GET['newuser'])) {
-    $pid = isset($_POST['pid']) ? sqladds($_POST['pid']) : '';
+    $pid = isset($_POST['pid']) ? $_POST['pid'] : '';
     $user = isset($_POST['user']) ? sqladds($_POST['user']) : '';
-    $tieba = isset($_POST['tieba']) ? sqladds($_POST['tieba']) : '';
+    $tieba = isset($_POST['tieba']) ? $_POST['tieba'] : '';
 
     //判定吧务权限
     // if (option::get('ver4_ban_break_check') === '0' && !ver4_is_manager($pid, $tieba)["isManager"]) {
@@ -261,7 +261,7 @@ if (isset($_GET['newuser'])) {
     }
 
     global $m;
-    $p = $m->fetch_array($m->query("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `id` = '{$pid}'"));
+    $p = $m->fetch_array($m->pquery("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `id` = ?", array($pid)));
     if ($p['uid'] != UID) {
         redirect('index.php?plugin=ver4_ban&error=' . urlencode('你不能替他人添加帖子'));
     }
@@ -283,7 +283,7 @@ if (isset($_GET['newuser'])) {
             $portrait = preg_replace('/([^?]+)(\?.*|)/', "$1", $banUserInfo["data"]["portrait"]);
             $t = $m->fetch_array($m->query("SELECT count(id) AS `c` FROM `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_ban_list` WHERE `uid` = {$uid}"));
             if ($t['c'] < $limit && !empty($v)) {
-                $m->query("INSERT IGNORE INTO `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_ban_list` (`uid`,`pid`,`name`,`name_show`,`portrait`,`tieba`,`stime`,`etime`,`date`) VALUES ({$uid},'{$pid}','{$name}','{$name_show}','{$portrait}','{$tieba}','{$stime}','{$etime}',0)");// ON DUPLICATE KEY UPDATE `uid`={$uid},`pid`='{$pid}',`name`='{$name}',`name_show`='{$name_show}',`portrait`='{$portrait}',`tieba`='{$tieba}',`stime`='{$stime}',`etime`='{$etime}'//TODO 插入时更新, 以后说不定用得上
+                $m->pquery("INSERT IGNORE INTO `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_ban_list` (`uid`,`pid`,`name`,`name_show`,`portrait`,`tieba`,`stime`,`etime`,`date`) VALUES (?,?,?,?,?,?,?,?,0)", array($uid, $pid, $name, $name_show, $portrait, $tieba, $stime, $etime));// ON DUPLICATE KEY UPDATE `uid`={$uid},`pid`='{$pid}',`name`='{$name}',`name_show`='{$name_show}',`portrait`='{$portrait}',`tieba`='{$tieba}',`stime`='{$stime}',`etime`='{$etime}'//TODO 插入时更新, 以后说不定用得上
             }
         } else {
             $notExistList .= ", {$v}";//添加不存在之人//某些神秘人无法取得信息

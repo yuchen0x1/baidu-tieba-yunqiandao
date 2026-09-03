@@ -8,9 +8,9 @@ if (!isset($_REQUEST['username']) || empty($_REQUEST['username']) || !isset($_RE
 global $m;
 global $i;
 
-$user = sqladds($_REQUEST['username']);
+$user = $_REQUEST['username'];
 $token = $_REQUEST['token'];
-$userinfo = $m->fetch_array($m->query('select * from `' . DB_NAME . '`.`' . DB_PREFIX . 'users` where `name` = "' . $user . '"'));
+$userinfo = $m->fetch_array($m->pquery('select * from `' . DB_NAME . '`.`' . DB_PREFIX . 'users` where `name` = ?', array($user)));
 if (empty($userinfo['email'])) {
     die('用户不存在');
 }

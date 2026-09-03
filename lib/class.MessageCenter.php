@@ -171,19 +171,21 @@ class MessageCenter
         $uid = (int) $uid;
         $page = max(1, (int) $page);
         $perPage = max(1, (int) $perPage);
-        $where = "WHERE `uid` = " . $uid;
+        $where = "WHERE `uid` = ?";
+        $whereParams = array($uid);
         if ($type === 'reply' || $type === 'at') {
-            $where .= " AND `type` = '" . ($type === 'reply' ? 'reply' : 'at') . "'";
+            $where .= " AND `type` = ?";
+            $whereParams[] = $type === 'reply' ? 'reply' : 'at';
         }
         if ($unreadOnly) {
             $where .= " AND `is_read` = 0";
         }
-        $totalRow = $m->once_fetch_array("SELECT COUNT(*) AS total FROM `" . DB_PREFIX . self::TABLE . "` {$where}");
+        $totalRow = $m->fetch_array($m->pquery("SELECT COUNT(*) AS total FROM `" . DB_PREFIX . self::TABLE . "` {$where}", $whereParams));
         $total = (int) $totalRow['total'];
         $pages = max(1, (int) ceil($total / $perPage));
         $page = min($page, $pages);
         $offset = ($page - 1) * $perPage;
-        $ex = $m->query("SELECT * FROM `" . DB_PREFIX . self::TABLE . "` {$where} ORDER BY `created_at` DESC, `id` DESC LIMIT {$perPage} OFFSET {$offset}");
+        $ex = $m->pquery("SELECT * FROM `" . DB_PREFIX . self::TABLE . "` {$where} ORDER BY `created_at` DESC, `id` DESC LIMIT ? OFFSET ?", array_merge($whereParams, array($perPage, $offset)));
         $rows = array();
         while ($row = $m->fetch_array($ex)) {
             $rows[] = $row;

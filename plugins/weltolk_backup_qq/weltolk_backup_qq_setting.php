@@ -47,23 +47,24 @@ if ($page == 'config') {
             echo '<div class="alert alert-success alert-dismissable"><button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>插件设置成功</div>';
             break;
         case 'addconnect'://添加推送地址
-            $client = !empty($_POST['client']) ? addslashes(strip_tags($_POST['client'])) : msg('请输入客户端');
-            $connect_type = !empty($_POST['connect_type']) ? addslashes(strip_tags($_POST['connect_type'])) : msg('请输入连接方式');
-            $address = !empty($_POST['address']) ? addslashes(strip_tags($_POST['address'])) : msg('请输入连接地址');
+            $client = !empty($_POST['client']) ? strip_tags($_POST['client']) : msg('请输入客户端');
+            $connect_type = !empty($_POST['connect_type']) ? strip_tags($_POST['connect_type']) : msg('请输入连接方式');
+            $address = !empty($_POST['address']) ? strip_tags($_POST['address']) : msg('请输入连接地址');
             $address = explode("\n", trim($address));
-            $access_token = addslashes(strip_tags($_POST['access_token']));
+            $access_token = strip_tags($_POST['access_token']);
             $anchor = addslashes(strip_tags($_POST['anchor']));
             foreach ($address as $address_i) {
                 $address_i = trim($address_i);
                 if (!empty($address_i)) {
-                    $exists = $m->fetch_array($m->query(
+                    $exists = $m->fetch_array($m->pquery(
                         "SELECT * FROM `" . DB_PREFIX . "weltolk_backup_qq_connect`"
-                        . " WHERE `uid` = '" . UID . "' AND `client` = '{$client}' AND `connect_type` = '{$connect_type}'"
-                        . " AND `address` = '{$address_i}' AND `access_token` = '{$access_token}' LIMIT 1"
+                        . " WHERE `uid` = ? AND `client` = ? AND `connect_type` = ?"
+                        . " AND `address` = ? AND `access_token` = ? LIMIT 1",
+                        array(UID, $client, $connect_type, $address_i, $access_token)
                     ));
                     if (is_null($exists)) {
-                        $m->query("INSERT INTO `" . DB_PREFIX . "weltolk_backup_qq_connect` (`uid`, `client`, `connect_type`, `address`, `access_token` )"
-                            . " VALUES ('" . UID . "', '{$client}', '{$connect_type}', '{$address_i}', '{$access_token}')");
+                        $m->pquery("INSERT INTO `" . DB_PREFIX . "weltolk_backup_qq_connect` (`uid`, `client`, `connect_type`, `address`, `access_token` )"
+                            . " VALUES (?, ?, ?, ?, ?)", array(UID, $client, $connect_type, $address_i, $access_token));
                     }
                 }
             }
@@ -143,22 +144,22 @@ if ($page == 'config') {
             ReDirect(SYSTEM_URL . 'index.php?mod=admin:setplug&plug=weltolk_backup_qq&ok' . '#' . $anchor);
             break;
         case 'update'://编辑单条推送地址
-            $id = !empty($_POST['id']) ? addslashes(strip_tags($_POST['id'])) : msg('请输入ID');
-            $client = !empty($_POST['client']) ? addslashes(strip_tags($_POST['client'])) : msg('请输入客户端');
-            $connect_type = !empty($_POST['connect_type']) ? addslashes(strip_tags($_POST['connect_type'])) : msg('请输入连接方式');
-            $address = !empty($_POST['address']) ? addslashes(strip_tags($_POST['address'])) : msg('请输入连接地址');
-            $access_token = addslashes(strip_tags($_POST['access_token']));
+            $id = !empty($_POST['id']) ? strip_tags($_POST['id']) : msg('请输入ID');
+            $client = !empty($_POST['client']) ? strip_tags($_POST['client']) : msg('请输入客户端');
+            $connect_type = !empty($_POST['connect_type']) ? strip_tags($_POST['connect_type']) : msg('请输入连接方式');
+            $address = !empty($_POST['address']) ? strip_tags($_POST['address']) : msg('请输入连接地址');
+            $access_token = strip_tags($_POST['access_token']);
             $anchor = addslashes(strip_tags($_POST['anchor']));
-            $m->query("UPDATE `" . DB_PREFIX . "weltolk_backup_qq_connect` "
-                . "SET `client` = '{$client}', `connect_type` = '{$connect_type}',"
-                . " `address` = '{$address}', `access_token` = '{$access_token}'"
-                . " WHERE `id` = '{$id}'");
+            $m->pquery("UPDATE `" . DB_PREFIX . "weltolk_backup_qq_connect` "
+                . "SET `client` = ?, `connect_type` = ?,"
+                . " `address` = ?, `access_token` = ?"
+                . " WHERE `id` = ?", array($client, $connect_type, $address, $access_token, $id));
             ReDirect(SYSTEM_URL . 'index.php?mod=admin:setplug&plug=weltolk_backup_qq&ok' . '#' . $anchor);
             break;
         case 'del'://删除推送地址
             $id = isset($_GET['id']) ? intval($_GET['id']) : msg('缺少ID');
             $anchor = addslashes(strip_tags($_GET['anchor']));
-            $m->query("DELETE FROM `" . DB_PREFIX . "weltolk_backup_qq_connect` WHERE `uid` = " . UID . " AND `id` = " . $id);
+            $m->pquery("DELETE FROM `" . DB_PREFIX . "weltolk_backup_qq_connect` WHERE `uid` = ? AND `id` = ?", array(UID, $id));
             ReDirect(SYSTEM_URL . 'index.php?mod=admin:setplug&plug=weltolk_backup_qq&act=ok' . '#' . $anchor);
             break;
         default:
@@ -592,35 +593,36 @@ if ($page == 'config') {
             die;
             break;
         case 'addqq'://添加推送目标
-            $connect_id = !empty($_POST['connect_id']) ? addslashes(strip_tags($_POST['connect_id'])) : msg('请输入使用的推送地址');
+            $connect_id = !empty($_POST['connect_id']) ? strip_tags($_POST['connect_id']) : msg('请输入使用的推送地址');
             $hour = $_POST['hour'];
             if ($hour == '0') {
             } elseif (empty($hour)) {
                 msg('请输入每日推送时间');
             } else {
-                $hour = addslashes(strip_tags($hour));
+                $hour = strip_tags($hour);
             }
             if ($hour >= 0 && $hour <= 23) {
             } else {
                 msg("请输入正确的每日推送时间");
             }
-            $path = !empty($_POST['path']) ? addslashes(strip_tags($_POST['path'])) : "/";
+            $path = !empty($_POST['path']) ? strip_tags($_POST['path']) : "/";
             $date_cache = strtotime(date('Y-m-d'));
-            $type = !empty($_POST['type']) ? addslashes(strip_tags($_POST['type'])) : msg('请输入类型');
-            $type_id = !empty($_POST['type_id']) ? addslashes(strip_tags($_POST['type_id'])) : msg('请输入号');
+            $type = !empty($_POST['type']) ? strip_tags($_POST['type']) : msg('请输入类型');
+            $type_id = !empty($_POST['type_id']) ? strip_tags($_POST['type_id']) : msg('请输入号');
             $type_id = explode("\n", trim($type_id));
             $anchor = addslashes(strip_tags($_POST['anchor']));
             foreach ($type_id as $type_id_i) {
                 $type_id_i = trim($type_id_i);
                 if (!empty($type_id_i)) {
-                    $exists = $m->fetch_array($m->query(
+                    $exists = $m->fetch_array($m->pquery(
                         "SELECT * FROM `" . DB_PREFIX . "weltolk_backup_qq_target`"
-                        . " WHERE `uid` = '" . UID . "' AND `connect_id` = '{$connect_id}' AND `hour` = '{$hour}'"
-                        . " AND `type` = '{$type}' AND `type_id` = '{$type_id_i}' LIMIT 1"
+                        . " WHERE `uid` = ? AND `connect_id` = ? AND `hour` = ?"
+                        . " AND `type` = ? AND `type_id` = ? LIMIT 1",
+                        array(UID, $connect_id, $hour, $type, $type_id_i)
                     ));
                     if (is_null($exists)) {
-                        $m->query("INSERT INTO `" . DB_PREFIX . "weltolk_backup_qq_target` (`uid`, `connect_id`, `hour`, `type`, `type_id`, `path`,`nextdo`)"
-                            . " VALUES ('" . UID . "', '{$connect_id}', '{$hour}', '{$type}', '{$type_id_i}', '{$path}', '{$date_cache}')");
+                        $m->pquery("INSERT INTO `" . DB_PREFIX . "weltolk_backup_qq_target` (`uid`, `connect_id`, `hour`, `type`, `type_id`, `path`,`nextdo`)"
+                            . " VALUES (?, ?, ?, ?, ?, ?, ?)", array(UID, $connect_id, $hour, $type, $type_id_i, $path, $date_cache));
                     }
                 }
             }
@@ -759,36 +761,36 @@ if ($page == 'config') {
             ReDirect(SYSTEM_URL . 'index.php?mod=admin:setplug&plug=weltolk_backup_qq&ok' . '#' . $anchor);
             break;
         case 'update'://编辑单条推送地址
-            $id = !empty($_POST['id']) ? addslashes(strip_tags($_POST['id'])) : msg('请输入ID');
-            $connect_id = !empty($_POST['connect_id']) ? addslashes(strip_tags($_POST['connect_id'])) : msg('请输入使用的推送地址');
+            $id = !empty($_POST['id']) ? strip_tags($_POST['id']) : msg('请输入ID');
+            $connect_id = !empty($_POST['connect_id']) ? strip_tags($_POST['connect_id']) : msg('请输入使用的推送地址');
             $hour = $_POST['hour'];
             if ($hour == '0') {
             } elseif (empty($hour)) {
                 msg('请输入每日推送时间');
             } else {
-                $hour = addslashes(strip_tags($hour));
+                $hour = strip_tags($hour);
             }
             if ($hour >= 0 && $hour <= 23) {
             } else {
                 msg("请输入正确的每日推送时间");
             }
-            $path = !empty($_POST['path']) ? addslashes(strip_tags($_POST['path'])) : "/";
-            $type = !empty($_POST['type']) ? addslashes(strip_tags($_POST['type'])) : msg('请输入类型');
-            $type_id = !empty($_POST['type_id']) ? addslashes(strip_tags($_POST['type_id'])) : msg('请输入号');
-            $nextdo = !empty($_POST['nextdo']) ? addslashes(strip_tags($_POST['nextdo'])) : msg('请输入下次推送日期');
+            $path = !empty($_POST['path']) ? strip_tags($_POST['path']) : "/";
+            $type = !empty($_POST['type']) ? strip_tags($_POST['type']) : msg('请输入类型');
+            $type_id = !empty($_POST['type_id']) ? strip_tags($_POST['type_id']) : msg('请输入号');
+            $nextdo = !empty($_POST['nextdo']) ? strip_tags($_POST['nextdo']) : msg('请输入下次推送日期');
             $nextdo = strtotime($nextdo);
             $anchor = addslashes(strip_tags($_POST['anchor']));
-            $m->query("UPDATE `" . DB_PREFIX . "weltolk_backup_qq_target` "
-                . "SET `connect_id` = '{$connect_id}', `hour` = '{$hour}',"
-                . " `type` = '{$type}', `type_id` = '{$type_id}',"
-                . " `path` = '{$path}', `nextdo` = '{$nextdo}'"
-                . " WHERE `id` = '{$id}'");
+            $m->pquery("UPDATE `" . DB_PREFIX . "weltolk_backup_qq_target` "
+                . "SET `connect_id` = ?, `hour` = ?,"
+                . " `type` = ?, `type_id` = ?,"
+                . " `path` = ?, `nextdo` = ?"
+                . " WHERE `id` = ?", array($connect_id, $hour, $type, $type_id, $path, $nextdo, $id));
             ReDirect(SYSTEM_URL . 'index.php?mod=admin:setplug&plug=weltolk_backup_qq&ok' . '#' . $anchor);
             break;
         case 'del'://删除推送地址
             $id = isset($_GET['id']) ? intval($_GET['id']) : msg('缺少ID');
             $anchor = addslashes(strip_tags($_GET['anchor']));
-            $m->query("DELETE FROM `" . DB_PREFIX . "weltolk_backup_qq_target` WHERE `uid` = " . UID . " AND `id` = " . $id);
+            $m->pquery("DELETE FROM `" . DB_PREFIX . "weltolk_backup_qq_target` WHERE `uid` = ? AND `id` = ?", array(UID, $id));
             ReDirect(SYSTEM_URL . 'index.php?mod=admin:setplug&plug=weltolk_backup_qq&act=ok' . '#' . $anchor);
             break;
         default:
@@ -819,7 +821,7 @@ if ($page == 'config') {
     <tr id="weltolk_backup_qq_limit">
         <td>单次计划任务连续推送次数<br/>越小效率越低，但太大也可能导致超时</td>
         <td id="values">
-            <input type="number" min="1" step="1" name="limit" value="<?php echo $limit ?>"
+            <input type="number" min="1" step="1" name="limit" value="<?php echo htmlspecialchars($limit, ENT_QUOTES, 'UTF-8') ?>"
                    class="form-control" required>
         </td>
     </tr>
@@ -840,7 +842,7 @@ if ($page == 'config') {
     </tr>
 </table>
 
-<b>最新日志：<?php echo $log ?></b>
+<b>最新日志：<?php echo htmlspecialchars($log, ENT_QUOTES, 'UTF-8') ?></b>
 </br>
 <b>注：请将计划任务顺序设置为0，以防止计划任务卡住导致没有备份！使用立即备份功能请确保已经设置了接收邮箱并保存！</b>
 <br/>

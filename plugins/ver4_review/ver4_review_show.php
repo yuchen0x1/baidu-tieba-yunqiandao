@@ -30,10 +30,10 @@ if (isset($_GET['error'])) {
 }
 
 if (isset($_GET['dtieba'])) {
-    $id = isset($_GET['id']) ? sqladds($_GET['id']) : '';
+    $id = isset($_GET['id']) ? $_GET['id'] : '';
     if (!empty($id)) {
         global $m;
-        $m->query("DELETE FROM `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_review_list` WHERE `id` = '{$id}' AND `uid` = {$uid}");
+        $m->pquery("DELETE FROM `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_review_list` WHERE `id` = ? AND `uid` = ?", array($id, $uid));
         redirect('index.php?plugin=ver4_review&success=' . urlencode('已成功删除该贴吧，系统将不再扫描此吧！'));
     } else {
         redirect('index.php?plugin=ver4_review&error=' . urlencode('ID不合法'));
@@ -46,10 +46,10 @@ if (isset($_GET['datieba'])) {
     redirect('index.php?plugin=ver4_review&success=' . urlencode('云审查列表已成功清空！'));
 }
 if (isset($_GET['newtieba'])) {
-    $pid = isset($_POST['pid']) ? sqladds($_POST['pid']) : '';
-    $kw = isset($_POST['kw']) ? sqladds($_POST['kw']) : '';
-    $tieba = isset($_POST['tieba']) ? sqladds($_POST['tieba']) : '';
-    $space = isset($_POST['space']) && is_numeric($_POST['space']) ? sqladds($_POST['space']) : option::get('ver4_review_time');
+    $pid = isset($_POST['pid']) ? $_POST['pid'] : '';
+    $kw = isset($_POST['kw']) ? $_POST['kw'] : '';
+    $tieba = isset($_POST['tieba']) ? $_POST['tieba'] : '';
+    $space = isset($_POST['space']) && is_numeric($_POST['space']) ? $_POST['space'] : option::get('ver4_review_time');
 
     $rc = explode("\n", $kw);
     foreach ($rc as $k => $v) {
@@ -70,13 +70,13 @@ if (isset($_GET['newtieba'])) {
         redirect('index.php?plugin=ver4_review&error=' . urlencode('间隔设置不正确！'));
     }
 
-    $p = $m->fetch_array($m->query("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `id` = '{$pid}'"));
+    $p = $m->fetch_array($m->pquery("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `id` = ?", array($pid)));
     if ($p['uid'] != UID) {
         redirect('index.php?plugin=ver4_review&error=' . urlencode('你不能替他人添加需要扫描的贴吧'));
     }
 
     $limit = option::get('ver4_review_limit');
-    $t = $m->fetch_array($m->query("SELECT count(id) AS `c` FROM `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_review_list` WHERE `pid` = '{$pid}'"));
+    $t = $m->fetch_array($m->pquery("SELECT count(id) AS `c` FROM `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_review_list` WHERE `pid` = ?", array($pid)));
     if ($t['c'] >= $limit) {
         redirect('index.php?plugin=ver4_review&error=' . urlencode('啊哦，您只能添加' . $limit . '个扫描吧哦！'));
     }
@@ -84,13 +84,13 @@ if (isset($_GET['newtieba'])) {
     $kw = json_encode($rc, JSON_UNESCAPED_UNICODE);
     $kw = str_replace('\r', '', $kw);
 
-    $m->query("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_review_list` (`uid`,`pid`,`tname`,`kw`,`space`) VALUES ({$uid},'{$pid}','{$tieba}','{$kw}','{$space}')");
+    $m->pquery("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_review_list` (`uid`,`pid`,`tname`,`kw`,`space`) VALUES (?,?,?,?,?)", array($uid, $pid, $tieba, $kw, $space));
     redirect('index.php?plugin=ver4_review&success=' . urlencode('该贴吧已加入扫描列表，请耐心等待系统扫描吧~~哇咔咔'));
 }
 if (isset($_GET['ctieba'])) {
-    $id = isset($_GET['id']) ? sqladds($_GET['id']) : '';
-    $kw = isset($_POST['kw']) ? sqladds($_POST['kw']) : '';
-    $space = isset($_POST['space']) && is_numeric($_POST['space']) ? sqladds($_POST['space']) : option::get('ver4_review_time');
+    $id = isset($_GET['id']) ? $_GET['id'] : '';
+    $kw = isset($_POST['kw']) ? $_POST['kw'] : '';
+    $space = isset($_POST['space']) && is_numeric($_POST['space']) ? $_POST['space'] : option::get('ver4_review_time');
 
     $rc = explode("\n", $kw);
     foreach ($rc as $k => $v) {
@@ -109,7 +109,7 @@ if (isset($_GET['ctieba'])) {
     if ($space < $time || $space > 86400) {
         redirect('index.php?plugin=ver4_review&error=' . urlencode('间隔设置不正确！'));
     }
-    $p = $m->fetch_array($m->query("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_review_list` WHERE `id` = '{$id}'"));
+    $p = $m->fetch_array($m->pquery("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_review_list` WHERE `id` = ?", array($id)));
     if ($p['uid'] != UID) {
         redirect('index.php?plugin=ver4_review&error=' . urlencode('你不能修改他人的贴吧设置'));
     }
@@ -118,7 +118,7 @@ if (isset($_GET['ctieba'])) {
     $kw = json_encode($rc, JSON_UNESCAPED_UNICODE);
     $kw = str_replace('\r', '', $kw);
 
-    $m->query("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_review_list` SET `space` = '{$space}',`kw` = '{$kw}' WHERE `id` = '{$id}'");
+    $m->pquery("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_review_list` SET `space` = ?,`kw` = ? WHERE `id` = ?", array($space, $kw, $id));
     redirect('index.php?plugin=ver4_review&success=' . urlencode('设置已成功修改~~哇咔咔'));
 }
 ?>
