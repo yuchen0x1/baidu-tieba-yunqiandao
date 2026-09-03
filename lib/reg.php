@@ -34,10 +34,9 @@ while ($rsr = $m->fetch_array($rs)) {
     $i['cron'][$key] = $rsr;
 }
 
-//贴吧分表列表
-$i['tabpart'] = safe_table_names($i['opt']['fb_tables']);
-$i['table'] = $i['tabpart'];
-$i['table'] = ['tieba']; //贴吧表列表
+//贴吧分表列表：'tieba' 为基础表、始终参与查询；自定义分表来自 fb_tables 设置并经白名单校验
+$i['tabpart'] = safe_table_names(isset($i['opt']['fb_tables']) ? $i['opt']['fb_tables'] : '');
+$i['table'] = array_values(array_unique(array_merge(array('tieba'), $i['tabpart']))); //贴吧表列表
 
 //当前页面/模式, $i['mode'][0] 一般表示页面
 if (request_text_value($_REQUEST, 'mod') !== '') {
