@@ -140,9 +140,10 @@ global $m;
 <form method="post" id="addbdid_form" onsubmit="return false;">
   <?php
   $login_info = misc::get_login_qrcode();
-  $qr_imgurl = preg_match('#^(https?://|//)#i', $login_info['imgurl']) ? $login_info['imgurl'] : '';
-  $qr_sign = htmlspecialchars($login_info['sign'], ENT_QUOTES, 'UTF-8');
+  $qr_imgurl = preg_match('#^(https?://|//)#i', (string) $login_info['imgurl']) ? $login_info['imgurl'] : '';
+  $qr_sign = htmlspecialchars((string) $login_info['sign'], ENT_QUOTES, 'UTF-8');
   ?>
+  <?php if ($qr_imgurl !== '') { ?>
   <img src="<?php echo htmlspecialchars($qr_imgurl, ENT_QUOTES, 'UTF-8'); ?>" alt="qrcode" class="thumbnail center-block">
   <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
   <div id="addbdid_ver" style="display: none">
@@ -150,6 +151,15 @@ global $m;
   </div>
   <a href="https://wappass.baidu.com/wp/?qrlogin=&sign=<?php echo $qr_sign; ?>" class="btn btn-default btn-block" target="_blank">网页授权</a>
   <input type="submit" id="addbdid_submit" class="btn btn-primary btn-block" value="点击绑定">
+  <?php } else { ?>
+  <div class="alert alert-danger" role="alert">
+    <strong>二维码获取失败</strong>：服务器当前无法连接百度的二维码接口（网络原因或接口临时不可用）。<br/>
+    <br/>你可以：
+    <br/>1. 稍后刷新本页重试；
+    <br/>2. 切换到上方「<b>手动绑定</b>」标签，直接粘贴 BDUSS 绑定（页面内有图文教程）。
+  </div>
+  <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
+  <?php } ?>
 </form>
 <br/><br/>
 <div class="panel panel-default">

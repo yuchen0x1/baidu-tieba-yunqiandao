@@ -406,7 +406,62 @@ class wcurl
             CURLOPT_SSL_VERIFYHOST  => 2, //校验主机名
             CURLOPT_FOLLOWLOCATION  => true //跟随重定向 会将服务器服务器返回的"Location: "放在header中递归的返回给服务器
         ));
+        $caInfo = self::findCaInfo();
+        if ($caInfo !== false) {
+            $this->set(CURLOPT_CAINFO, $caInfo);
+        }
         return $this;
+    }
+
+    /**
+     * 探测可用的 CA 证书包（Windows PHP 常缺省无 CA 配置，TLS 校验会全部失败）
+     * @return string|false 证书包路径，未找到返回 false
+     */
+    public static function findCaInfo()
+    {
+        foreach (array(
+            getenv('SSL_CERT_FILE'),
+            getenv('CURL_CA_BUNDLE'),
+            ini_get('curl.cainfo'),
+            ini_get('openssl.cafile'),
+            'C:/Program Files/Git/usr/ssl/certs/ca-bundle.crt',
+            'C:/Program Files/Git/mingw64/etc/ssl/certs/ca-bundle.crt',
+            '/etc/ssl/certs/ca-certificates.crt',
+            '/etc/pki/tls/certs/ca-bundle.crt',
+            '/usr/local/share/certs/ca-root-nss.crt',
+        ) as $candidate) {
+            if ($candidate !== false && $candidate !== '' && is_file($candidate) && is_readable($candidate)) {
+                return $candidate;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 校验外发 URL：仅允许 http/https，且 host 不得指向本机或私有/保留地址
+     * @param string $url 待请求的 URL
+     * @return bool
+     */
+    public static function isAllowedPublicUrl($url)
+    {
+        $parts = parse_url((string) $url);
+        if (!$parts || empty($parts['scheme']) || empty($parts['host'])) {
+            return false;
+        }
+        if (!in_array(strtolower((string) $parts['scheme']), array('http', 'https'), true)) {
+            return false;
+        }
+        $host = strtolower((string) $parts['host']);
+        if ($host === '' || $host === 'localhost' || substr($host, -6) === '.local' || substr($host, -9) === '.internal') {
+            return false;
+        }
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            return filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false;
+        }
+        if (in_array($host, array('0.0.0.0', '::1', '::'), true)) {
+            return false;
+        }
+        return true;
     }
 
     /**

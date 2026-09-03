@@ -664,7 +664,7 @@ class misc
      */
     public static function fetchCaptchaImage($url)
     {
-        if (empty($url)) {
+        if (empty($url) || !wcurl::isAllowedPublicUrl($url)) {
             return '';
         }
         try {
@@ -879,11 +879,22 @@ class misc
     {
 
         $resp = ["sign" => null, "imgurl" => null];
-        $qrcode_ch = new wcurl("https://passport.baidu.com/v2/api/getqrcode?lp=pc");
+        $qrcodeUrl = "https://passport.baidu.com/v2/api/getqrcode?lp=pc";
+        if (!wcurl::isAllowedPublicUrl($qrcodeUrl)) {
+            return $resp;
+        }
+        $qrcode_ch = new wcurl($qrcodeUrl);
         self::applyProxy($qrcode_ch);
         $get_qrcode = json_decode($qrcode_ch->get(), true);
         if (isset($get_qrcode["imgurl"]) && isset($get_qrcode["sign"])) {
-            $resp = ["sign" => $get_qrcode["sign"], "imgurl" => $get_qrcode["imgurl"]];
+            // 百度返回的是无协议前缀的 host 路径，归一化为 https
+            $imgurl = (string) $get_qrcode["imgurl"];
+            if ($imgurl !== '' && stripos($imgurl, 'http') !== 0 && stripos($imgurl, '//') !== 0) {
+                $imgurl = 'https://' . ltrim($imgurl, '/');
+            }
+            if (wcurl::isAllowedPublicUrl($imgurl)) {
+                $resp = ["sign" => $get_qrcode["sign"], "imgurl" => $imgurl];
+            }
         }
         return $resp;
     }
