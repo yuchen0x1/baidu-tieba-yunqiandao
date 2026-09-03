@@ -70,6 +70,7 @@ $unreadCount = Notice::unreadCount($viewUid);
     <?php if ($unreadCount > 0) { ?>
     <form method="post" action="index.php?mod=notices" style="display:inline">
         <input type="hidden" name="op" value="mark_all_read">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
         <button type="submit" class="cs-btn cs-btn-secondary cs-btn-sm">全部标为已读</button>
     </form>
     <?php } ?>
@@ -126,6 +127,7 @@ $unreadCount = Notice::unreadCount($viewUid);
                         <form method="post" action="index.php?mod=notices" style="display:inline">
                             <input type="hidden" name="op" value="<?php echo $isUnread ? 'mark_read' : 'delete'; ?>">
                             <input type="hidden" name="notice_id" value="<?php echo (int) $row['id']; ?>">
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
                             <?php if ($isUnread) { ?>
                             <button type="submit" class="cs-btn cs-btn-ghost cs-btn-sm" title="标记为已读">已读</button>
                             <?php } else { ?>
