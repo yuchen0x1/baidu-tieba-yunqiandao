@@ -67,7 +67,21 @@
       tab.setAttribute('tabindex', '0');
       if (focusable(tab)) { tab.focus(); }
 
-      var panels = container.querySelectorAll('.cs-tabpanel, [role="tabpanel"]');
+      // 面板常与 .cs-tabs 容器为兄弟节点，不能只在容器内查找：
+      // 先按本组标签的 aria-controls 到全文档精确收集，再按 aria-labelledby 归属兜底
+      var panels = [];
+      var seen = {};
+      Array.prototype.forEach.call(tabs, function (t) {
+        var ref = t.getAttribute('aria-controls');
+        var p = ref ? document.getElementById(ref) : null;
+        if (p && !seen[p.id]) { seen[p.id] = true; panels.push(p); }
+      });
+      if (!panels.length) {
+        Array.prototype.forEach.call(document.querySelectorAll('.cs-tabpanel, [role="tabpanel"]'), function (p) {
+          var owner = p.getAttribute('aria-labelledby');
+          if (owner && list.querySelector('[id="' + owner + '"]')) { panels.push(p); }
+        });
+      }
       Array.prototype.forEach.call(panels, function (p) {
         var isMatch = !target || p.id === target || p.getAttribute('aria-labelledby') === tab.id;
         p.setAttribute('hidden', !isMatch);

@@ -249,6 +249,14 @@ if (isset($_COOKIE['uid']) && isset($_COOKIE['pwd'])) {
 }
 doAction('globals_3');
 csrf(false);
+// 首次使用初始化：系统中不存在管理员账号时，强制先完成管理员账号初始化再使用
+if (SYSTEM_PAGE != 'init' && SYSTEM_PAGE != 'init:do') {
+    $initAdminRow = $m->once_fetch_array('SELECT COUNT(*) AS total FROM `' . DB_NAME . '`.`' . DB_PREFIX . 'users` WHERE `role` = \'admin\'');
+    if ((int) $initAdminRow['total'] <= 0) {
+        ReDirect('index.php?mod=init');
+        die;
+    }
+}
 if (SYSTEM_PAGE == 'admin:login') {
     if (defined('ROLE')) {
         ReDirect('index.php');
@@ -574,6 +582,78 @@ if (SYSTEM_PAGE == 'admin:login') {
         $c->createNoting();
     }
     exit;
+} elseif (SYSTEM_PAGE == 'init') {
+    // 首次使用初始化页
+    if (defined('ROLE')) {
+        ReDirect('index.php');
+    }
+    define('ROLE', 'visitor');
+    $i['user']['role'] = 'visitor';
+    doAction('init_page_1');
+    $initAdminRow = $m->once_fetch_array('SELECT COUNT(*) AS total FROM `' . DB_NAME . '`.`' . DB_PREFIX . 'users` WHERE `role` = \'admin\'');
+    if ((int) $initAdminRow['total'] > 0) {
+        ReDirect('index.php?mod=login');
+        die;
+    }
+    template('init');
+    doAction('init_page_4');
+    die;
+} elseif (SYSTEM_PAGE == 'init:do') {
+    // 首次使用初始化：创建首个管理员账号并自动登录
+    if (defined('ROLE')) {
+        ReDirect('index.php');
+    }
+    define('ROLE', 'visitor');
+    doAction('init_do_1');
+    $name = trim((string) request_scalar_value($_POST, 'user'));
+    // 用户名不得含有@符号，避免登录时与邮箱混淆
+    if (stripos($name, '@') !== false) {
+        redirect('index.php?mod=init&error_msg=' . urlencode('用户名不得含有@符号'));
+        die;
+    }
+    if (!preg_match('/^[A-Za-z0-9_\x{4e00}-\x{9fa5}]{1,20}$/u', $name)) {
+        redirect('index.php?mod=init&error_msg=' . urlencode('用户名只允许字母、数字、下划线、中文，长度不超过 20'));
+        die;
+    }
+    $mail = trim((string) request_scalar_value($_POST, 'mail'));
+    $pw = request_scalar_value($_POST, 'pw');
+    $repeatPw = request_scalar_value($_POST, 'rpw');
+    if (empty($name) || empty($mail) || empty($pw)) {
+        redirect('index.php?mod=init&error_msg=' . urlencode('请正确填写用户名、密码或邮箱'));
+        die;
+    }
+    if ($pw !== $repeatPw) {
+        redirect('index.php?mod=init&error_msg=' . urlencode('两次输入的密码不一致，请重新输入'));
+        die;
+    }
+    if (!checkMail($mail)) {
+        redirect('index.php?mod=init&error_msg=' . urlencode('邮箱格式不正确'));
+        die;
+    }
+    if (strlen((string) $pw) < 8) {
+        redirect('index.php?mod=init&error_msg=' . urlencode('管理员密码至少 8 位'));
+        die;
+    }
+    $initDup = $m->fetch_array($m->pquery('SELECT COUNT(*) AS total FROM `' . DB_NAME . '`.`' . DB_PREFIX . 'users` WHERE `name` = ? OR `email` = ? LIMIT 1', array($name, $mail)));
+    if ((int) $initDup['total'] > 0) {
+        redirect('index.php?mod=init&error_msg=' . urlencode('用户名或邮箱已经被注册'));
+        die;
+    }
+    $initAdminRow = $m->fetch_array($m->pquery('SELECT COUNT(*) AS total FROM `' . DB_NAME . '`.`' . DB_PREFIX . 'users` WHERE `role` = ?', array('admin')));
+    if ((int) $initAdminRow['total'] > 0) {
+        redirect('index.php?mod=login&msg=' . urlencode('系统已完成初始化，请直接登录'));
+        die;
+    }
+    doAction('init_do_2');
+    $initStoredHash = EncodePwd($pw);
+    $m->pquery('INSERT INTO `' . DB_NAME . '`.`' . DB_PREFIX . 'users` (`name`, `pw`, `email`, `role`, `t`) VALUES (?, ?, ?, ?, ?)', array($name, $initStoredHash, $mail, 'admin', getfreetable()));
+    $initUid = (int) $m->insert_id();
+    doAction('init_do_3');
+    // 自动登录并进入工作台
+    $initCktime = time() + auth_cookie_lifetime();
+    set_site_cookie('uid', $initUid, $initCktime);
+    set_site_cookie('pwd', hash_hmac('sha256', $initStoredHash, $initUid . $initStoredHash), $initCktime);
+    ReDirect('index.php');
 } elseif (SYSTEM_PAGE == 'login') {
     if (defined('ROLE')) {
         ReDirect('index.php');
