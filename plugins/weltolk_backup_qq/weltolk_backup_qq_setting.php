@@ -894,26 +894,26 @@ if ($page == 'config') {
         $x = $m->query("SELECT * FROM `" . DB_PREFIX . "weltolk_backup_qq_target` WHERE `uid` = " . UID);
         while ($v = $m->fetch_array($x)) {
             ?>
-            <tr id="addedqq<?php echo $v['id'] ?>">
-                <td id="use"><?php echo $v['id'] ?></td>
-                <td id="use"><?php echo $v['connect_id'] ?></td>
-                <td id="use"><?php echo $v['hour'] ?></td>
-                <td id="use"><?php echo $v['type'] ?></td>
-                <td id="use"><?php echo $v['type_id'] ?></td>
-                <td id="use"><?php echo $v['path'] ?></td>
+            <tr id="addedqq<?php echo (int) $v['id'] ?>">
+                <td id="use"><?php echo (int) $v['id'] ?></td>
+                <td id="use"><?php echo htmlspecialchars($v['connect_id'], ENT_QUOTES, 'UTF-8') ?></td>
+                <td id="use"><?php echo htmlspecialchars($v['hour'], ENT_QUOTES, 'UTF-8') ?></td>
+                <td id="use"><?php echo htmlspecialchars($v['type'], ENT_QUOTES, 'UTF-8') ?></td>
+                <td id="use"><?php echo htmlspecialchars($v['type_id'], ENT_QUOTES, 'UTF-8') ?></td>
+                <td id="use"><?php echo htmlspecialchars($v['path'], ENT_QUOTES, 'UTF-8') ?></td>
                 <td>
-                    <a id="debug_btn<?php echo $v['id'] ?>"
-                       onclick="debug_event('addedqq<?php echo $v['id'] ?>', '<?php echo $v['id'] ?>')"
+                    <a id="debug_btn<?php echo (int) $v['id'] ?>"
+                       onclick="debug_event('addedqq<?php echo (int) $v['id'] ?>', '<?php echo (int) $v['id'] ?>')"
                        href="javascript:void(0)" class="btn btn-warning">
                         测试推送</a>
                 </td>
                 <td><a href="javascript:scroll(0,0)">返回顶部</a></td>
-                <td id="use"><?php echo date('Y-m-d', $v['nextdo']) ?></td>
+                <td id="use"><?php echo date('Y-m-d', (int) $v['nextdo']) ?></td>
                 <td><a class="btn btn-default" data-toggle="modal" data-target="#editqq"
-                       onclick="edit_qq_values('addedqq<?php echo $v['id'] ?>')"
+                       onclick="edit_qq_values('addedqq<?php echo (int) $v['id'] ?>')"
                        title="修改"><span class="glyphicon glyphicon-edit"></span> </a></td>
                 <td><a class="btn btn-default"
-                       href="index.php?mod=admin:setplug&plug=weltolk_backup_qq&page=list&act=del&id=<?php echo $v['id'] ?>&anchor=page_list"
+                       href="index.php?mod=admin:setplug&plug=weltolk_backup_qq&page=list&act=del&id=<?php echo (int) $v['id'] ?>&anchor=page_list"
                        title="删除"><span class="glyphicon glyphicon-remove"></span> </a></td>
             </tr>
         <?php } ?>
@@ -953,21 +953,21 @@ if ($page == 'config') {
         $x = $m->query("SELECT * FROM `" . DB_PREFIX . "weltolk_backup_qq_connect` WHERE `uid` = " . UID);
         while ($v = $m->fetch_array($x)) {
             ?>
-            <tr id="addedconnect<?php echo $v['id'] ?>">
-                <td id="use"><?php echo $v['id'] ?></td>
-                <td id="use"><?php echo $v['client'] ?></td>
-                <td id="use"><?php echo $v['connect_type'] ?></td>
-                <td id="use"><?php echo $v['address'] ?></td>
+            <tr id="addedconnect<?php echo (int) $v['id'] ?>">
+                <td id="use"><?php echo (int) $v['id'] ?></td>
+                <td id="use"><?php echo htmlspecialchars($v['client'], ENT_QUOTES, 'UTF-8') ?></td>
+                <td id="use"><?php echo htmlspecialchars($v['connect_type'], ENT_QUOTES, 'UTF-8') ?></td>
+                <td id="use"><?php echo htmlspecialchars($v['address'], ENT_QUOTES, 'UTF-8') ?></td>
                 <td id="use">******<br/>
                     <a href="javascript:scroll(0,0)">返回顶部</a>
                 </td>
-                <input id="addedconnect<?php echo $v['id'] ?>_access_token_hidden" type="hidden"
-                       value="<?php echo $v['access_token'] ?>">
+                <input id="addedconnect<?php echo (int) $v['id'] ?>_access_token_hidden" type="hidden"
+                       value="<?php echo htmlspecialchars($v['access_token'], ENT_QUOTES, 'UTF-8') ?>">
                 <td><a class="btn btn-default" data-toggle="modal" data-target="#editconnect"
-                       onclick="edit_values('addedconnect<?php echo $v['id'] ?>')"
+                       onclick="edit_values('addedconnect<?php echo (int) $v['id'] ?>')"
                        title="修改"><span class="glyphicon glyphicon-edit"></span> </a></td>
                 <td><a class="btn btn-default"
-                       href="index.php?mod=admin:setplug&plug=weltolk_backup_qq&page=config&act=del&id=<?php echo $v['id'] ?>&anchor=page_config"
+                       href="index.php?mod=admin:setplug&plug=weltolk_backup_qq&page=config&act=del&id=<?php echo (int) $v['id'] ?>&anchor=page_config"
                        title="删除"><span class="glyphicon glyphicon-remove"></span> </a></td>
             </tr>
         <?php } ?>
@@ -1056,7 +1056,7 @@ if ($page == 'config') {
                             <?php
                             $x = $m->query("SELECT `id` FROM `" . DB_PREFIX . "weltolk_backup_qq_connect` WHERE `uid` = " . UID);
                             while ($v = $m->fetch_array($x)) {
-                                echo '<option value="' . $v['id'] . '">' . $v['id'] . '</option>';
+                                echo '<option value="' . (int) $v['id'] . '">' . (int) $v['id'] . '</option>';
                             }
                             ?>
                         </select>
@@ -1445,7 +1445,7 @@ if ($page == 'config') {
             <?php
             $x = $m->query("SELECT `id` FROM `" . DB_PREFIX . "weltolk_backup_qq_connect` WHERE `uid` = " . UID);
             while ($v = $m->fetch_array($x)) {
-                echo '"' . $v['id'] . '",';
+                echo '"' . (int) $v['id'] . '",';
             }
             ?>
         ]
@@ -1505,7 +1505,7 @@ if ($page == 'config') {
             <?php
             $x = $m->query("SELECT `id` FROM `" . DB_PREFIX . "weltolk_backup_qq_connect` WHERE `uid` = " . UID);
             while ($v = $m->fetch_array($x)) {
-                echo '"' . $v['id'] . '",';
+                echo '"' . (int) $v['id'] . '",';
             }
             ?>
         ];
