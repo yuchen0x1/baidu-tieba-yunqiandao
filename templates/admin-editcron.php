@@ -73,6 +73,22 @@ global $i;
                     echo htmlspecialchars($i['cron'][$edit]['log'], ENT_QUOTES, 'UTF-8');
                                                                                    } ?></textarea></td>
             </tr>
+            <tr>
+            <td>启用任务（V5.13）<br/>禁用后该任务不会被执行</td>
+            <td><input type="radio" name="enable" value="1" required="" <?php if (!isset($edit) || (isset($i['cron'][$edit]['enable']) && (int)$i['cron'][$edit]['enable'] !== 0)) {
+                echo 'checked';
+            }; ?>> 是&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input type="radio" name="enable" value="0" required="" <?php if (isset($edit) && isset($i['cron'][$edit]['enable']) && (int)$i['cron'][$edit]['enable'] === 0) {
+                echo 'checked';
+            }; ?>> 否</td>
+            </tr>
+            <tr>
+            <td>最大重试次数（V5.13）<br/>失败后自动重试次数，超出后进入正常周期并通知</td>
+            <td><input type="number" name="max_retry" class="form-control" min="0" max="20" value="<?php if (isset($edit) && isset($i['cron'][$edit]['max_retry'])) {
+                echo htmlspecialchars($i['cron'][$edit]['max_retry'], ENT_QUOTES, 'UTF-8');
+            } else {
+                echo '2';
+            } ?>"></td>
+            </tr>
             </tbody>
         </table>
     </div>

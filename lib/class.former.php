@@ -9,6 +9,16 @@
 class former
 {
     /**
+     * 允许标签说明文案中使用的安全 HTML 子集（核心设置页的 <b>/<br/> 等），其余标签与属性一律剥除
+     * @param string $html 原始文案
+     * @return string 过滤后的文案
+     */
+    public static function allowLabelHtml($html)
+    {
+        return strip_tags((string) $html, '<b><strong><i><em><u><br><span><a><code><input><label>');
+    }
+
+    /**
      * 新建表单
      * @param array $set 信息设置
      * @param array $content 内容
@@ -59,11 +69,11 @@ class former
                         $show['text'] = ' ' . $show['text'];
                         $show['value'] = '1';
                     }
-                    $form .= '<tr><td>' . htmlspecialchars($show['td1'], ENT_QUOTES, 'UTF-8') . '</td><td><input type="' . $show['type'] . '" name="' . htmlspecialchars($item, ENT_QUOTES, 'UTF-8') . '" id="' . htmlspecialchars($item, ENT_QUOTES, 'UTF-8') . '" value="' . htmlspecialchars($show['value'], ENT_QUOTES, 'UTF-8') . '" ' . $show['extra'] . '>' . htmlspecialchars($show['text'], ENT_QUOTES, 'UTF-8') . '</td>';
+                    $form .= '<tr><td>' . self::allowLabelHtml($show['td1']) . '</td><td><input type="' . $show['type'] . '" name="' . htmlspecialchars($item, ENT_QUOTES, 'UTF-8') . '" id="' . htmlspecialchars($item, ENT_QUOTES, 'UTF-8') . '" value="' . htmlspecialchars($show['value'], ENT_QUOTES, 'UTF-8') . '" ' . $show['extra'] . '>' . self::allowLabelHtml($show['text']) . '</td>';
                     break;
 
                 case 'select':
-                    $form .= '<tr><td>' . htmlspecialchars($show['td1'], ENT_QUOTES, 'UTF-8') . '</td><td><select name="' . htmlspecialchars($item, ENT_QUOTES, 'UTF-8') . '" class="form-control">';
+                    $form .= '<tr><td>' . self::allowLabelHtml($show['td1']) . '</td><td><select name="' . htmlspecialchars($item, ENT_QUOTES, 'UTF-8') . '" class="form-control">';
                     foreach ($show['select'] as $opvalue => $optext) {
                         $form .= '<option value="' . htmlspecialchars($opvalue, ENT_QUOTES, 'UTF-8') . '"';
                         if (self::fill($item, $set['name']) == $opvalue) {
@@ -71,7 +81,7 @@ class former
                         }
                         $form .= '>' . htmlspecialchars($optext, ENT_QUOTES, 'UTF-8') . '</option>';
                     }
-                    $form .= '</select>' . htmlspecialchars($show['text'], ENT_QUOTES, 'UTF-8') . '</td></tr>';
+                    $form .= '</select>' . self::allowLabelHtml($show['text']) . '</td></tr>';
                     break;
 
                 case 'else':

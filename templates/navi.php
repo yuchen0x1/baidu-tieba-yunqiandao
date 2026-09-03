@@ -18,6 +18,7 @@ $pageLabels = array(
     'admin:stat' => '统计信息',
     'admin:sign' => '签到看板',
     'admin:cron' => '计划任务',
+    'admin:totp' => '双因素认证',
     'admin:update' => '系统更新',
     'admin:plugins' => '插件管理',
     'thanks' => '开源致谢',
@@ -67,6 +68,7 @@ $userInitial = function_exists('mb_substr') ? mb_substr($userName, 0, 1, 'UTF-8'
                     <li class="<?php checkIfActive('admin:users'); ?>"><a href="index.php?mod=admin:users"><span class="sidebar-icon glyphicon glyphicon-user"></span><span>用户管理</span></a></li>
                     <li class="<?php checkIfActive('admin:invite'); ?>"><a href="index.php?mod=admin:invite"><span class="sidebar-icon glyphicon glyphicon-envelope"></span><span>邀请码管理</span></a></li>
                     <li class="<?php checkIfActive('admin:cron'); ?>"><a href="index.php?mod=admin:cron"><span class="sidebar-icon glyphicon glyphicon-time"></span><span>计划任务</span></a></li>
+                    <li class="<?php checkIfActive('admin:totp'); ?>"><a href="index.php?mod=admin:totp"><span class="sidebar-icon glyphicon glyphicon-lock"></span><span>双因素认证</span></a></li>
                     <li class="<?php checkIfActive('admin:tools'); ?>"><a href="index.php?mod=admin:tools"><span class="sidebar-icon glyphicon glyphicon-wrench"></span><span>工具箱</span></a></li>
                     <li class="<?php checkIfActive('admin:set'); ?>"><a href="index.php?mod=admin:set"><span class="sidebar-icon glyphicon glyphicon-adjust"></span><span>设置中心</span></a></li>
                     <?php doAction('navi_2'); ?>

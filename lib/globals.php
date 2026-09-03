@@ -10,6 +10,50 @@ if (!defined('SYSTEM_ROOT')) {
 /**
  * 校验找回密码令牌，返回 array(uid, expire) 或 false
  */
+if (!function_exists('totp_enabled')) {
+    function totp_enabled()
+    {
+        return (string) option::get('admin_totp_secret') !== '';
+    }
+}
+if (!function_exists('totp_get_secret')) {
+    function totp_get_secret()
+    {
+        $s = (string) option::get('admin_totp_secret');
+        if ($s === '') {
+            return '';
+        }
+        return P::decrypt($s);
+    }
+}
+if (!function_exists('totp_issue_cookie')) {
+    function totp_issue_cookie()
+    {
+        if (!defined('UID')) {
+            return;
+        }
+        $val = hash_hmac('sha256', 'totp:' . UID, totp_get_secret()) . ':' . UID;
+        set_site_cookie('tc_2fa', $val, time() + 2592000);
+    }
+}
+if (!function_exists('totp_check_cookie')) {
+    function totp_check_cookie()
+    {
+        if (!defined('UID') || empty($_COOKIE['tc_2fa'])) {
+            return false;
+        }
+        $parts = explode(':', (string) $_COOKIE['tc_2fa'], 2);
+        if (count($parts) !== 2) {
+            return false;
+        }
+        list($sig, $uid) = $parts;
+        if ((int) $uid !== (int) UID) {
+            return false;
+        }
+        $expect = hash_hmac('sha256', 'totp:' . UID, totp_get_secret());
+        return hash_equals($expect, $sig);
+    }
+}
 if (!function_exists('lostpw_token_info')) {
     function lostpw_token_info($token)
     {
@@ -195,6 +239,11 @@ if (isset($_COOKIE['uid']) && isset($_COOKIE['pwd'])) {
         if (ROLE == 'banned') {
             msg('你已被禁止访问，请联系管理员解封');
         }
+    }
+    // V5.13 B5：管理员双因素认证（TOTP）强制校验
+    if (ROLE == 'admin' && totp_enabled() && !in_array(SYSTEM_PAGE, array('admin:2fa', 'admin:totp', 'admin:logout'), true) && !totp_check_cookie()) {
+        ReDirect('index.php?mod=admin:2fa');
+        die;
     }
     doAction('globals_2');
 }
@@ -546,6 +595,28 @@ if (SYSTEM_PAGE == 'admin:login') {
 } elseif (isset($_GET['pub_plugin'])) {
     define('ROLE', 'visitor');
     define('SYSTEM_READY_LOAD_PUBPLUGIN', true);
+} elseif (SYSTEM_PAGE == 'admin:2fa') {
+    if (!defined('ROLE') || ROLE != 'admin') {
+        ReDirect('index.php?mod=login');
+        die;
+    }
+    if (!totp_enabled()) {
+        ReDirect('index.php');
+        die;
+    }
+    if (isset($_POST['code'])) {
+        csrf();
+        require_once SYSTEM_ROOT . '/lib/class.totp.php';
+        if (TOTP::verify(totp_get_secret(), (string) $_POST['code'])) {
+            totp_issue_cookie();
+            ReDirect('index.php');
+            die;
+        }
+        msg('验证码错误，请重试');
+    }
+    $i['mode'] = array('admin', '2fa');
+    template('admin-2fa');
+    die;
 } elseif (SYSTEM_PAGE == 'admin:logout') {
     csrf();
     doAction('logout');

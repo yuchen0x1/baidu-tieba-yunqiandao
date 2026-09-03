@@ -26,6 +26,14 @@ CREATE TABLE `{VAR-PREFIX}cron` (
   `freq` int(10) NOT NULL DEFAULT '0',
   `lastdo`  int(10) UNSIGNED NOT NULL DEFAULT 0 ,
   `log` text,
+  `enable` tinyint(1) unsigned NOT NULL DEFAULT '1',
+  `nextrun` int(10) unsigned NOT NULL DEFAULT '0',
+  `retry` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `max_retry` tinyint(3) unsigned NOT NULL DEFAULT '2',
+  `last_status` varchar(20) NOT NULL DEFAULT '',
+  `last_duration` int(10) unsigned NOT NULL DEFAULT '0',
+  `running` tinyint(1) unsigned NOT NULL DEFAULT '0',
+  `running_at` int(10) unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`name`),
   UNIQUE KEY `name` (`name`) USING BTREE,
   UNIQUE KEY `id` (`id`) USING BTREE
@@ -292,3 +300,23 @@ CREATE TABLE `{VAR-PREFIX}invites` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `code` (`code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS `{VAR-PREFIX}task_runs`;
+CREATE TABLE `{VAR-PREFIX}task_runs` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(40) NOT NULL DEFAULT '',
+  `status` VARCHAR(20) NOT NULL DEFAULT '',
+  `message` TEXT,
+  `duration_ms` INT UNSIGNED NOT NULL DEFAULT 0,
+  `started_at` INT UNSIGNED NOT NULL DEFAULT 0,
+  `finished_at` INT UNSIGNED NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `name` (`name`),
+  KEY `status` (`status`),
+  KEY `started_at` (`started_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `{VAR-PREFIX}options` VALUES ('cron_max_retry', '2');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('cron_retry_backoff', '300');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('cron_lock_timeout', '600');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('cron_notify_on_fail', '1');

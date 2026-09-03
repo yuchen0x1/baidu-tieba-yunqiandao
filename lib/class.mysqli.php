@@ -28,6 +28,12 @@ class wmysql
     private $result;
 
     /**
+     * 预处理语句最近一次受影响行数（供 affected_rows() 读取）
+     * @var int|null
+     */
+    private $lastAffected = null;
+
+    /**
      * 内部实例对象
      * @var object MySql
      */
@@ -114,6 +120,14 @@ class wmysql
     public function close()
     {
         return $this->conn->close();
+    }
+
+    /**
+     * 检测数据库连接是否存活
+     */
+    public function ping()
+    {
+        return $this->conn->ping();
     }
 
     /**
@@ -216,7 +230,14 @@ class wmysql
             return false;
         }
         // mysqlnd 为 PHP 默认内置驱动，get_result 始终可用；防御性判断兜底
-        $result = method_exists($stmt, 'get_result') ? $stmt->get_result() : true;
+        // 记录受影响行数：预处理语句执行后连接级 affected_rows 不可靠，须在 close 前取 stmt 级
+        $this->lastAffected = $stmt->affected_rows;
+        // 无结果集（INSERT/UPDATE/DELETE/DDL）视为执行成功，返回 true
+        if ($stmt->field_count > 0) {
+            $result = method_exists($stmt, 'get_result') ? $stmt->get_result() : true;
+        } else {
+            $result = true;
+        }
         $stmt->close();
         return $result;
     }
@@ -302,6 +323,11 @@ class wmysql
      */
     public function affected_rows()
     {
+        if ($this->lastAffected !== null) {
+            $v = $this->lastAffected;
+            $this->lastAffected = null;
+            return $v;
+        }
         return $this->conn->affected_rows;
     }
 

@@ -79,10 +79,37 @@ function extractPluginArchive($zip, $targetRoot)
             break;
         }
     }
-    if (!$hasEntry || is_dir(rtrim($targetRoot, '/\\') . '/' . $pluginId)) {
+    if (!$hasEntry) {
         return false;
     }
     $base = rtrim(str_replace('\\', '/', realpath($targetRoot)), '/') . '/' . $pluginId;
+
+    // V5.13 B4：目标目录已存在时，先整体备份到 plugins/.rollback 并移开旧目录；
+    // 解压成功保留备份（可手动回滚），解压失败自动恢复旧目录。
+    $tmpOld = '';
+    if (is_dir($base)) {
+        // 回滚备份目录与目标插件同根（<targetRoot>/.rollback），便于真实部署与测试一致
+        $rollbackRoot = dirname($base) . '/.rollback';
+        if (!is_dir($rollbackRoot) && !@mkdir($rollbackRoot, 0755, true) && !is_dir($rollbackRoot)) {
+            return false;
+        }
+        $backupDir = $rollbackRoot . '/' . $pluginId . '_' . date('Ymd_His') . '_' . bin2hex(random_bytes(3));
+        if (!plugin_copy_dir($base, $backupDir)) {
+            return false;
+        }
+        $tmpOld = $base . '_old_' . bin2hex(random_bytes(4));
+        if (!@rename($base, $tmpOld)) {
+            DeleteFile($backupDir);
+            return false;
+        }
+    }
+    $fail = function () use ($base, $tmpOld) {
+        DeleteFile($base);
+        if ($tmpOld !== '') {
+            @rename($tmpOld, $base);
+        }
+        return false;
+    };
     foreach ($entries as $entry) {
         $relative = $entry[1];
         if ($sourcePrefix !== '') {
@@ -95,39 +122,182 @@ function extractPluginArchive($zip, $targetRoot)
             continue;
         }
         if (strpos($relative, '../') !== false || $relative[0] === '/' || preg_match('/^[A-Za-z]:/', $relative)) {
-            DeleteFile($base);
-            return false;
+            return $fail();
         }
         $target = $base . '/' . $relative;
         if (substr($target, 0, strlen($base . '/')) !== $base . '/') {
-            DeleteFile($base);
-            return false;
+            return $fail();
         }
         if (substr($relative, -1) === '/') {
             if (!is_dir($target) && !mkdir($target, 0755, true) && !is_dir($target)) {
-                DeleteFile($base);
-                return false;
+                return $fail();
             }
             continue;
         }
         $dir = dirname($target);
         if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
-            DeleteFile($base);
-            return false;
+            return $fail();
         }
         $stream = $zip->getStream($entry[0]);
         if ($stream === false) {
-            DeleteFile($base);
-            return false;
+            return $fail();
         }
         $content = stream_get_contents($stream);
         fclose($stream);
         if ($content === false || file_put_contents($target, $content, LOCK_EX) === false) {
-            DeleteFile($base);
-            return false;
+            return $fail();
         }
     }
+    // 解压成功：移开的旧目录不再需要（备份已保留在 .rollback）
+    if ($tmpOld !== '') {
+        DeleteFile($tmpOld);
+    }
     return $pluginId;
+}
+
+/**
+ * V5.13 B4：递归复制目录
+ */
+function plugin_copy_dir($src, $dst)
+{
+    if (!is_dir($src)) {
+        return false;
+    }
+    if (!is_dir($dst) && !@mkdir($dst, 0755, true) && !is_dir($dst)) {
+        return false;
+    }
+    $items = @scandir($src);
+    if ($items === false) {
+        return false;
+    }
+    foreach ($items as $item) {
+        if ($item === '.' || $item === '..') {
+            continue;
+        }
+        $s = $src . '/' . $item;
+        $d = $dst . '/' . $item;
+        if (is_dir($s)) {
+            if (!plugin_copy_dir($s, $d)) {
+                return false;
+            }
+        } elseif (is_file($s)) {
+            if (!@copy($s, $d)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+/**
+ * V5.13 B4：插件回滚备份根目录（插件覆盖安装前自动备份）
+ */
+function plugin_rollback_dir()
+{
+    return SYSTEM_ROOT . '/plugins/.rollback';
+}
+
+/**
+ * V5.13 B4：备份插件目录到 .rollback/<plugin>_<ts>_<rand>，成功返回备份路径，失败返回 false
+ */
+function plugin_backup_plugin($plugin)
+{
+    if (!valid_plugin_id($plugin)) {
+        return false;
+    }
+    $src = SYSTEM_ROOT . '/plugins/' . $plugin;
+    if (!is_dir($src)) {
+        return false;
+    }
+    $root = plugin_rollback_dir();
+    if (!is_dir($root) && !@mkdir($root, 0755, true) && !is_dir($root)) {
+        return false;
+    }
+    $backup = $root . '/' . $plugin . '_' . date('Ymd_His') . '_' . bin2hex(random_bytes(3));
+    if (!plugin_copy_dir($src, $backup)) {
+        return false;
+    }
+    return $backup;
+}
+
+/**
+ * V5.13 B4：从指定备份恢复插件目录（仅接受 .rollback 下的合法备份路径）
+ */
+function plugin_restore_plugin($plugin, $backupDir)
+{
+    if (!valid_plugin_id($plugin) || !is_string($backupDir) || !is_dir($backupDir)) {
+        return false;
+    }
+    $backupPath = rtrim(str_replace('\\', '/', realpath($backupDir)), '/');
+    // 仅接受 <插件根>/.rollback/<plugin>_<ts>_<hex> 结构的合法备份
+    if (!preg_match('#^(.+)/\.rollback/' . preg_quote($plugin, '#') . '_\d{8}_\d{6}_[0-9a-f]+$#i', $backupPath, $mm)) {
+        return false;
+    }
+    $dest = $mm[1] . '/' . $plugin;
+    DeleteFile($dest);
+    return @rename($backupDir, $dest);
+}
+
+/**
+ * V5.13 B4：清理某插件的全部回滚备份
+ */
+function plugin_purge_rollback($plugin)
+{
+    if (!valid_plugin_id($plugin)) {
+        return;
+    }
+    $root = plugin_rollback_dir();
+    if (!is_dir($root)) {
+        return;
+    }
+    $dirs = glob($root . '/' . $plugin . '_*');
+    if ($dirs) {
+        foreach ($dirs as $d) {
+            DeleteFile($d);
+        }
+    }
+}
+
+/**
+ * V5.13 B4：校验插件清单（manifest）
+ * 新式 _desc.php 或旧式头部注释皆可；返回 array('ok'=>bool,'errors'=>array)
+ */
+function plugin_manifest_validate($plugin)
+{
+    $errors = array();
+    if (!valid_plugin_id($plugin)) {
+        $errors[] = '插件标识不合法';
+        return array('ok' => false, 'errors' => $errors);
+    }
+    $path = SYSTEM_ROOT . '/plugins/' . $plugin . '/';
+    if (!file_exists($path . $plugin . '.php')) {
+        $errors[] = '缺少入口文件 ' . $plugin . '.php';
+        return array('ok' => false, 'errors' => $errors);
+    }
+    if (file_exists($path . $plugin . '_desc.php')) {
+        $info = include $path . $plugin . '_desc.php';
+    } else {
+        $d = getOldPluginData($plugin . '/' . $plugin . '.php');
+        $info = array(
+            'plugin' => array(
+                'name'    => isset($d['Name']) ? $d['Name'] : '',
+                'version' => isset($d['Version']) ? $d['Version'] : '',
+            ),
+            'author' => array('author' => isset($d['Author']) ? $d['Author'] : ''),
+        );
+    }
+    $p = (is_array($info) && isset($info['plugin'])) ? $info['plugin'] : array();
+    if (empty($p['name'])) {
+        $errors[] = '清单缺少 name';
+    }
+    if (empty($p['version'])) {
+        $errors[] = '清单缺少 version';
+    }
+    $author = (is_array($info) && isset($info['author']['author'])) ? $info['author']['author'] : '';
+    if (empty($author)) {
+        $errors[] = '清单缺少 author';
+    }
+    return array('ok' => count($errors) === 0, 'errors' => $errors);
 }
 
 /**
@@ -397,6 +567,9 @@ function getPluginInfo($plugin)
     $qRes = $m->pquery('Select `order` From `' . DB_NAME . '`.`' . DB_PREFIX . 'plugins` Where `name` = ? LIMIT 1', array($plugin));
     $q = $qRes ? $m->fetch_array($qRes) : array('order' => 0);
     $r['plugin']['order'] = empty($q['order']) ? 0 : intval($q['order']);
+    $manifest = plugin_manifest_validate($plugin);
+    $r['plugin']['manifest_ok'] = $manifest['ok'];
+    $r['plugin']['manifest_errors'] = $manifest['errors'];
 //否则将会是00000001这样的数
 
     return $r;

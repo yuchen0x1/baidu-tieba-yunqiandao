@@ -13,3 +13,7 @@ docker/.env
 vendor/
 
 .phpunit.result.cache
+
+# 运行产物（不入库）
+data/log/
+plugins/.rollback/

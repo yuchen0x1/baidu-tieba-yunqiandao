@@ -36,19 +36,8 @@ if (SYSTEM_PAGE == 'runcron') {
         msg('运行失败：此计划任务不存在');
     }
 
-    $log = cron::run($x['file'], $x['name']);
-
-    if ($x['freq'] == '-1') {
-        cron::del($x['name']);
-    } else {
-        cron::aset(
-            $x['name'],
-            array(
-                'lastdo' => time(),
-                'log'    => $log
-            )
-        );
-    }
+    // V5.13：完整执行单个任务（加锁→执行→记录运行历史→解锁→排程），失败自动进入退避重试
+    cron::runOnce($x['name']);
 } else {
     $sign_multith = option::get('sign_multith');
     if (!isset($_GET['donnot_sign_multith']) && !empty($sign_multith) && function_exists('fsockopen')) {

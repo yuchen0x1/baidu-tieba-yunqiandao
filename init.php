@@ -6,8 +6,8 @@
  */
 
 define('SYSTEM_FN', '百度贴吧云签到');
-define('SYSTEM_VER', '5.12');
-define('SYSTEM_VER_NOTE', '全渠道通知+云点赞+逐用户API+签到日历');
+define('SYSTEM_VER', '5.13');
+define('SYSTEM_VER_NOTE', '全面升级：调度引擎+可观测性+迁移体系+插件规范+2FA+API增强+i18n');
 define('SYSTEM_ROOT', dirname(__FILE__));
 require_once SYSTEM_ROOT . '/lib/request.php';
 define('PLUGIN_ROOT', dirname(__FILE__) . '/plugins/');
@@ -145,6 +145,7 @@ define('UPDATE_SERVER_GITHUB', PROJECT_GITHUB_URL . '/archive/refs/heads/main.zi
 define('UPDATE_FNAME_GITHUB', 'baidu-tieba-yunqiandao-main');
 //压缩包解压路径
 define('UPDATE_CACHE', SYSTEM_ROOT . '/setup/update_cache/');
+require SYSTEM_ROOT . '/lib/i18n.php';
 require SYSTEM_ROOT . '/lib/sfc.functions.php';
 require SYSTEM_ROOT . '/lib/class.updater.php';
 require SYSTEM_ROOT . '/lib/ui.php';

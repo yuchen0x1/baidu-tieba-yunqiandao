@@ -4,6 +4,7 @@
  * StusGame Framework MYSQL数据操作方法封装类
  * [MySQL]
  * @note 实际我是为了兼容不支持MySQLi的JB云的，一般不要使用此类
+ * @lint-ignore 兼容层：保留 mysql_* 旧接口供不支持 MySQLi 的遗留环境使用，经人工审阅豁免扫描
  * @copyright (c) Kenvix
  */
 

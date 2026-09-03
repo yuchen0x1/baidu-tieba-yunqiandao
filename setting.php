@@ -617,12 +617,46 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
         Redirect('index.php?mod=admin:invite&ok');
 
         break;
+    case 'admin:totp':
+        // V5.13 B5：管理员双因素认证（TOTP）设置
+        if (ROLE != 'admin') {
+            msg('权限不足!');
+        }
+        doAction('totp_setting_1');
+        require_once SYSTEM_ROOT . '/lib/class.totp.php';
+        $action = isset($_GET['setting']) ? (string) $_GET['setting'] : '';
+        $i['totp_msg'] = '';
+        if ($action === 'gen') {
+            option::set('admin_totp_secret', P::encrypt(TOTP::generateSecret()));
+            $i['totp_msg'] = '双因素认证密钥已生成，请在认证器应用（Google/Microsoft Authenticator 等）中添加下方密钥并输入验证码完成确认';
+        } elseif ($action === 'verify') {
+            $code = isset($_POST['code']) ? (string) $_POST['code'] : '';
+            if (TOTP::verify(totp_get_secret(), $code)) {
+                totp_issue_cookie();
+                $i['totp_msg'] = '验证通过，双因素认证已生效';
+            } else {
+                $i['totp_msg'] = '验证码错误，请重新输入';
+            }
+        } elseif ($action === 'disable') {
+            option::set('admin_totp_secret', '');
+            $i['totp_msg'] = '双因素认证已关闭';
+        }
+        doAction('totp_setting_2');
+        $i['totp_enabled'] = totp_enabled();
+        if ($i['totp_enabled']) {
+            $i['totp_secret'] = totp_get_secret();
+            $i['totp_account'] = SYSTEM_NAME !== '' ? 'admin@' . SYSTEM_NAME : 'admin';
+            $i['totp_uri'] = TOTP::otpauthUri($i['totp_secret'], $i['totp_account'], SYSTEM_NAME);
+        }
+        $i['mode'] = array('admin', 'totp');
+        template('admin-totp');
+        break;
     case 'admin:cron':
         doAction('cron_setting_1');
         if (!empty($_GET['act']) && preg_match('/^[A-Za-z0-9_]+$/', (string) $_GET['act'])) {
-            cron::aset($_GET['act'], array('no' => 0));
+            cron::aset($_GET['act'], array('no' => 0, 'enable' => 1));
         } elseif (!empty($_GET['dis']) && preg_match('/^[A-Za-z0-9_]+$/', (string) $_GET['dis'])) {
-            cron::aset($_GET['dis'], array('no' => 1));
+            cron::aset($_GET['dis'], array('no' => 1, 'enable' => 0));
         } elseif (isset($_GET['uninst']) && preg_match('/^[A-Za-z0-9_]+$/', (string) $_GET['uninst'])) {
             cron::del($_GET['uninst']);
         } elseif (isset($_GET['add'])) {
@@ -633,12 +667,18 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
             } elseif (!preg_match('/^[A-Za-z0-9_]+$/', $cronName) || !preg_match('~^(lib/[A-Za-z0-9_\-/]+\.php|plugins/[A-Za-z0-9_\-]+/[A-Za-z0-9_\-/]+\.php)$~', str_replace('\\', '/', $cronFile)) || strpos($cronFile, '..') !== false) {
                 msg('计划任务添加失败：任务名称或文件不合法');
             } else {
-                cron::set($cronName, $cronFile, $_POST['no'], $_POST['desc'], $_POST['freq'], $_POST['lastdo'], $_POST['log']);
+                $cronSet = array('file' => $cronFile, 'no' => $_POST['no'], 'desc' => $_POST['desc'], 'freq' => $_POST['freq'], 'lastdo' => $_POST['lastdo'], 'log' => $_POST['log']);
+                if (isset($_POST['enable'])) { $cronSet['enable'] = ($_POST['enable'] == '0') ? 0 : 1; }
+                if (isset($_POST['max_retry'])) { $cronSet['max_retry'] = max(0, min(20, (int) $_POST['max_retry'])); }
+                cron::aset($cronName, $cronSet);
             }
-        } elseif (isset($_GET['run']) && isset($_GET['file'])
-            && preg_match('/^[A-Za-z0-9_]+$/', (string) $_GET['run'])) {
-            $return = cron::run($_GET['file'], $_GET['run']);
-            cron::aset($_GET['run'], array('lastdo' => time() , 'log' => $return));
+        } elseif (isset($_GET['run']) && preg_match('/^[A-Za-z0-9_]+$/', (string) $_GET['run'])) {
+            // V5.13：完整执行单个任务（加锁→执行→记录→排程）
+            cron::runOnce($_GET['run']);
+        } elseif (isset($_GET['retry']) && preg_match('/^[A-Za-z0-9_]+$/', (string) $_GET['retry'])) {
+            // V5.13：手动重试，先清零重试计数再立即执行
+            cron::aset($_GET['retry'], array('retry' => 0, 'nextrun' => 0));
+            cron::runOnce($_GET['retry']);
         } elseif (isset($_GET['xorder'])) {
             foreach ($_POST['order'] as $key => $value) {
                 if (!preg_match('/^[A-Za-z0-9_]+$/', (string) $key)) {

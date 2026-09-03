@@ -69,6 +69,31 @@ function api_user_tables($uid, $user)
 $action = request_text_value($_GET, 'action');
 $apiTables = api_user_tables($apiUserId, $apiUser);
 
+// ---------- 按 Token 限流（V5.13 B6，选项 api_rate_limit，0=不限） ----------
+$rateLimit = (int) option::get('api_rate_limit');
+if ($rateLimit > 0) {
+    $m->query("CREATE TABLE IF NOT EXISTS `" . DB_PREFIX . "api_rate_limits` (
+        `token_hash` VARCHAR(64) NOT NULL DEFAULT '',
+        `window_start` INT UNSIGNED NOT NULL DEFAULT 0,
+        `count` INT UNSIGNED NOT NULL DEFAULT 0,
+        PRIMARY KEY (`token_hash`, `window_start`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+    $window = (int) floor(time() / 60) * 60;
+    $th = $m->real_escape_string($tokenHash);
+    $rateRow = $m->once_fetch_array("SELECT `count` FROM `" . DB_PREFIX . "api_rate_limits` WHERE `token_hash` = '{$th}' AND `window_start` = {$window}");
+    $rateCount = !empty($rateRow) ? (int) $rateRow['count'] : 0;
+    if ($rateCount >= $rateLimit) {
+        http_response_code(429);
+        die(json_encode(array('error' => '请求过于频繁，请稍后再试', 'limit' => $rateLimit, 'window' => 60), JSON_UNESCAPED_UNICODE));
+    }
+    if ($rateCount === 0) {
+        $m->pquery("INSERT INTO `" . DB_PREFIX . "api_rate_limits` (`token_hash`, `window_start`, `count`) VALUES (?, ?, 1) ON DUPLICATE KEY UPDATE `count` = `count` + 1", array($tokenHash, $window));
+    } else {
+        $m->pquery("UPDATE `" . DB_PREFIX . "api_rate_limits` SET `count` = `count` + 1 WHERE `token_hash` = ? AND `window_start` = ?", array($tokenHash, $window));
+    }
+}
+
+
 switch ($action) {
     case 'update':
         try {
@@ -185,8 +210,40 @@ switch ($action) {
         echo json_encode(array('ok' => true, 'data' => SignManager::calendar($days, $apiUserId)), JSON_UNESCAPED_UNICODE);
         break;
 
+
+    case 'webhook_test':
+        if ($apiUserId > 0) {
+            http_response_code(403);
+            die(json_encode(array('error' => '仅管理员全局 Token 可测试 Webhook'), JSON_UNESCAPED_UNICODE));
+        }
+        require_once SYSTEM_ROOT . '/lib/class.webhook.php';
+        $res = Webhook::push('test', array('version' => SYSTEM_VER));
+        echo json_encode(array('ok' => $res['ok'], 'detail' => $res['detail']), JSON_UNESCAPED_UNICODE);
+        break;
+
+    case 'openapi':
+        $doc = array(
+            'name' => SYSTEM_FN,
+            'version' => SYSTEM_VER,
+            'auth' => 'Bearer Token（管理员全局 Token 或逐用户 Token）',
+            'rate_limit_per_minute' => (int) option::get('api_rate_limit'),
+            'endpoints' => array(
+                array('action' => 'status', 'method' => 'GET', 'desc' => '签到状态汇总'),
+                array('action' => 'health', 'method' => 'GET', 'desc' => '账号健康度'),
+                array('action' => 'sign', 'method' => 'POST', 'desc' => '立即执行签到'),
+                array('action' => 'retry', 'method' => 'POST', 'desc' => '执行复签'),
+                array('action' => 'health_check', 'method' => 'POST', 'desc' => '执行健康检查'),
+                array('action' => 'logs', 'method' => 'GET', 'desc' => '最近日志'),
+                array('action' => 'calendar', 'method' => 'GET', 'desc' => '个人签到日历'),
+                array('action' => 'update', 'method' => 'GET', 'desc' => '在线版本检查'),
+                array('action' => 'webhook_test', 'method' => 'GET', 'desc' => '测试 Webhook 推送（管理员）'),
+            ),
+        );
+        echo json_encode(array('ok' => true, 'data' => $doc), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        break;
+
     default:
         http_response_code(400);
-        echo json_encode(array('error' => '未知 action', 'available' => array('update', 'status', 'health', 'sign', 'retry', 'health_check', 'logs', 'calendar')), JSON_UNESCAPED_UNICODE);
+        echo json_encode(array('error' => '未知 action', 'available' => array('update', 'status', 'health', 'sign', 'retry', 'health_check', 'logs', 'calendar', 'webhook_test', 'openapi')), JSON_UNESCAPED_UNICODE);
         break;
 }

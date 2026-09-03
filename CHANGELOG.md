@@ -1,5 +1,22 @@
 # 更新日志
 
+## 2026-09-03 V5.13 全面升级
+
+### 新功能
+- **调度引擎**：任务级运行历史（`task_runs`）、跨进程防重入锁、按 `nextrun` 调度、失败指数退避重试（`cron_max_retry`/`cron_retry_backoff`）、任务中心增强（状态徽标/下次执行/耗时/一键重试）。
+- **Webhook 事件推送**：新增 `lib/class.webhook.php`，任务失败等事件推送自定义 URL（HMAC-SHA256 签名 `X-Webhook-Signature`），curl 优先、stream 回退；选项 `webhook_enable/url/secret/events`。
+- **开放 API 增强**：`api.php` 新增按 Token 的滑动窗口限流（`api_rate_limit`，超限 429）、`webhook_test`（管理员测试推送）、`openapi`（接口文档）。
+- **可观测性**：新增结构化 JSON 日志（`lib/class.logger.php` → `data/log/system.log`）、Prometheus 端点（`metrics.php`，Token 认证）、深度健康检查（`healthz.php?mode=deep`：cron 新鲜度/错误堆积）。
+- **数据库迁移体系**：新增 `tools/migrate.php status|up|down` 与 `schema_migrations` 表；首个幂等迁移 `setup/migrations/001001_v513_scheduler.php` 覆盖 V5.13 全部结构。
+- **插件规范**：manifest 清单校验（`plugin_manifest_validate`，缺失 name/version/author 标记不完整）；覆盖安装自动备份到 `plugins/.rollback` 且失败自动回滚，`plugin_restore_plugin` 支持手动恢复。
+- **管理员双因素认证（TOTP）**：新增 `lib/class.totp.php`（RFC 6238，兼容 Google/Microsoft Authenticator），管理员登录二次验证；`admin:totp` 页生成密钥/链接、启用/关闭。
+- **工程收尾**：`tools/lint.php` 新增高危模式扫描（eval/废弃 mysql_* 硬失败，addslashes/命令调用警告，`@lint-ignore` 豁免），随 CI 自动执行。
+- **国际化骨架**：新增 `lib/i18n.php` 与 `lang/zh-CN.php`，`I18N::t()` 词条化调用（登录页示例接入）。
+
+### 升级
+- 数据库版本 5.12 → 5.13：`cron` 表新增 `enable/nextrun/retry/max_retry/last_status/last_duration/running/running_at`，新建 `task_runs`、`api_rate_limits` 表，补齐调度/API/可观测性/Webhook 选项。
+- 升级路径：访问 `/setup/update5.12to5.13.php`（自动迁移+自删），或使用 `php tools/migrate.php up` 统一迁移（幂等，可重复执行）。
+
 ## 2026-09-03 V5.12 多项目调研落地批次
 
 ### 新功能
@@ -69,6 +86,8 @@
 - 新增 `tools/publish-gitee.ps1`，仅从干净的版本 Tag 生成 Windows ZIP 和 SHA-256 文件；必须显式传入 `-Publish` 才会发布到 Gitee。
 - 修复登录失败审计未保存用户名、导致同账号限流规则无法命中的问题。
 - 修复数组形式请求参数在核心入口触发类型错误或转换警告的问题。
+- 修复 MySQLi 兼容层 `pquery()` 对 INSERT/UPDATE/DELETE 等无结果集语句返回 `false`，导致调度锁 `acquireLock` 误判失败、任务被反复跳过且锁不释放的问题；`affected_rows()` 改为读取预处理语句实际受影响行数，并补充 `ping()` 方法（本地真实数据库运行验证时暴露）。
+- 修复 `tools/migrate.php` 迁移后未同步 `core_version` 导致 init 版本校验拦截访问的问题；`migrate.php up` 现会自动同步 `core_version`。
 - 固定 bcrypt cost 并保证自动重哈希后的登录 Cookie 使用最新密码哈希。
 - 新增 `/healthz.php` 存活与就绪检查，以及 Windows 环境检查启动器和健康检查脚本。
 - CI 扩展为 PHP 8.2/8.4 测试矩阵、依赖审计、全仓 PHP 语法和 PowerShell 脚本检查。

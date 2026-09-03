@@ -30,11 +30,11 @@ loadhead();
         <form name="f" method="post" action="index.php?mod=admin:login">
             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
             <div class="form-group">
-                <label for="login-user">用户名或邮箱</label>
+                <label for="login-user"><?php echo I18N::t('login.username'); ?></label>
                 <input id="login-user" type="text" class="form-control" name="user" placeholder="输入用户名或邮箱地址" required>
             </div>
             <div class="form-group">
-                <label for="login-password">密码</label>
+                <label for="login-password"><?php echo I18N::t('login.password'); ?></label>
                 <input id="login-password" type="password" class="form-control" name="pw" required>
             </div>
             <?php if (option::get('captcha')) { ?>
@@ -55,12 +55,12 @@ loadhead();
                 </script>
             </div>
             <?php } ?>
-            <label class="checkbox-inline"><input type="checkbox" name="ispersis" value="1"> 在此设备保持登录</label>
+            <label class="checkbox-inline"><input type="checkbox" name="ispersis" value="1"> <?php echo I18N::t('login.remember'); ?></label>
             <?php doAction('login_page_2'); ?>
             <button type="submit" class="btn btn-primary auth-submit">进入工作台</button>
             <?php doAction('login_page_3'); ?>
         </form>
-        <div class="auth-footer">还没有账号？<a href="index.php?mod=reg">创建一个账号</a>　<a href="index.php?mod=lostpw">忘记密码？</a></div>
+        <div class="auth-footer"><?php echo I18N::t('login.no_account'); ?><a href="index.php?mod=reg">创建一个账号</a>　<a href="index.php?mod=lostpw">忘记密码？</a></div>
     </section>
 </div>
 <?php loadfoot(); ?>
