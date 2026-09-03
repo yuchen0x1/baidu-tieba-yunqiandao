@@ -27,6 +27,11 @@ switch ($i['mode'][0]) {
         ReDirect('index.php?mod=showtb');
 
         break;
+    case 'account':
+                      loadhead('账号中心');
+        template('account');
+
+        break;
     case 'set':
                       loadhead('个人设置');
         template('set');
