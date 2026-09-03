@@ -184,7 +184,8 @@ function render_heatmap_cells($map, $startStamp, $endStamp, $maxTotal) {
 
 <?php loadChartAssets(); ?>
 <script>
-(function(){
+// components.js 为 defer 加载，CS 在解析期内联脚本执行时尚不可用，必须等 DOMContentLoaded
+function initCalendarUI(){
     if (window.CS && CS.tabs) {
         var t = document.getElementById('calendar-tabs');
         if (t) CS.tabs.init(t);
@@ -253,5 +254,6 @@ function render_heatmap_cells($map, $startStamp, $endStamp, $maxTotal) {
         });
     }
     // 主题切换由 components.js 全局监听并调用 CS.chart.refreshTheme()
-})();
+}
+if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initCalendarUI); } else { initCalendarUI(); }
 </script>

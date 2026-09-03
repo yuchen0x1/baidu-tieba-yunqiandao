@@ -62,7 +62,8 @@ $rateToday = ($summary['signed'] + $summary['error']) > 0 ? round($summary['sign
 
 <?php loadChartAssets(); ?>
 <script>
-(function(){
+// components.js 为 defer 加载，CS 在解析期内联脚本执行时尚不可用，必须等 DOMContentLoaded
+function initAdminChartPage(){
     if (typeof echarts === 'undefined' || !window.CS || !CS.chart) return;
     if (window.CS && CS.tabs) { CS.tabs.init(document.getElementById('chart-tabs')); }
     var days = <?php echo json_encode($days, JSON_UNESCAPED_UNICODE); ?>;
@@ -112,5 +113,6 @@ $rateToday = ($summary['signed'] + $summary['error']) > 0 ? round($summary['sign
     }
 
     // 主题切换由 components.js 全局监听并调用 CS.chart.refreshTheme()
-})();
+}
+if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initAdminChartPage); } else { initAdminChartPage(); }
 </script>

@@ -135,7 +135,8 @@ $todayRate    = $todayTotal > 0 ? round($todaySuccess / $todayTotal * 100, 1) : 
 
 <?php loadChartAssets(); ?>
 <script>
-(function(){
+// components.js 为 defer 加载，CS 在解析期内联脚本执行时尚不可用，必须等 DOMContentLoaded
+function initRankingCharts(){
     if (typeof echarts === 'undefined' || !window.CS || !CS.chart) return;
     var rows = <?php echo json_encode($rankRows, JSON_UNESCAPED_UNICODE); ?>;
     if (!rows.length) return;
@@ -160,5 +161,6 @@ $todayRate    = $todayTotal > 0 ? round($todaySuccess / $todayTotal * 100, 1) : 
             label: { show: true, position: 'right', fontSize: 11 }
         }]
     });
-})();
+}
+if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initRankingCharts); } else { initRankingCharts(); }
 </script>

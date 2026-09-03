@@ -332,8 +332,8 @@ doAction('index_1');
     $('#tb_prog').css('width', tb + '%').attr('aria-valuenow', tb);
     <?php } ?>
 
-    // 阶段 D：工作台 ECharts 图表初始化
-    (function () {
+    // 阶段 D：工作台 ECharts 图表初始化（components.js 为 defer 加载，CS 须等 DOMContentLoaded 后才可用）
+    function initDashboardCharts() {
         if (typeof echarts === 'undefined' || !window.CS || !CS.chart) return;
         var summary = <?php echo json_encode($summary, JSON_UNESCAPED_UNICODE); ?>;
         var rate = <?php echo $successRate; ?>;
@@ -418,5 +418,6 @@ doAction('index_1');
         }
 
         // 主题切换由 components.js 全局监听并调用 CS.chart.refreshTheme()
-    })();
+    }
+    if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initDashboardCharts); } else { initDashboardCharts(); }
 </script>

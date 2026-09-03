@@ -21,11 +21,14 @@
 - 存储：`tc_baidu_friends`（uid, pid, type[follow/fan], fid, info json, updated_at）
 - 风控：分页间隔与请求限速复用 `sign_sleep`/客户端指纹轮换
 
-## Phase 3（当前开发）：签到数据深度分析
+## Phase 3（已完成，2026-09-04）：签到数据深度分析
 
-- 基于 `tc_sign_history` + `tc_baiduid_health` 现有数据，无需新表、无百度接口依赖（不受 Phase 1 影响）
-- 页面：账号分析页（等级/成长值变化、成功率趋势、吧维度对比、失败原因 TOP）
-- 图表：复用 V6.0 `CS.chart`（统计页已用）
+- 基于 `tc_sign_history` + `tc_baiduid_health` 现有数据，无新表、无百度接口依赖（不受 Phase 1 影响）
+- 页面：`index.php?mod=analysis`（导航「数据分析」），支持 7/30/90/365 天区间切换
+- 内容：概览指标卡（总量/成功失败/成功率/活跃贴吧/连签）、成功率趋势图（柱线双轴）、吧维度对比（Top15 横向堆叠图 + 明细表）、失败原因 TOP（图 + 占比表）、签到时段分布（24 小时聚合）、账号对比与 BDUSS 健康状态表
+- 查询层：`SignManager` 新增 `overview` / `hourDistribution` / `accountCompare` / `accountHealth`，`failureBreakdown` 支持自定义天数
+- 附带修复 V6.0 遗留缺陷：`components.js` 为 defer 加载，此前所有页面（工作台/日历/排行/统计）的 `CS.chart` 图表初始化时 `CS` 尚不存在导致图表从不渲染；统一改为 DOMContentLoaded 后初始化，浏览器实测全部恢复
+- 说明：路线图原列的「等级/成长值变化」本地无数据源（百度接口封锁期间无法获取），暂不实现，待数据源可用后再评估
 
 ## Phase 4：第三方登录
 

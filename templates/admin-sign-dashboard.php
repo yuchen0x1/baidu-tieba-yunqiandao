@@ -126,7 +126,8 @@ for ($i = 1; $i <= $total_pages && $i <= 20; $i++) {
 
 <?php loadChartAssets(); ?>
 <script>
-(function(){
+// components.js 为 defer 加载，CS 在解析期内联脚本执行时尚不可用，必须等 DOMContentLoaded
+function initSignDashboardUI(){
     if (window.CS && CS.tabs) {
         var tabs = document.getElementById('sign-dashboard-tabs');
         if (tabs) CS.tabs.init(tabs);
@@ -156,5 +157,6 @@ for ($i = 1; $i <= $total_pages && $i <= 20; $i++) {
         }
     }
     // 主题切换由 components.js 全局监听并调用 CS.chart.refreshTheme()
-})();
+}
+if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initSignDashboardUI); } else { initSignDashboardUI(); }
 </script>

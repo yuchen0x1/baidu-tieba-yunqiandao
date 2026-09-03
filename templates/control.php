@@ -30,6 +30,11 @@ switch ($i['mode'][0]) {
         template('sign-logs');
 
         break;
+    case 'analysis':
+                      loadhead('签到数据分析');
+        template('analysis');
+
+        break;
     case 'signlogs_export':
         // 会话级 CSV 导出：复用 sign-logs 的筛选逻辑，直接流式输出
         if (ROLE === 'visitor' || ROLE === 'banned') {

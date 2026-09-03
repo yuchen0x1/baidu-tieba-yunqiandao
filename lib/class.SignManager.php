@@ -410,14 +410,16 @@ class SignManager
      * 失败原因分布（基于 sign_history.message 聚合 Top N）
      * @param int $uid 0 表示全局
      * @param int $limit
+     * @param int $days 统计区间天数，默认 30
      * @return array [{reason, count}]
      */
-    public static function failureBreakdown($uid = 0, $limit = 10)
+    public static function failureBreakdown($uid = 0, $limit = 10, $days = 30)
     {
         global $m;
         self::ensureHistoryTable();
         $limit = max(1, min(50, (int) $limit));
-        $since = time() - 86400 * 30;
+        $days = max(1, min(365, (int) $days));
+        $since = strtotime('-' . ($days - 1) . ' days midnight');
         $sql = "SELECT COALESCE(NULLIF(`message`, ''), '未知错误') AS `reason`, COUNT(*) AS `count`
             FROM `" . DB_PREFIX . self::HISTORY_TABLE . "`
             WHERE `status` != 'success' AND `created_at` >= ?";
@@ -434,6 +436,154 @@ class SignManager
             $rows[] = array(
                 'reason' => (string) $row['reason'],
                 'count' => (int) $row['count'],
+            );
+        }
+        return $rows;
+    }
+
+    /**
+     * 指定时间内的签到概览（账号分析页指标卡）
+     * @param int $uid
+     * @param int $days 统计区间天数
+     * @return array {total, success, error, skipped, rate, forums, active_days, avg_per_day}
+     */
+    public static function overview($uid, $days = 30)
+    {
+        global $m;
+        self::ensureHistoryTable();
+        $uid = (int) $uid;
+        $days = max(1, min(365, (int) $days));
+        $empty = array('total' => 0, 'success' => 0, 'error' => 0, 'skipped' => 0,
+            'rate' => 0.0, 'forums' => 0, 'active_days' => 0, 'avg_per_day' => 0.0);
+        if ($uid <= 0) {
+            return $empty;
+        }
+        $since = strtotime('-' . ($days - 1) . ' days midnight');
+        $row = $m->once_fetch_array("SELECT COUNT(*) AS `total`,
+            SUM(`status` = 'success') AS `success`,
+            SUM(`status` = 'error') AS `error`,
+            COUNT(DISTINCT `tieba`) AS `forums`,
+            COUNT(DISTINCT DATE(FROM_UNIXTIME(`created_at`))) AS `active_days`
+            FROM `" . DB_PREFIX . self::HISTORY_TABLE . "`
+            WHERE `uid` = {$uid} AND `created_at` >= {$since}");
+        $total = (int) ($row['total'] ?? 0);
+        $success = (int) ($row['success'] ?? 0);
+        $error = (int) ($row['error'] ?? 0);
+        $result = $empty;
+        $result['total'] = $total;
+        $result['success'] = $success;
+        $result['error'] = $error;
+        $result['skipped'] = max(0, $total - $success - $error);
+        $result['rate'] = $total > 0 ? round($success / $total * 100, 1) : 0.0;
+        $result['forums'] = (int) ($row['forums'] ?? 0);
+        $result['active_days'] = (int) ($row['active_days'] ?? 0);
+        $result['avg_per_day'] = $days > 0 ? round($total / $days, 1) : 0.0;
+        return $result;
+    }
+
+    /**
+     * 签到时段分布：近 N 天按小时聚合的成功/失败次数（账号分析页）
+     * @param int $uid
+     * @param int $days 统计区间天数
+     * @return array [{hour, success, error, total}] hour 为 0-23，无记录的小时也返回 0
+     */
+    public static function hourDistribution($uid, $days = 30)
+    {
+        global $m;
+        self::ensureHistoryTable();
+        $uid = (int) $uid;
+        $days = max(1, min(365, (int) $days));
+        $buckets = array();
+        for ($h = 0; $h < 24; $h++) {
+            $buckets[$h] = array('hour' => $h, 'success' => 0, 'error' => 0, 'total' => 0);
+        }
+        if ($uid <= 0) {
+            return array_values($buckets);
+        }
+        $since = strtotime('-' . ($days - 1) . ' days midnight');
+        $result = $m->pquery("SELECT HOUR(FROM_UNIXTIME(`created_at`)) AS `hour`,
+            SUM(`status` = 'success') AS `success`,
+            SUM(`status` = 'error') AS `error`,
+            COUNT(*) AS `total`
+            FROM `" . DB_PREFIX . self::HISTORY_TABLE . "`
+            WHERE `uid` = ? AND `created_at` >= ?
+            GROUP BY `hour`", array($uid, $since));
+        while ($row = $m->fetch_array($result)) {
+            $h = (int) $row['hour'];
+            if (isset($buckets[$h])) {
+                $buckets[$h]['success'] = (int) $row['success'];
+                $buckets[$h]['error'] = (int) $row['error'];
+                $buckets[$h]['total'] = (int) $row['total'];
+            }
+        }
+        return array_values($buckets);
+    }
+
+    /**
+     * 账号维度对比：近 N 天每个百度账号（pid）的签到聚合
+     * @param int $uid
+     * @param int $days 统计区间天数
+     * @return array [{pid, name, portrait, success, error, total, rate}]
+     */
+    public static function accountCompare($uid, $days = 30)
+    {
+        global $m;
+        self::ensureHistoryTable();
+        $uid = (int) $uid;
+        $days = max(1, min(365, (int) $days));
+        if ($uid <= 0) { return array(); }
+        $since = strtotime('-' . ($days - 1) . ' days midnight');
+        $result = $m->pquery("SELECT h.`pid`, b.`name`, b.`portrait`,
+            SUM(h.`status` = 'success') AS `success`,
+            SUM(h.`status` = 'error') AS `error`,
+            COUNT(*) AS `total`
+            FROM `" . DB_PREFIX . self::HISTORY_TABLE . "` h
+            LEFT JOIN `" . DB_PREFIX . "baiduid` b ON h.`pid` = b.`id`
+            WHERE h.`uid` = ? AND h.`created_at` >= ?
+            GROUP BY h.`pid`, b.`name`, b.`portrait`
+            ORDER BY `total` DESC", array($uid, $since));
+        $rows = array();
+        while ($row = $m->fetch_array($result)) {
+            $success = (int) $row['success'];
+            $total = (int) $row['total'];
+            $rows[] = array(
+                'pid' => (int) $row['pid'],
+                'name' => (string) ($row['name'] ?? ''),
+                'portrait' => (string) ($row['portrait'] ?? ''),
+                'success' => $success,
+                'error' => (int) $row['error'],
+                'total' => $total,
+                'rate' => $total > 0 ? round($success / $total * 100, 1) : 0.0,
+            );
+        }
+        return $rows;
+    }
+
+    /**
+     * 当前用户所有百度账号的 BDUSS 健康状态（baiduid_health）
+     * @param int $uid
+     * @return array 以 pid 为键：{pid, name, status, last_ok, last_fail, fail_count, error_msg, updated_at}
+     */
+    public static function accountHealth($uid)
+    {
+        global $m;
+        $uid = (int) $uid;
+        if ($uid <= 0) { return array(); }
+        $result = $m->pquery("SELECT h.`pid`, h.`status`, h.`last_ok`, h.`last_fail`,
+            h.`fail_count`, h.`error_msg`, h.`updated_at`
+            FROM `" . DB_PREFIX . self::HEALTH_TABLE . "` h
+            INNER JOIN `" . DB_PREFIX . "baiduid` b ON h.`pid` = b.`id`
+            WHERE b.`uid` = ?", array($uid));
+        $rows = array();
+        while ($row = $m->fetch_array($result)) {
+            $rows[(int) $row['pid']] = array(
+                'pid' => (int) $row['pid'],
+                'status' => (string) $row['status'],
+                'last_ok' => (int) $row['last_ok'],
+                'last_fail' => (int) $row['last_fail'],
+                'fail_count' => (int) $row['fail_count'],
+                'error_msg' => (string) ($row['error_msg'] ?? ''),
+                'updated_at' => (int) $row['updated_at'],
             );
         }
         return $rows;

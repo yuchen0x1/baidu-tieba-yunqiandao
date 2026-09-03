@@ -120,7 +120,8 @@ $globalRate = ($summary['signed'] + $summary['error']) > 0
 </div>
 <?php loadChartAssets(); ?>
 <script>
-(function(){
+// components.js 为 defer 加载，CS 在解析期内联脚本执行时尚不可用，必须等 DOMContentLoaded
+function initAdminStatCharts(){
     if (typeof echarts === 'undefined' || !window.CS || !CS.chart) return;
     var cal = <?php echo json_encode($calendar30, JSON_UNESCAPED_UNICODE); ?>;
     var failures = <?php echo json_encode($failures, JSON_UNESCAPED_UNICODE); ?>;
@@ -166,7 +167,8 @@ $globalRate = ($summary['signed'] + $summary['error']) > 0
         });
     }
     // 主题切换由 components.js 全局监听并调用 CS.chart.refreshTheme()
-})();
+}
+if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initAdminStatCharts); } else { initAdminStatCharts(); }
 </script>
         <?php
         break; case 'env':
