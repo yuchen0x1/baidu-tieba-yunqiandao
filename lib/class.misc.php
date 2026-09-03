@@ -168,7 +168,18 @@ class misc
     public static function addTiebaSign(&$data, $withClientType = true)
     {
         $data["_client_version"] = self::clientVersion();
-        if ($withClientType) {
+        if (option::get('client_rotate') !== '0') {
+            //客户端指纹轮换：随机切换客户端类型，并追加随机设备标识，防止请求特征固化
+            if ($withClientType) {
+                $data["_client_type"] = (string) mt_rand(1, 4);
+            }
+            if (!isset($data["_client_id"])) {
+                $data["_client_id"] = 'wappc_' . mt_rand(100000000, 999999999) . '_' . mt_rand(100, 999);
+            }
+            if (!isset($data["_phone_imei"])) {
+                $data["_phone_imei"] = md5(uniqid('', true));
+            }
+        } elseif ($withClientType) {
             $data["_client_type"] = "4";
         }
         ksort($data);

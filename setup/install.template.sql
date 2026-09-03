@@ -86,6 +86,7 @@ INSERT INTO `{VAR-PREFIX}options` VALUES ('sign_sleep', '0');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('sign_jitter', '0');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('sign_shuffle', '1');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('client_version', '');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('client_rotate', '1');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('proxy_type', '0');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('proxy_host', '');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('proxy_user', '');

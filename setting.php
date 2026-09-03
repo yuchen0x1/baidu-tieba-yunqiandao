@@ -118,6 +118,7 @@ switch (SYSTEM_PAGE) {
             @option::set('same_pid', $sou['same_pid']);
             @option::set('sign_jitter', $sou['sign_jitter']);
             @option::set('client_version', isset($sou['client_version']) ? trim($sou['client_version']) : '');
+            @option::set('client_rotate', isset($sou['client_rotate']) ? $sou['client_rotate'] : '1');
             @option::set('sign_shuffle', isset($sou['sign_shuffle']) ? $sou['sign_shuffle'] : '0');
             @option::set('proxy_type', isset($sou['proxy_type']) ? $sou['proxy_type'] : '0');
             @option::set('proxy_host', isset($sou['proxy_host']) ? trim($sou['proxy_host']) : '');

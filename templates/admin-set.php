@@ -53,6 +53,11 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
     $content2['sign_sleep'] = array('td1' => '<b>签到间隔时间</b><br/>单位为毫秒，0为不暂停','type' => 'number','text' => '适量的间隔时间可以防止签到过快而失败的问题，但会导致签到效率降低','extra' => 'min="0" step="1"');
     $content2['sign_jitter'] = array('td1' => '<b>签到随机抖动</b><br/>单位为毫秒，每次签到在间隔基础上随机追加 0~该值 的等待时间，0为关闭','type' => 'number','text' => '随机化请求节奏可以降低被百度风控识别的概率','extra' => 'min="0" step="1"');
     $content2['client_version'] = array('td1' => '<b>模拟客户端版本号</b><br/>客户端签到与贴吧扫描使用的版本号','type' => 'text','text' => '百度更新客户端后旧版本号可能触发风控，可在此手动更新；留空使用内置默认值','extra' => '');
+    $rotateHtml = '<tr><td><b>客户端指纹轮换</b><br/><br/>每次请求随机切换客户端类型（1-4）并携带随机设备标识<br/>降低同一设备特征被百度风控识别的概率</td><td>
+	            <label><input type="radio" name="client_rotate" value="1" ' . (option::get('client_rotate') != '0' ? 'checked' : '') . '> 开启轮换（推荐）</label>
+	            <label><input type="radio" name="client_rotate" value="0" ' . (option::get('client_rotate') == '0' ? 'checked' : '') . '> 固定客户端类型</label>
+	        </td></tr>';
+    $content2['client_rotate'] = array('html' => $rotateHtml,'type' => 'else');
     $shuffleHtml = '<tr><td><b>签到乱序</b></td><td>
 	            <label><input type="radio" name="sign_shuffle" value="1" ' . (option::get('sign_shuffle') != '0' ? 'checked' : '') . '> 随机乱序（推荐，降低风控特征）</label><br/>
 	            <label><input type="radio" name="sign_shuffle" value="0" ' . (option::get('sign_shuffle') == '0' ? 'checked' : '') . '> 按固定顺序</label>
