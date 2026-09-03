@@ -52,11 +52,13 @@ function ver4_ai_insert_log($pid, $tid, $kw, $type, $status, $msg, $day)
     );
 }
 
-/** 解析「指定账号 ID」设置：空数组表示全部账号 */
+/** 解析「指定账号 ID」设置：空数组表示全部账号（注意 strlen('0')===1，必须按数值>0 过滤） */
 function ver4_ai_target_pids($optKey)
 {
     $raw = str_replace(array(",", "，", " "), "\n", (string) option::get($optKey));
-    return array_values(array_filter(array_map('intval', explode("\n", $raw)), 'strlen'));
+    return array_values(array_filter(array_map('intval', explode("\n", $raw)), function ($v) {
+        return $v > 0;
+    }));
 }
 
 /**
@@ -264,7 +266,8 @@ function ver4_ai_post_thread($bduss, $tbs, $kw, $fid, $title, $content, $pid)
         return array(-1, '接口返回无法解析', 0);
     }
     $code = isset($resp['error_code']) ? (int) $resp['error_code'] : -1;
-    $newTid = isset($resp['data']['tid']) ? (int) $resp['data']['tid'] : 0;
+    //tid 在响应顶层（实测），旧文档的 data.tid 作兜底
+    $newTid = isset($resp['tid']) ? (int) $resp['tid'] : (isset($resp['data']['tid']) ? (int) $resp['data']['tid'] : 0);
     if ($code === 0) {
         return array(0, '发主题帖成功', $newTid);
     }

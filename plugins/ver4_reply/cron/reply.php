@@ -206,7 +206,8 @@ function ver4_reply_post_thread($bduss, $tbs, $kw, $fid, $title, $content, $pid)
         return array(-1, '接口返回无法解析', 0);
     }
     $code = isset($resp['error_code']) ? (int) $resp['error_code'] : -1;
-    $newTid = isset($resp['data']['tid']) ? (int) $resp['data']['tid'] : 0;
+    //tid 在响应顶层（实测），旧文档的 data.tid 作兜底
+    $newTid = isset($resp['tid']) ? (int) $resp['tid'] : (isset($resp['data']['tid']) ? (int) $resp['data']['tid'] : 0);
     if ($code === 0) {
         return array(0, '发主题帖成功', $newTid);
     }
