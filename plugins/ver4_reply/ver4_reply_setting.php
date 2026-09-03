@@ -12,7 +12,13 @@ if (isset($_POST['ver4_reply_submit'])) {
     option::set('ver4_reply_num', max(1, min(20, (int) $_POST['ver4_reply_num'])));
     option::set('ver4_reply_daily', max(1, min(200, (int) $_POST['ver4_reply_daily'])));
     option::set('ver4_reply_sleep', max(0, (int) $_POST['ver4_reply_sleep']));
-    echo '<div class="alert alert-success">自动回帖设置已保存</div>';
+    option::set('ver4_reply_floor_rate', min(100, max(0, (int) $_POST['ver4_reply_floor_rate'])));
+    option::set('ver4_reply_thread_kws', trim((string) $_POST['ver4_reply_thread_kws']));
+    option::set('ver4_reply_thread_titles', trim((string) $_POST['ver4_reply_thread_titles']));
+    option::set('ver4_reply_thread_contents', trim((string) $_POST['ver4_reply_thread_contents']));
+    option::set('ver4_reply_thread_num', max(1, min(10, (int) $_POST['ver4_reply_thread_num'])));
+    option::set('ver4_reply_thread_daily', max(1, min(50, (int) $_POST['ver4_reply_thread_daily'])));
+    echo '<div class="alert alert-success">自动回帖/发帖设置已保存</div>';
 }
 
 $kws     = htmlspecialchars((string) option::get('ver4_reply_kws'), ENT_QUOTES, 'UTF-8');
@@ -20,11 +26,18 @@ $contents = htmlspecialchars((string) option::get('ver4_reply_contents'), ENT_QU
 $num     = htmlspecialchars((string) option::get('ver4_reply_num'), ENT_QUOTES, 'UTF-8');
 $daily   = htmlspecialchars((string) option::get('ver4_reply_daily'), ENT_QUOTES, 'UTF-8');
 $sleep   = htmlspecialchars((string) option::get('ver4_reply_sleep'), ENT_QUOTES, 'UTF-8');
+$floorRate = htmlspecialchars((string) option::get('ver4_reply_floor_rate'), ENT_QUOTES, 'UTF-8');
+$tKws     = htmlspecialchars((string) option::get('ver4_reply_thread_kws'), ENT_QUOTES, 'UTF-8');
+$tTitles  = htmlspecialchars((string) option::get('ver4_reply_thread_titles'), ENT_QUOTES, 'UTF-8');
+$tContents = htmlspecialchars((string) option::get('ver4_reply_thread_contents'), ENT_QUOTES, 'UTF-8');
+$tNum     = htmlspecialchars((string) option::get('ver4_reply_thread_num'), ENT_QUOTES, 'UTF-8');
+$tDaily   = htmlspecialchars((string) option::get('ver4_reply_thread_daily'), ENT_QUOTES, 'UTF-8');
 ?>
 
 <form method="post" action="index.php?mod=admin:setplug&plug=ver4_reply">
     <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
     <table class="table table-striped">
+        <tr><th colspan="2"><h4>自动回帖</h4></th></tr>
         <tr>
             <td style="width:35%"><b>目标贴吧</b><br/><br/>每行一个贴吧名（不带"吧"字）<br/>留空表示不执行回帖</td>
             <td><textarea class="form-control" name="ver4_reply_kws" style="height:120px" placeholder="例如：&#10;签到&#10;贴吧云签到"><?php echo $kws; ?></textarea></td>
@@ -42,8 +55,33 @@ $sleep   = htmlspecialchars((string) option::get('ver4_reply_sleep'), ENT_QUOTES
             <td><input type="number" min="1" max="200" step="1" class="form-control" name="ver4_reply_daily" value="<?php echo $daily; ?>"></td>
         </tr>
         <tr>
-            <td><b>回帖间隔</b><br/>单位为毫秒</td>
+            <td><b>楼中楼回复比例</b><br/>0-100 的百分比。回复时有该概率随机选一栋楼层进行楼中楼回复，设为 0 表示始终回复主题帖</td>
+            <td><input type="number" min="0" max="100" step="5" class="form-control" name="ver4_reply_floor_rate" value="<?php echo $floorRate == '' ? '0' : $floorRate; ?>"></td>
+        </tr>
+        <tr>
+            <td><b>回帖间隔</b><br/>单位为毫秒，发主题帖共用此间隔</td>
             <td><input type="number" min="0" step="500" class="form-control" name="ver4_reply_sleep" value="<?php echo $sleep; ?>"></td>
+        </tr>
+        <tr><th colspan="2"><h4>自动发主题帖</h4></th></tr>
+        <tr>
+            <td><b>目标贴吧</b><br/><br/>每行一个贴吧名（不带"吧"字）<br/>留空表示不执行发主题帖</td>
+            <td><textarea class="form-control" name="ver4_reply_thread_kws" style="height:100px" placeholder="例如：&#10;贴吧云签到"><?php echo $tKws; ?></textarea></td>
+        </tr>
+        <tr>
+            <td><b>标题库</b><br/><br/>每行一条，发帖时随机选取</td>
+            <td><textarea class="form-control" name="ver4_reply_thread_titles" style="height:100px" placeholder="每行一条主题帖标题"><?php echo $tTitles; ?></textarea></td>
+        </tr>
+        <tr>
+            <td><b>内容库</b><br/><br/>每行一条，发帖时随机选取<br/><span class="text-danger">请勿发布违法违规内容，后果由使用者自负</span></td>
+            <td><textarea class="form-control" name="ver4_reply_thread_contents" style="height:120px" placeholder="每行一条主题帖内容"><?php echo $tContents; ?></textarea></td>
+        </tr>
+        <tr>
+            <td><b>每吧每次发帖数</b></td>
+            <td><input type="number" min="1" max="10" step="1" class="form-control" name="ver4_reply_thread_num" value="<?php echo $tNum == '' ? '1' : $tNum; ?>"></td>
+        </tr>
+        <tr>
+            <td><b>每账号每日发帖上限</b><br/>所有目标贴吧合计</td>
+            <td><input type="number" min="1" max="50" step="1" class="form-control" name="ver4_reply_thread_daily" value="<?php echo $tDaily == '' ? '3' : $tDaily; ?>"></td>
         </tr>
         <tr>
             <td></td>
