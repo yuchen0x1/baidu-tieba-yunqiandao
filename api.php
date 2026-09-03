@@ -259,11 +259,11 @@ switch ($action) {
         header('Content-Type: text/csv; charset=UTF-8');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
         header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-        $out = fopen('php://output', 'w');
-        fwrite($out, "\xEF\xBB\xBF");
-        fputcsv($out, array('时间', '贴吧', '状态', '错误码', '信息', 'PID', 'UID'));
+        // UTF-8 BOM 让 Excel 正确识别编码
+        echo "\xEF\xBB\xBF";
+        echo csv_line(array('时间', '贴吧', '状态', '错误码', '信息', 'PID', 'UID'));
         foreach ($exportRows as $r) {
-            fputcsv($out, array(
+            echo csv_line(array(
                 date('Y-m-d H:i:s', $r['created_at']),
                 $r['tieba'],
                 $r['status'],
@@ -273,7 +273,6 @@ switch ($action) {
                 (string) $r['uid'],
             ));
         }
-        fclose($out);
         exit;
 
 

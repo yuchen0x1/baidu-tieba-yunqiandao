@@ -1333,3 +1333,20 @@ function safe_zip_extract($zip, $dest)
     }
     return true;
 }
+
+/**
+ * 编码一行 CSV 字段（RFC 4180：含逗号、引号或换行的字段加引号包裹，引号翻倍）
+ * @param array $fields 字段列表
+ * @return string 以换行结尾的 CSV 行
+ */
+function csv_line(array $fields)
+{
+    $fields = array_map('strval', $fields);
+    foreach ($fields as &$v) {
+        if (preg_match('/[",\r\n]/', $v)) {
+            $v = '"' . str_replace('"', '""', $v) . '"';
+        }
+    }
+    unset($v);
+    return implode(',', $fields) . "\n";
+}

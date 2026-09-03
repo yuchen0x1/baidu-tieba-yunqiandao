@@ -15,6 +15,8 @@ class TOTP
     const PERIOD = 30;
     /** 默认码长 */
     const DIGITS = 6;
+    /** RFC 6238 规定 TOTP 默认摘要为 HMAC-SHA-1（兼容所有标准验证器应用），并非弱哈希口令存储场景 */
+    const HMAC_ALGO = 'sha1';
 
     /**
      * 生成随机 Base32 secret（160 bit，与 Google Authenticator 兼容）
@@ -44,7 +46,7 @@ class TOTP
             return '';
         }
         $msg = pack('N*', 0, (int) $timeSlice);
-        $hash = hash_hmac('sha1', $msg, $key, true);
+        $hash = hash_hmac(self::HMAC_ALGO, $msg, $key, true);
         $offset = ord($hash[strlen($hash) - 1]) & 0x0f;
         $binary = ((ord($hash[$offset]) & 0x7f) << 24)
             | ((ord($hash[$offset + 1]) & 0xff) << 16)
