@@ -2,7 +2,7 @@
     die('Insufficient Permissions');
 }
 global $i;
-loadhead('双因素认证'); ?>
+?>
 <?php if (!empty($i['totp_msg'])) {
     echo '<div class="alert alert-info">' . htmlspecialchars((string) $i['totp_msg'], ENT_QUOTES, 'UTF-8') . '</div>';
 } ?>
@@ -37,4 +37,3 @@ loadhead('双因素认证'); ?>
         <?php endif; ?>
     </div>
 </div>
-<?php loadfoot(); ?>

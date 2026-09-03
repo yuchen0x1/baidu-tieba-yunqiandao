@@ -134,7 +134,7 @@ $userInitial = function_exists('mb_substr') ? mb_substr($userName, 0, 1, 'UTF-8'
 
         <div class="sidebar-footer">
             <div>当前版本 V<?php echo SYSTEM_VER; ?></div>
-            <a href="<?php echo htmlspecialchars(PROJECT_GITHUB_URL, ENT_QUOTES, 'UTF-8'); ?>" target="_blank">反馈与文档</a>
+            <a href="<?php echo htmlspecialchars(PROJECT_GITEE_URL, ENT_QUOTES, 'UTF-8'); ?>" target="_blank">反馈与文档</a>
             <?php doAction('navi_5'); ?>
         </div>
     </aside>

@@ -174,6 +174,11 @@ switch ($i['mode'][0]) {
                 template('admin-sign-dashboard');
 
                 break;
+            case 'totp':
+                          loadhead('双因素认证');
+                template('admin-totp');
+
+                break;
         }
 
         break;

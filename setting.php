@@ -660,7 +660,9 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
             $i['totp_uri'] = TOTP::otpauthUri($i['totp_secret'], $i['totp_account'], SYSTEM_NAME);
         }
         $i['mode'] = array('admin', 'totp');
+        loadhead('双因素认证');
         template('admin-totp');
+        loadfoot();
         break;
     case 'admin:cron':
         doAction('cron_setting_1');
