@@ -37,6 +37,7 @@ if (!empty($i['user']['bduss'])) {
     }
     $ex = $m->query('SELECT * FROM  `' . DB_NAME . '`.`' . DB_PREFIX . TABLE . '` WHERE  `uid` = ' . UID . ' ORDER BY `pid` ASC');
     $lpid = '';
+    $seq = 0;
     while ($x = $m->fetch_array($ex)) {
         $num++;
         if ($x['no'] == '0') {
@@ -47,8 +48,10 @@ if (!empty($i['user']['bduss'])) {
         if ($lpid != $x['pid'] || !isset($x['pid'])) {
             $lpid = $x['pid'];
             $f[$x['pid']] = '';
+            $seq = 0;
         }
-        $f[$x['pid']] .= '<tr><td>' . $x['id'] . '</td>';
+        $seq++;
+        $f[$x['pid']] .= '<tr><td>' . $seq . '</td>';
         $tieba = htmlspecialchars($x['tieba'], ENT_QUOTES, 'UTF-8');
         $tieba_url = rawurlencode($x['tieba']);
         $f[$x['pid']] .= '<td class="wrap"><a title="' . $tieba . '" href="https://tieba.baidu.com/f?ie=utf-8&kw=' . $tieba_url . '" target="_blank">' . htmlspecialchars(mb_substr($x['tieba'], 0, 30, 'UTF-8'), ENT_QUOTES, 'UTF-8') . '</a>';
