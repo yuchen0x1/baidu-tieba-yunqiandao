@@ -1,4 +1,12 @@
+<div align="center">
+
 # 百度贴吧云签到（Tieba Cloud Sign）
+
+[![PHP](https://img.shields.io/badge/PHP-%3E%3D8.2-777BB4?logo=php&logoColor=white)](https://www.php.net/)
+[![MariaDB](https://img.shields.io/badge/MariaDB-11.4-003545?logo=mariadb&logoColor=white)](https://mariadb.org/)
+[![Docker](https://img.shields.io/badge/Docker-Compose%20V2-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+
+</div>
 
 > 把「每天打开贴吧逐个签到」这件事，交给一台你自己掌控的服务器。
 
