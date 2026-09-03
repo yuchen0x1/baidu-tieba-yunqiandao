@@ -36,6 +36,7 @@ CREATE TABLE `{VAR-PREFIX}cron` (
 
 INSERT INTO `{VAR-PREFIX}cron` (`name`, `orde`, `file`, `no`, `desc`, `freq`, `lastdo`, `log`) VALUES ('system_sign', '0', 'lib/cron_system_sign.php', '0', '每天对所有贴吧进行签到\r\n忽略或卸载此任务会导致停止签到', '0', '0', '');
 INSERT INTO `{VAR-PREFIX}cron` (`name`, `orde`, `file`, `no`, `desc`, `freq`, `lastdo`, `log`) VALUES ('system_sign_retry', '1', 'lib/cron_system_sign_retry.php', '0', '对所有签到失败的贴吧进行复签\r\n忽略或卸载此任务会导致停止复签', '0', '0', '');
+INSERT INTO `{VAR-PREFIX}cron` (`name`, `orde`, `file`, `no`, `desc`, `freq`, `lastdo`, `log`) VALUES ('system_dbbackup', '9', 'lib/cron_system_dbbackup.php', '0', '每日自动备份数据库到 data/backups 目录\r\n启用后需在设置中开启定时备份', '86400', '0', '');
 
 
 
@@ -61,6 +62,7 @@ INSERT INTO `{VAR-PREFIX}options` VALUES ('enable_reg', '1');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('reg_mail_verify', '0');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('captcha', '0');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('yr_reg', '');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('yr_reg_multi', '0');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('icp', '');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('mail_mode', 'MAIL');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('mail_name', '');
@@ -81,6 +83,9 @@ INSERT INTO `{VAR-PREFIX}options` VALUES ('dev', '');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('cron_last_do_time', '');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('cron_last_do', '0');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('cron_isdoing', '0');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('db_backup_enable', '0');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('db_backup_keep', '7');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('db_backup_email', '');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('cron_pw', '');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('sign_sleep', '0');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('sign_jitter', '0');
@@ -272,4 +277,18 @@ CREATE TABLE `{VAR-PREFIX}login_audit` (
   KEY `username` (`username`),
   KEY `ip` (`ip`),
   KEY `ts` (`ts`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS `{VAR-PREFIX}invites`;
+CREATE TABLE `{VAR-PREFIX}invites` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `code` VARCHAR(32) NOT NULL DEFAULT '',
+  `max_uses` INT UNSIGNED NOT NULL DEFAULT 1,
+  `used_count` INT UNSIGNED NOT NULL DEFAULT 0,
+  `expire` INT UNSIGNED NOT NULL DEFAULT 0,
+  `status` TINYINT NOT NULL DEFAULT 1,
+  `note` VARCHAR(255) NOT NULL DEFAULT '',
+  `created_at` INT UNSIGNED NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `code` (`code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
