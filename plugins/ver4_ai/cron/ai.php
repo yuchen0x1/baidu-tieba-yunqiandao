@@ -4,10 +4,12 @@ if (!defined('SYSTEM_ROOT')) {
     die('Insufficient Permissions');
 }
 /**
- * AI 大模型定时发帖/回帖计划任务
+ * AI 大模型定时发帖/回帖计划任务（按用户配置执行）
+ * 每个百度账号归属站点用户（baiduid.uid），仅当该用户在个人面板启用 AI 且配置可用时才执行，
+ * 用户可用自己的 API Key 或（管理员开放时）站点共享配置。
  * 回帖 c/c/post/add、发主题帖 c/c/thread/add、帖子列表 c/f/frs/page、楼层列表 c/f/pb/page，
  * 接口参数集与 ver4_reply 保持一致（tiebaclient 签名），内容由大模型按人设生成。
- * 调度：计划任务建议每 5 分钟触发；回帖按「轮间隔」节流，发帖按「每日小时点 / 每 N 小时」节流。
+ * 调度：计划任务建议每 5 分钟触发；回帖按「轮间隔」节流（用户级），发帖按「每日小时点 / 每 N 小时」节流。
  */
 
 require_once SYSTEM_ROOT . '/plugins/ver4_ai/ver4_ai_client.php';
@@ -52,13 +54,203 @@ function ver4_ai_insert_log($pid, $tid, $kw, $type, $status, $msg, $day)
     );
 }
 
-/** 解析「指定账号 ID」设置：空数组表示全部账号（注意 strlen('0')===1，必须按数值>0 过滤） */
-function ver4_ai_target_pids($optKey)
+function cron_ver4_ai_do()
 {
-    $raw = str_replace(array(",", "，", " "), "\n", (string) option::get($optKey));
-    return array_values(array_filter(array_map('intval', explode("\n", $raw)), function ($v) {
-        return $v > 0;
-    }));
+    if (function_exists('set_time_limit')) {
+        @set_time_limit(600);
+    }
+    global $m;
+    ver4_ai_ensure_table();
+    $day = date('Ymd');
+
+    //按归属用户分组账号，逐用户解析配置执行
+    $rs = $m->query("SELECT `id`, `uid`, `bduss` FROM `" . DB_PREFIX . "baiduid` ORDER BY `id` ASC");
+    $byUid = array();
+    while ($acc = $m->fetch_array($rs)) {
+        $byUid[(int) $acc['uid']][] = $acc;
+    }
+    foreach ($byUid as $uid => $accounts) {
+        $cfg = ver4_ai_user_cfg($uid);
+        if ($cfg === false) {
+            continue; //用户未启用或无可用配置
+        }
+        //===== AI 智能回帖：用户级轮间隔节流 =====
+        if ($cfg['reply_enable'] && !empty($cfg['reply_kws'])) {
+            $interval = $cfg['reply_interval'] * 60;
+            $lastRun = (int) option::uget('uai_reply_lastrun', $uid);
+            if (time() - $lastRun >= $interval) {
+                ver4_ai_uopt_set($uid, 'uai_reply_lastrun', (string) time());
+                foreach ($accounts as $acc) {
+                    ver4_ai_do_replies($cfg, $acc, $day);
+                }
+            }
+        }
+        //===== AI 定时发主题帖 =====
+        if ($cfg['thread_enable'] && !empty($cfg['thread_kws'])) {
+            foreach ($accounts as $acc) {
+                ver4_ai_do_threads($cfg, $acc, $day);
+            }
+        }
+    }
+}
+
+/**
+ * AI 回帖阶段（单账号，配置来自账号归属用户）
+ */
+function ver4_ai_do_replies($cfg, $acc, $day)
+{
+    global $m;
+    $pid = (int) $acc['id'];
+    if (!empty($cfg['reply_pids']) && !in_array($pid, $cfg['reply_pids'], true)) {
+        return;
+    }
+    $bduss = P::decrypt($acc['bduss']);
+    if (empty($bduss)) {
+        return;
+    }
+    $tbs = misc::getTbs(0, $bduss, $pid);
+    if (empty($tbs)) {
+        ver4_ai_insert_log($pid, 0, '', 0, 2, 'TBS 获取失败（账号可能已失效）', $day);
+        return;
+    }
+    $perKw = $cfg['reply_num'];
+    $daily = $cfg['reply_daily'];
+    $floorRate = $cfg['reply_floor_rate'];
+    $useContext = $cfg['reply_context'];
+    $fallbacks = $cfg['reply_fallback'];
+    $todayCount = ver4_ai_day_count($pid, 0, $day);
+    if ($todayCount >= $daily) {
+        return;
+    }
+    $floorsCache = array();
+    foreach ($cfg['reply_kws'] as $kw) {
+        if ($todayCount >= $daily) {
+            break;
+        }
+        $data = ver4_ai_get_threads($bduss, $kw, $pid);
+        if ($data === false || empty($data['threads'])) {
+            continue;
+        }
+        $fid = $data['fid'];
+        if ($fid <= 0) {
+            $fid = (int) misc::getFid($kw);
+        }
+        if ($fid <= 0) {
+            continue;
+        }
+        $done = 0;
+        foreach ($data['threads'] as $t) {
+            if ($done >= $perKw || $todayCount >= $daily) {
+                break;
+            }
+            $tid = (int) $t['tid'];
+            if (ver4_ai_replied_today($pid, $tid, $day)) {
+                continue;
+            }
+            //生成 AI 回复（可带首楼上下文），失败走兜底内容库
+            $context = $useContext ? ver4_ai_get_first_post($bduss, $kw, $tid, $pid) : '';
+            $aiErr = null;
+            $content = ver4_ai_gen_reply($cfg, $kw, $t['title'], $context, $aiErr);
+            if ($content === false) {
+                ver4_ai_insert_log($pid, $tid, $kw, 0, 4, 'AI 生成失败 @' . $t['title'] . '：' . $aiErr, $day);
+                if (!empty($fallbacks)) {
+                    $content = $fallbacks[mt_rand(0, count($fallbacks) - 1)];
+                } else {
+                    continue;
+                }
+            }
+            //按比例随机楼中楼
+            $quoteId = 0;
+            if ($floorRate > 0 && mt_rand(1, 100) <= $floorRate) {
+                $cacheKey = $kw . ':' . $tid;
+                if (!isset($floorsCache[$cacheKey])) {
+                    $floorsCache[$cacheKey] = ver4_ai_get_floors($bduss, $kw, $tid, $pid);
+                }
+                $floors = $floorsCache[$cacheKey];
+                if (!empty($floors)) {
+                    $quoteId = (int) $floors[mt_rand(0, count($floors) - 1)];
+                }
+            }
+            list($rCode, $rMsg) = ver4_ai_post($bduss, $tbs, $kw, $fid, $tid, $content, $pid, $quoteId);
+            $status = $rCode === 0 ? 1 : ($rCode === -2 ? 3 : 2);
+            ver4_ai_insert_log($pid, $tid, $kw, 0, $status, ($quoteId > 0 ? '[楼中楼] ' : '') . $rMsg . ' @' . $t['title'], $day);
+            if ($rCode === 0) {
+                $todayCount++;
+            } elseif ($rCode === -2) {
+                ver4_ai_cron_log("账号 {$pid} AI 回帖触发频率限制：{$rMsg}，本轮终止");
+                return;
+            }
+            $done++;
+            usleep((2000 + mt_rand(0, 1500)) * 1000);
+        }
+    }
+    ver4_ai_cron_log("AI 回帖完成：账号 {$pid} 今日累计 " . ver4_ai_day_count($pid, 0, $day) . ' 条');
+}
+
+/**
+ * AI 发主题帖阶段（单账号）：daily 模式在设定小时点后发一帖；hourly 模式每 N 小时发一帖
+ */
+function ver4_ai_do_threads($cfg, $acc, $day)
+{
+    global $m;
+    $pid = (int) $acc['id'];
+    if (!empty($cfg['thread_pids']) && !in_array($pid, $cfg['thread_pids'], true)) {
+        return;
+    }
+    $bduss = P::decrypt($acc['bduss']);
+    if (empty($bduss)) {
+        return;
+    }
+    $tbs = misc::getTbs(0, $bduss, $pid);
+    if (empty($tbs)) {
+        ver4_ai_insert_log($pid, 0, '', 1, 2, 'TBS 获取失败（账号可能已失效）', $day);
+        return;
+    }
+    $mode = $cfg['thread_mode'];
+    $hourPoint = $cfg['thread_hour'];
+    $everyHours = $cfg['thread_every'] * 3600;
+    $dailyMax = $cfg['thread_daily'];
+
+    if ($mode === 'daily' && (int) date('G') < $hourPoint) {
+        return; //未到当日设定小时点
+    }
+
+    foreach ($cfg['thread_kws'] as $kw) {
+        if (ver4_ai_day_count($pid, 1, $day) >= $dailyMax) {
+            break;
+        }
+        if ($mode === 'daily') {
+            if (ver4_ai_posted_today($pid, $kw, $day)) {
+                continue; //该吧今日已发
+            }
+        } else {
+            $last = ver4_ai_last_post_time($pid, $kw);
+            if ($last > 0 && time() - $last < $everyHours) {
+                continue; //未到 N 小时间隔
+            }
+        }
+        $fid = (int) misc::getFid($kw);
+        if ($fid <= 0) {
+            ver4_ai_insert_log($pid, 0, $kw, 1, 2, '获取吧 ID 失败（贴吧名可能不存在）', $day);
+            continue;
+        }
+        $aiErr = null;
+        $thread = ver4_ai_gen_thread($cfg, $kw, $aiErr);
+        if ($thread === false) {
+            ver4_ai_insert_log($pid, 0, $kw, 1, 4, 'AI 生成失败：' . $aiErr, $day);
+            continue;
+        }
+        list($rCode, $rMsg, $newTid) = ver4_ai_post_thread($bduss, $tbs, $kw, $fid, $thread['title'], $thread['content'], $pid);
+        $status = $rCode === 0 ? 1 : ($rCode === -2 ? 3 : 2);
+        ver4_ai_insert_log($pid, $newTid, $kw, 1, $status, $rMsg . ' @' . $thread['title'], $day);
+        if ($rCode === 0) {
+            ver4_ai_cron_log("AI 发帖成功：账号 {$pid} 在 {$kw}吧 发布《" . $thread['title'] . "》");
+        } elseif ($rCode === -2) {
+            ver4_ai_cron_log("账号 {$pid} AI 发帖触发频率限制：{$rMsg}，本轮终止");
+            return;
+        }
+        usleep((2000 + mt_rand(0, 1500)) * 1000);
+    }
 }
 
 /**
@@ -120,7 +312,7 @@ function ver4_ai_fragments_text($fragments)
 
 /**
  * 拉取主题帖首楼内容（作为回帖上下文）
- * @return string 失败或为空时返回空字符串
+ * @return string
  */
 function ver4_ai_get_first_post($bduss, $kw, $tid, $pid)
 {
@@ -284,207 +476,15 @@ function ver4_ai_post_thread($bduss, $tbs, $kw, $fid, $title, $content, $pid)
     return array(-1, '错误码 ' . $code . ($errmsg !== '' ? '：' . $errmsg : ''), 0);
 }
 
-function cron_ver4_ai_do()
-{
-    if (function_exists('set_time_limit')) {
-        @set_time_limit(600);
-    }
-    global $m;
-    ver4_ai_ensure_table();
-    $day = date('Ymd');
-
-    // ===== AI 智能回帖：按轮间隔节流 =====
-    $replyKws = array_values(array_filter(array_map('trim', explode("\n", (string) option::get('ver4_ai_reply_kws'))), 'strlen'));
-    if (ver4_ai_cfg('ver4_ai_reply_enable') === '1' && !empty($replyKws)) {
-        $interval = max(5, min(1440, (int) ver4_ai_cfg('ver4_ai_reply_interval', '60'))) * 60;
-        $lastRun = (int) option::get('ver4_ai_reply_lastrun');
-        if (time() - $lastRun >= $interval) {
-            option::set('ver4_ai_reply_lastrun', (string) time());
-            ver4_ai_do_replies($replyKws, $day);
-        }
-    }
-
-    // ===== AI 定时发主题帖 =====
-    $threadKws = array_values(array_filter(array_map('trim', explode("\n", (string) option::get('ver4_ai_thread_kws'))), 'strlen'));
-    if (ver4_ai_cfg('ver4_ai_thread_enable') === '1' && !empty($threadKws)) {
-        ver4_ai_do_threads($threadKws, $day);
-    }
-}
-
-/**
- * AI 回帖阶段
- */
-function ver4_ai_do_replies($kws, $day)
-{
-    global $m;
-    $pidsFilter = ver4_ai_target_pids('ver4_ai_reply_pids');
-    $perKw = max(1, (int) ver4_ai_cfg('ver4_ai_reply_num', '2'));
-    $daily = max(1, (int) ver4_ai_cfg('ver4_ai_reply_daily', '10'));
-    $floorRate = min(100, max(0, (int) ver4_ai_cfg('ver4_ai_reply_floor_rate', '0')));
-    $useContext = ver4_ai_cfg('ver4_ai_reply_context', '1') === '1';
-    $fallbacks = array_values(array_filter(array_map('trim', explode("\n", (string) option::get('ver4_ai_reply_fallback'))), 'strlen'));
-
-    $rs = $m->query("SELECT `id`, `bduss` FROM `" . DB_PREFIX . "baiduid` ORDER BY `id` ASC");
-    while ($acc = $m->fetch_array($rs)) {
-        $pid = (int) $acc['id'];
-        if (!empty($pidsFilter) && !in_array($pid, $pidsFilter, true)) {
-            continue;
-        }
-        $bduss = P::decrypt($acc['bduss']);
-        if (empty($bduss)) {
-            continue;
-        }
-        $tbs = misc::getTbs(0, $bduss, $pid);
-        if (empty($tbs)) {
-            ver4_ai_insert_log($pid, 0, '', 0, 2, 'TBS 获取失败（账号可能已失效）', $day);
-            continue;
-        }
-        $todayCount = ver4_ai_day_count($pid, 0, $day);
-        if ($todayCount >= $daily) {
-            continue;
-        }
-        $floorsCache = array();
-        foreach ($kws as $kw) {
-            if ($todayCount >= $daily) {
-                break;
-            }
-            $data = ver4_ai_get_threads($bduss, $kw, $pid);
-            if ($data === false || empty($data['threads'])) {
-                continue;
-            }
-            $fid = $data['fid'];
-            if ($fid <= 0) {
-                $fid = (int) misc::getFid($kw);
-            }
-            if ($fid <= 0) {
-                continue;
-            }
-            $done = 0;
-            foreach ($data['threads'] as $t) {
-                if ($done >= $perKw || $todayCount >= $daily) {
-                    break;
-                }
-                $tid = (int) $t['tid'];
-                if (ver4_ai_replied_today($pid, $tid, $day)) {
-                    continue;
-                }
-                //生成 AI 回复（可带首楼上下文），失败走兜底内容库
-                $context = $useContext ? ver4_ai_get_first_post($bduss, $kw, $tid, $pid) : '';
-                $aiErr = null;
-                $content = ver4_ai_gen_reply($kw, $t['title'], $context, $aiErr);
-                if ($content === false) {
-                    ver4_ai_insert_log($pid, $tid, $kw, 0, 4, 'AI 生成失败 @' . $t['title'] . '：' . $aiErr, $day);
-                    if (!empty($fallbacks)) {
-                        $content = $fallbacks[mt_rand(0, count($fallbacks) - 1)];
-                    } else {
-                        continue;
-                    }
-                }
-                //按比例随机楼中楼
-                $quoteId = 0;
-                if ($floorRate > 0 && mt_rand(1, 100) <= $floorRate) {
-                    $cacheKey = $kw . ':' . $tid;
-                    if (!isset($floorsCache[$cacheKey])) {
-                        $floorsCache[$cacheKey] = ver4_ai_get_floors($bduss, $kw, $tid, $pid);
-                    }
-                    $floors = $floorsCache[$cacheKey];
-                    if (!empty($floors)) {
-                        $quoteId = (int) $floors[mt_rand(0, count($floors) - 1)];
-                    }
-                }
-                list($rCode, $rMsg) = ver4_ai_post($bduss, $tbs, $kw, $fid, $tid, $content, $pid, $quoteId);
-                $status = $rCode === 0 ? 1 : ($rCode === -2 ? 3 : 2);
-                ver4_ai_insert_log($pid, $tid, $kw, 0, $status, ($quoteId > 0 ? '[楼中楼] ' : '') . $rMsg . ' @' . $t['title'], $day);
-                if ($rCode === 0) {
-                    $todayCount++;
-                } elseif ($rCode === -2) {
-                    ver4_ai_cron_log("账号 {$pid} AI 回帖触发频率限制：{$rMsg}，本轮终止");
-                    return;
-                }
-                $done++;
-                usleep((2000 + mt_rand(0, 1500)) * 1000);
-            }
-        }
-        ver4_ai_cron_log("AI 回帖完成：账号 {$pid} 今日累计 " . ver4_ai_day_count($pid, 0, $day) . ' 条');
-    }
-}
-
-/**
- * AI 发主题帖阶段：daily 模式在设定小时点后发一帖；hourly 模式每 N 小时发一帖
- */
-function ver4_ai_do_threads($kws, $day)
-{
-    global $m;
-    $pidsFilter = ver4_ai_target_pids('ver4_ai_thread_pids');
-    $mode = ver4_ai_cfg('ver4_ai_thread_mode', 'daily');
-    $hourPoint = min(23, max(0, (int) ver4_ai_cfg('ver4_ai_thread_hour', '9')));
-    $everyHours = max(1, min(24, (int) ver4_ai_cfg('ver4_ai_thread_every', '1'))) * 3600;
-    $dailyMax = max(1, min(24, (int) ver4_ai_cfg('ver4_ai_thread_daily', '3')));
-
-    if ($mode === 'daily' && (int) date('G') < $hourPoint) {
-        return; //未到当日设定小时点
-    }
-
-    $rs = $m->query("SELECT `id`, `bduss` FROM `" . DB_PREFIX . "baiduid` ORDER BY `id` ASC");
-    while ($acc = $m->fetch_array($rs)) {
-        $pid = (int) $acc['id'];
-        if (!empty($pidsFilter) && !in_array($pid, $pidsFilter, true)) {
-            continue;
-        }
-        $bduss = P::decrypt($acc['bduss']);
-        if (empty($bduss)) {
-            continue;
-        }
-        $tbs = misc::getTbs(0, $bduss, $pid);
-        if (empty($tbs)) {
-            ver4_ai_insert_log($pid, 0, '', 1, 2, 'TBS 获取失败（账号可能已失效）', $day);
-            continue;
-        }
-        foreach ($kws as $kw) {
-            if (ver4_ai_day_count($pid, 1, $day) >= $dailyMax) {
-                break;
-            }
-            if ($mode === 'daily') {
-                if (ver4_ai_posted_today($pid, $kw, $day)) {
-                    continue; //该吧今日已发
-                }
-            } else {
-                $last = ver4_ai_last_post_time($pid, $kw);
-                if ($last > 0 && time() - $last < $everyHours) {
-                    continue; //未到 N 小时间隔
-                }
-            }
-            $fid = (int) misc::getFid($kw);
-            if ($fid <= 0) {
-                ver4_ai_insert_log($pid, 0, $kw, 1, 2, '获取吧 ID 失败（贴吧名可能不存在）', $day);
-                continue;
-            }
-            $aiErr = null;
-            $thread = ver4_ai_gen_thread($kw, $aiErr);
-            if ($thread === false) {
-                ver4_ai_insert_log($pid, 0, $kw, 1, 4, 'AI 生成失败：' . $aiErr, $day);
-                continue;
-            }
-            list($rCode, $rMsg, $newTid) = ver4_ai_post_thread($bduss, $tbs, $kw, $fid, $thread['title'], $thread['content'], $pid);
-            $status = $rCode === 0 ? 1 : ($rCode === -2 ? 3 : 2);
-            ver4_ai_insert_log($pid, $newTid, $kw, 1, $status, $rMsg . ' @' . $thread['title'], $day);
-            if ($rCode === 0) {
-                ver4_ai_cron_log("AI 发帖成功：账号 {$pid} 在 {$kw}吧 发布《" . $thread['title'] . "》");
-            } elseif ($rCode === -2) {
-                ver4_ai_cron_log("账号 {$pid} AI 发帖触发频率限制：{$rMsg}，本轮终止");
-                return;
-            }
-            usleep((2000 + mt_rand(0, 1500)) * 1000);
-        }
-    }
-}
-
-/** 某账号某类型今日已执行条数 */
+/** 某账号某类型今日已成功执行条数 */
 function ver4_ai_day_count($pid, $type, $day)
 {
     global $m;
-    $row = $m->pquery("SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "ver4_ai_log` WHERE `pid` = ? AND `type` = ? AND `day` = ? AND `status` = 1", array($pid, $type, $day))->fetch_array();
-    //pquery 返回结果集对象，取数组
+    $result = $m->pquery("SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "ver4_ai_log` WHERE `pid` = ? AND `type` = ? AND `day` = ? AND `status` = 1", array($pid, $type, $day));
+    if ($result === false) {
+        return 0;
+    }
+    $row = $result->fetch_array();
     return isset($row['c']) ? (int) $row['c'] : 0;
 }
 
@@ -493,6 +493,9 @@ function ver4_ai_replied_today($pid, $tid, $day)
 {
     global $m;
     $result = $m->pquery("SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "ver4_ai_log` WHERE `pid` = ? AND `tid` = ? AND `type` = 0 AND `day` = ?", array($pid, $tid, $day));
+    if ($result === false) {
+        return false;
+    }
     $row = $result->fetch_array();
     return !empty($row['c']);
 }
@@ -502,6 +505,9 @@ function ver4_ai_posted_today($pid, $kw, $day)
 {
     global $m;
     $result = $m->pquery("SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "ver4_ai_log` WHERE `pid` = ? AND `kw` = ? AND `type` = 1 AND `status` = 1 AND `day` = ?", array($pid, $kw, $day));
+    if ($result === false) {
+        return false;
+    }
     $row = $result->fetch_array();
     return !empty($row['c']);
 }
@@ -511,6 +517,9 @@ function ver4_ai_last_post_time($pid, $kw)
 {
     global $m;
     $result = $m->pquery("SELECT MAX(`created_at`) AS t FROM `" . DB_PREFIX . "ver4_ai_log` WHERE `pid` = ? AND `kw` = ? AND `type` = 1 AND `status` = 1", array($pid, $kw));
+    if ($result === false) {
+        return 0;
+    }
     $row = $result->fetch_array();
     return empty($row['t']) ? 0 : (int) $row['t'];
 }
