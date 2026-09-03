@@ -197,9 +197,20 @@ switch (SYSTEM_PAGE) {
             @option::set('notify_ntfy_server', isset($sou['notify_ntfy_server']) ? trim($sou['notify_ntfy_server']) : 'https://ntfy.sh');
             @option::set('notify_ntfy_topic', isset($sou['notify_ntfy_topic']) ? trim($sou['notify_ntfy_topic']) : '');
             @option::set('api_token', isset($sou['api_token']) ? $sou['api_token'] : '');
+            @option::set('oauth_github_enable', isset($sou['oauth_github_enable']) ? '1' : '0');
+            @option::set('oauth_github_client_id', trim((string) (isset($sou['oauth_github_client_id']) ? $sou['oauth_github_client_id'] : '')));
+            @option::set('oauth_github_client_secret', trim((string) (isset($sou['oauth_github_client_secret']) ? $sou['oauth_github_client_secret'] : '')));
+            @option::set('oauth_auto_register', isset($sou['oauth_auto_register']) ? '1' : '0');
         }
         doAction('admin_set_save');
         Redirect('index.php?mod=admin:set:' . $_GET['type'] . '&ok');
+
+        break;
+    case 'oauth:unbind':
+        // 解绑第三方登录身份（账号中心提交，CSRF 由全局 csrf() 校验）
+        require_once SYSTEM_ROOT . '/lib/class.OAuth.php';
+        OAuth::unbind((int) UID, 'github');
+        Redirect('index.php?mod=account&ok=oauth_unbind');
 
         break;
     case 'admin:tools':

@@ -207,6 +207,19 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
 		</div>
 		</td></tr>';
     $content1['reg'] = array('html' => $reghtml,'type' => 'else');
+    $oauthhtml = '<tr><td><b>第三方登录（GitHub OAuth）</b><br/>在 GitHub「Settings → Developer settings → OAuth Apps」创建应用，<br/>回调地址填写 <b>' . htmlspecialchars(SYSTEM_URL . 'index.php?mod=oauth:callback&provider=github', ENT_QUOTES, 'UTF-8') . '</b></td><td>
+		<div class="input-group">
+		<input type="checkbox" name="oauth_github_enable" value="1"' . (option::get('oauth_github_enable') == '1' ? ' checked' : '') . '> 启用 GitHub 登录
+		</div><br/>
+		<div class="input-group">
+			<span class="input-group-addon">Client ID</span><input type="text" name="oauth_github_client_id" value="' . htmlspecialchars(option::get('oauth_github_client_id'), ENT_QUOTES, 'UTF-8') . '" class="form-control">
+		</div><br/>
+		<div class="input-group">
+			<span class="input-group-addon">Client Secret</span><input type="text" name="oauth_github_client_secret" value="' . htmlspecialchars(option::get('oauth_github_client_secret'), ENT_QUOTES, 'UTF-8') . '" class="form-control">
+		</div><br/>
+		<label class="checkbox-inline"><input type="checkbox" name="oauth_auto_register" value="1"' . (option::get('oauth_auto_register') == '1' ? ' checked' : '') . '> 新 GitHub 用户自动注册本站账号（跳过邀请码，仅在上方"允许用户注册"开启时生效）</label>
+		</td></tr>';
+    $content1['oauth'] = array('html' => $oauthhtml,'type' => 'else');
     if (function_exists('imagecreatetruecolor')) {
         $captchahtml = '<tr><td><b>注册/登录验证码</b><br/>可防止恶意用户爆破数据库，提升安全性<br/>点选难度可以查看示例。<br>';
         $captchahtml .= '<img alt="验证码" id="captcha" class="img-thumbnail" style="cursor:pointer;display:none;" alt="示例验证码加载失败">';

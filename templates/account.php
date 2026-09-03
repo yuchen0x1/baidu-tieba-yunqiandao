@@ -103,3 +103,45 @@ $week = SignManager::calendar(7, UID);
     </ul>
     <?php } ?>
 </section>
+
+<section class="panel panel-primary">
+    <div class="panel-heading"><span class="panel-title">第三方账号绑定</span></div>
+    <?php
+    require_once SYSTEM_ROOT . '/lib/class.OAuth.php';
+    $oauthOk = isset($_GET['ok']) ? (string) $_GET['ok'] : '';
+    $oauthErrMsg = isset($_GET['error_msg']) ? (string) $_GET['error_msg'] : '';
+    if ($oauthOk === 'oauth_bind') {
+        echo '<div class="panel-body"><div class="cs-alert cs-alert-success"><svg class="cs-alert-icon" aria-hidden="true"><use href="#i-check"/></svg><div class="cs-alert-body">GitHub 账号绑定成功，之后可在登录页使用 GitHub 一键登录。</div></div></div>';
+    }
+    if ($oauthOk === 'oauth_unbind') {
+        echo '<div class="panel-body"><div class="cs-alert cs-alert-info"><svg class="cs-alert-icon" aria-hidden="true"><use href="#i-info"/></svg><div class="cs-alert-body">GitHub 账号已解绑。</div></div></div>';
+    }
+    if ($oauthErrMsg !== '') {
+        $oauthErrMsgSafe = htmlspecialchars($oauthErrMsg, ENT_QUOTES, 'UTF-8');
+        echo '<div class="panel-body"><div class="cs-alert cs-alert-danger"><svg class="cs-alert-icon" aria-hidden="true"><use href="#i-alert"/></svg><div class="cs-alert-body">' . $oauthErrMsgSafe . '</div></div></div>';
+    }
+    $oauthBinding = OAuth::bindingOf(UID, 'github');
+    ?>
+    <div class="panel-body">
+        <?php if (OAuth::githubConfigured()) { ?>
+            <?php if ($oauthBinding) {
+                $ghLabel = $oauthBinding['info'] !== '' ? $oauthBinding['info'] : 'GitHub 用户 ' . $oauthBinding['openid'];
+                $ghLabelSafe = htmlspecialchars($ghLabel, ENT_QUOTES, 'UTF-8');
+                $ghBoundAtSafe = htmlspecialchars(date('Y-m-d H:i', (int) $oauthBinding['bound_at']), ENT_QUOTES, 'UTF-8');
+                $ghUnbindToken = htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8');
+            ?>
+                <p>已绑定 GitHub：<strong><?php echo $ghLabelSafe; ?></strong>
+                <span class="text-muted" style="font-size:12px">（绑定于 <?php echo $ghBoundAtSafe; ?>）</span></p>
+                <form method="post" action="setting.php?mod=oauth:unbind" style="margin-top:8px">
+                    <input type="hidden" name="csrf_token" value="<?php echo $ghUnbindToken; ?>">
+                    <button type="submit" class="cs-btn cs-btn-danger cs-btn-sm" onclick="return confirm('解绑后将无法使用 GitHub 登录本站，确定解绑吗？');">解绑 GitHub</button>
+                </form>
+            <?php } else { ?>
+                <p>绑定后可使用 GitHub 一键登录本站。</p>
+                <a class="cs-btn cs-btn-secondary cs-btn-sm" href="index.php?mod=oauth:start&provider=github&bind=1" style="margin-top:8px">绑定 GitHub 账号</a>
+            <?php } ?>
+        <?php } else { ?>
+            <p class="text-muted">本站未启用第三方登录。管理员可在 <a href="index.php?mod=admin:set:else">设置中心</a> 配置 GitHub OAuth。</p>
+        <?php } ?>
+    </div>
+</section>

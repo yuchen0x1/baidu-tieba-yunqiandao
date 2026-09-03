@@ -60,6 +60,15 @@ loadhead();
             <button type="submit" class="cs-btn cs-btn-primary auth-submit">进入工作台</button>
             <?php doAction('login_page_3'); ?>
         </form>
+        <?php
+        require_once SYSTEM_ROOT . '/lib/class.OAuth.php';
+        if (OAuth::githubConfigured()) { ?>
+        <div class="auth-oauth" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--color-border, #eee)">
+            <a class="cs-btn cs-btn-secondary cs-btn-block" href="index.php?mod=oauth:start&provider=github" rel="noopener">
+                <svg class="cs-icon" style="width:16px;height:16px;vertical-align:-3px;margin-right:6px" aria-hidden="true"><use href="#i-link"/></svg>使用 GitHub 登录
+            </a>
+        </div>
+        <?php } ?>
         <div class="auth-footer"><?php echo I18N::t('login.no_account'); ?><a href="index.php?mod=reg">创建一个账号</a>　<a href="index.php?mod=lostpw">忘记密码？</a></div>
     </section>
 </div>

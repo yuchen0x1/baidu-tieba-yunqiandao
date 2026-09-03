@@ -248,7 +248,11 @@ if (isset($_COOKIE['uid']) && isset($_COOKIE['pwd'])) {
     doAction('globals_2');
 }
 doAction('globals_3');
-csrf(false);
+// OAuth 回调豁免常规 CSRF：该接口自带一次性 state 防重放校验，且 GitHub 跳回时必然携带跨站 Referer，
+// 常规来源校验会把合法回调误杀
+if (SYSTEM_PAGE != 'oauth:callback') {
+    csrf(false);
+}
 // 首次使用初始化：系统中不存在管理员账号时，强制先完成管理员账号初始化再使用
 // （计划任务与命令行工具入口不受此拦截影响）
 if (!defined('SYSTEM_DO_NOT_LOGIN') && !SYSTEM_ISCONSOLE && SYSTEM_PAGE != 'init' && SYSTEM_PAGE != 'init:do') {
@@ -435,6 +439,52 @@ if (SYSTEM_PAGE == 'admin:login') {
     }
     doAction('admin_reg_3');
     ReDirect('index.php?mod=login&msg=' . urlencode($regMsg));
+} elseif (SYSTEM_PAGE == 'oauth:start' || SYSTEM_PAGE == 'oauth:callback') {
+    // 第三方登录（V6.1）：访客走登录/自动注册，已登录用户走账号绑定
+    if (!defined('ROLE')) {
+        define('ROLE', 'visitor');
+        $i['user']['role'] = 'visitor';
+    }
+    require_once SYSTEM_ROOT . '/lib/class.OAuth.php';
+    if (SYSTEM_PAGE == 'oauth:start') {
+        $oauthBind = isset($_GET['bind']) && ROLE != 'visitor';
+        OAuth::start('github', $oauthBind);
+        die;
+    }
+    $oauthProvider = isset($_GET['provider']) ? (string) $_GET['provider'] : 'github';
+    $oauthCode = isset($_GET['code']) ? (string) $_GET['code'] : '';
+    $oauthState = isset($_GET['state']) ? (string) $_GET['state'] : '';
+    $oauthId = OAuth::finish($oauthProvider, $oauthCode, $oauthState);
+    if ($oauthId === false) {
+        ReDirect('index.php?mod=login&error_msg=' . urlencode('第三方登录校验失败或已过期，请重试'));
+        die;
+    }
+    if (ROLE != 'visitor' && $oauthId['bind']) {
+        // 已登录：把 GitHub 身份绑定到当前账号
+        if (OAuth::bind((int) UID, 'github', $oauthId['openid'], $oauthId['name'])) {
+            ReDirect('index.php?mod=account&ok=oauth_bind');
+        } else {
+            ReDirect('index.php?mod=account&error_msg=' . urlencode('该 GitHub 账号已绑定到其他本站账号'));
+        }
+        die;
+    }
+    // 访客：按绑定关系直接登录
+    $oauthUser = OAuth::userOf('github', $oauthId['openid']);
+    if ($oauthUser === false && option::get('enable_reg') == '1' && option::get('oauth_auto_register') == '1') {
+        $oauthNew = OAuth::autoRegister('github', $oauthId['openid'], $oauthId['name']);
+        if ($oauthNew !== false) {
+            OAuth::bind($oauthNew['uid'], 'github', $oauthId['openid'], $oauthId['name']);
+            $oauthUser = OAuth::userOf('github', $oauthId['openid']);
+        }
+    }
+    if ($oauthUser === false) {
+        ReDirect('index.php?mod=login&error_msg=' . urlencode('该 GitHub 账号尚未绑定本站账号，请先登录后到「账号中心」完成绑定'));
+        die;
+    }
+    set_site_cookie('uid', (int) $oauthUser['uid']);
+    set_site_cookie('pwd', hash_hmac('sha256', $oauthUser['pw'], $oauthUser['uid'] . $oauthUser['pw']));
+    ReDirect('index.php');
+    die;
 } elseif (SYSTEM_PAGE == 'lostpw') {
 //访客可访问的找回密码页面
     if (defined('ROLE')) {
