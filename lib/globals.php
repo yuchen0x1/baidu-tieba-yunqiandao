@@ -250,7 +250,8 @@ if (isset($_COOKIE['uid']) && isset($_COOKIE['pwd'])) {
 doAction('globals_3');
 csrf(false);
 // 首次使用初始化：系统中不存在管理员账号时，强制先完成管理员账号初始化再使用
-if (SYSTEM_PAGE != 'init' && SYSTEM_PAGE != 'init:do') {
+// （计划任务与命令行工具入口不受此拦截影响）
+if (!defined('SYSTEM_DO_NOT_LOGIN') && !SYSTEM_ISCONSOLE && SYSTEM_PAGE != 'init' && SYSTEM_PAGE != 'init:do') {
     $initAdminRow = $m->once_fetch_array('SELECT COUNT(*) AS total FROM `' . DB_NAME . '`.`' . DB_PREFIX . 'users` WHERE `role` = \'admin\'');
     if ((int) $initAdminRow['total'] <= 0) {
         ReDirect('index.php?mod=init');

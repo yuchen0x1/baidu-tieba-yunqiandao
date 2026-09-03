@@ -135,7 +135,8 @@ require SYSTEM_ROOT . '/lib/class.former.php';
 require SYSTEM_ROOT . '/lib/class.smtp.php';
 require SYSTEM_ROOT . '/lib/class.zip.php';
 require SYSTEM_ROOT . '/lib/reg.php';
-define('SYSTEM_URL', option::get('system_url'));
+//系统地址统一以 / 结尾，保证 SYSTEM_URL . 'do.php' 等拼接在任何配置下都正确
+define('SYSTEM_URL', rtrim(trim((string) option::get('system_url')), '/') . '/');
 define('SYSTEM_NAME', option::get('system_name'));
 //版本修订号
 define('SYSTEM_REV', option::get('core_revision'));
