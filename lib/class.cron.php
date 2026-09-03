@@ -44,51 +44,29 @@ class cron
     {
         global $m;
 
-        $set = adds($set);
-
-        $sql = "INSERT INTO  `" . DB_PREFIX . "cron` (`name`";
-        $a = '';
-        $b = "'{$name}'";
-        $c = "`name` = '{$name}'";
-
-        if (isset($set['file'])) {
-            $a .= ', `file`';
-            $b .= ", '{$set['file']}'";
-            $c .= ", `file` = '{$set['file']}'";
+        //列名来自固定白名单，值全部经 bind_param 参数化绑定
+        $allowed = array('file', 'no', 'desc', 'freq', 'lastdo', 'orde', 'log');
+        $cols = array('`name`');
+        $ph = array('?');
+        $params = array((string) $name);
+        $dupCols = array();
+        foreach ($allowed as $col) {
+            if (isset($set[$col])) {
+                $cols[] = '`' . $col . '`';
+                $ph[] = '?';
+                $params[] = $set[$col];
+                $dupCols[] = $col;
+            }
         }
-        if (isset($set['no'])) {
-            $a .= ', `no`';
-            $b .= ", '{$set['no']}'";
-            $c .= ", `no` = '{$set['no']}'";
-        }
-        if (isset($set['desc'])) {
-            $a .= ', `desc`';
-            $b .= ", '{$set['desc']}'";
-            $c .= ", `desc` = '{$set['desc']}'";
-        }
-        if (isset($set['freq'])) {
-            $a .= ', `freq`';
-            $b .= ", '{$set['freq']}'";
-            $c .= ", `freq` = '{$set['freq']}'";
-        }
-        if (isset($set['lastdo'])) {
-            $a .= ', `lastdo`';
-            $b .= ", '{$set['lastdo']}'";
-            $c .= ", `lastdo` = '{$set['lastdo']}'";
-        }
-        if (isset($set['orde'])) {
-            $a .= ', `orde`';
-            $b .= ", '{$set['orde']}'";
-            $c .= ", `orde` = '{$set['orde']}'";
-        }
-        if (isset($set['log'])) {
-            $a .= ', `log`';
-            $b .= ", '{$set['log']}'";
-            $c .= ", `log` = '{$set['log']}'";
+        $updateParts = array();
+        foreach ($dupCols as $col) {
+            $updateParts[] = '`' . $col . '` = ?';
+            $params[] = $set[$col];
         }
 
-        $sql .= $a . ' ) VALUES (' . $b . ') ON DUPLICATE KEY UPDATE ' . $c . ';';
-        $m->query($sql);
+        $sql = "INSERT INTO `" . DB_PREFIX . "cron` (" . implode(', ', $cols) . ') VALUES (' . implode(', ', $ph) . ')'
+            . ' ON DUPLICATE KEY UPDATE ' . implode(', ', $updateParts) . ';';
+        $m->pquery($sql, $params);
     }
 
     /**
@@ -182,7 +160,7 @@ class cron
     public static function del($name)
     {
         global $m;
-        $m->query("DELETE FROM `" . DB_NAME . "`.`" . DB_PREFIX . "cron` WHERE `name` = '{$name}'");
+        $m->pquery("DELETE FROM `" . DB_NAME . "`.`" . DB_PREFIX . "cron` WHERE `name` = ?", array((string) $name));
     }
 
     /**

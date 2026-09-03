@@ -25,17 +25,17 @@ final class InputAndAuthTest extends TestCase
         global $m;
         $previous = $m ?? null;
         $database = new class {
-            public array $queries = array();
+            public array $statements = array();
 
             public function query($sql)
             {
-                $this->queries[] = $sql;
                 return true;
             }
 
-            public function real_escape_string($value)
+            public function pquery($sql, $params = array())
             {
-                return addslashes((string) $value);
+                $this->statements[] = $params;
+                return true;
             }
         };
         $m = $database;
@@ -44,7 +44,11 @@ final class InputAndAuthTest extends TestCase
 
         try {
             LoginGuard::auditLogin(false, ' Admin+()@example.com ');
-            $this->assertStringContainsString("VALUES ('Admin@example.com', '127.0.0.1', 'PHPUnit', 0", end($database->queries));
+            $this->assertCount(1, $database->statements);
+            $this->assertSame('Admin@example.com', $database->statements[0][0]);
+            $this->assertSame('127.0.0.1', $database->statements[0][1]);
+            $this->assertSame('PHPUnit', $database->statements[0][2]);
+            $this->assertSame(0, $database->statements[0][3]);
         } finally {
             $m = $previous;
             unset($_SERVER['REMOTE_ADDR'], $_SERVER['HTTP_USER_AGENT']);

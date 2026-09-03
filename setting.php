@@ -49,7 +49,7 @@ switch (SYSTEM_PAGE) {
                 $id = preg_replace('/[^A-Za-z0-9_-]/', '', (string) $id);
                 $order = (int) $order;
                 if ($id !== '' && $id !== 'csrf_token') {
-                    $m->query('UPDATE `' . DB_NAME . '`.`' . DB_PREFIX . "plugins` SET `order`={$order} WHERE `name`='" . $m->real_escape_string($id) . "'");
+                    $m->pquery('UPDATE `' . DB_NAME . '`.`' . DB_PREFIX . 'plugins` SET `order` = ? WHERE `name` = ?', array($order, $id));
                 }
             }
         }
@@ -490,7 +490,7 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
                 foreach ($_POST['user'] as $value) {
                     $value = (int) $value;
                     doAction('admin_users_crole_process', $value, $role);
-                    $m->query("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "users` SET `role` = '{$role}' WHERE `" . DB_PREFIX . "users`.`id` = {$value}");
+                    $m->pquery("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "users` SET `role` = ? WHERE `id` = ?", array($role, $value));
                 }
                 doAction('admin_users_crole');
 
@@ -520,13 +520,12 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
                 if (!checkMail($mail)) {
                     msg('添加用户失败：邮箱格式不正确');
                 }
-                $name = sqladds($name);
-                $mail = sqladds($mail);
-                $x = $m->once_fetch_array("SELECT COUNT(*) AS total FROM `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE name='{$name}' OR `email`='{$mail}'");
-                if ($x['total'] > 0) {
+                $dup = $m->pquery("SELECT COUNT(*) AS total FROM `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE `name` = ? OR `email` = ?", array($name, $mail));
+                $dupRow = $dup ? $m->fetch_array($dup) : array('total' => 0);
+                if ($dupRow['total'] > 0) {
                     msg('添加用户失败：用户名或邮箱已经存在');
                 }
-                $m->query('INSERT INTO `' . DB_NAME . '`.`' . DB_PREFIX . 'users` (`name`, `pw`, `email`, `role`, `t`) VALUES (\'' . $name . '\', \'' . EncodePwd($pw) . '\', \'' . $mail . '\', \'' . $role . '\', \'' . getfreetable() . '\');');
+                $m->pquery('INSERT INTO `' . DB_NAME . '`.`' . DB_PREFIX . 'users` (`name`, `pw`, `email`, `role`, `t`) VALUES (?, ?, ?, ?, ?)', array($name, EncodePwd($pw), $mail, $role, getfreetable()));
                 doAction('admin_users_add');
                 Redirect('index.php?mod=admin:users&ok');
 
@@ -731,25 +730,17 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
             if ($proxyRaw !== '' && strcasecmp($proxyRaw, 'off') !== 0 && misc::parseProxyUrl($proxyRaw) === false) {
                 msg('代理格式不正确<br/><br/>支持格式：http://host:port 或 socks5://user:pass@host:port，留空跟随全局，off 为禁用');
             }
-            $proxyVal = $m->escape_string($proxyRaw);
-            $m->query("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` SET `proxy` = '{$proxyVal}' WHERE `id` = {$proxyPid}" . (!ISADMIN ? ' AND `uid` = ' . UID : ''));
+            $proxySql = "UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` SET `proxy` = ? WHERE `id` = ?";
+            $proxyParams = array($proxyRaw, $proxyPid);
+            if (!ISADMIN) {
+                $proxySql .= ' AND `uid` = ?';
+                $proxyParams[] = UID;
+            }
+            $m->pquery($proxySql, $proxyParams);
             Redirect('index.php?mod=baiduid');
         } elseif (empty($bdussIn)) {
             msg('BDUSS或STOKEN不合法，请核验后重新绑定');
         }
-        /*
-      elseif (!empty($_GET['reget'])){
-           $reget = (int) $_GET['reget'];
-         $x=$m->once_fetch_array("SELECT * FROM  `".DB_NAME."`.`".DB_PREFIX."baiduid` WHERE `uid` = ".UID." AND `id` = ".$reget." LIMIT 1");
-            if(!empty($x)){
-                $baidu_name = sqladds(getBaiduId($x['bduss']));
-                if(empty($baidu_name)){
-                    $baidu_name = '[E]';
-               }
-              $m->query("UPDATE `".DB_NAME."`.`".DB_PREFIX."baiduid` SET `name` = '$baidu_name' WHERE `id` = '$reget'");
-         }
-      }
-        */
         doAction('baiduid_set');
         Redirect("index.php?mod=baiduid");
 
@@ -799,17 +790,20 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
             Redirect('index.php?mod=showtb&ok');
         } elseif (isset($_POST['add'])) {
             if (option::get('enable_addtieba') == '1') {
-                $v = addslashes(htmlspecialchars($_POST['add']));
+                $v = trim((string) $_POST['add']);
+                if ($v === '' || mb_strlen($v, 'UTF-8') > 60) {
+                    msg('贴吧名不合法');
+                }
                 $pid = (int) strip_tags($_POST['pid']);
-                $osq = $m->query("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . TABLE . "` WHERE `uid` = " . UID . " AND `tieba` = '{$v}';");
+                $osq = $m->pquery("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . TABLE . "` WHERE `uid` = ? AND `tieba` = ?", array(UID, $v));
                 if ($m->num_rows($osq) == 0) {
                     $table = $m->fetch_array($m->query('select * from `' . DB_NAME . '`.`' . DB_PREFIX . 'users` where `id` = ' . UID));
                     $tb_max = $m->fetch_row($m->query("SELECT COUNT(*) FROM `" . DB_NAME . "`.`" . DB_PREFIX . $table['t'] . "` where `uid` = " . UID));
                     if (ROLE == 'admin' || ROLE == 'vip') {
-                        $m->query("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . TABLE . "` (`id`, `pid`, `uid`, `tieba`, `no`, `latest`) VALUES (NULL, {$pid} ,'" . UID . "', '{$v}', 0, 0);");
+                        $m->pquery("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . TABLE . "` (`pid`, `uid`, `tieba`, `no`, `latest`) VALUES (?, ?, ?, 0, 0)", array($pid, UID, $v));
                     } else {
                         if ($tb_max[0] < option::get('tb_max')) {
-                            $m->query("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . TABLE . "` (`id`, `pid`, `uid`, `tieba`, `no`, `latest`) VALUES (NULL, {$pid} ,'" . UID . "', '{$v}', 0, 0);");
+                            $m->pquery("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . TABLE . "` (`pid`, `uid`, `tieba`, `no`, `latest`) VALUES (?, ?, ?, 0, 0)", array($pid, UID, $v));
                         } else {
                             msg('错误：您的贴吧数量超过限制，无法刷新！');
                         }
@@ -863,12 +857,13 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
     //更改邮箱
         if ($_POST['mail'] != $i['user']['email'] && !empty($_POST['mail'])) {
             if (checkMail($_POST['mail'])) {
-                $mail = sqladds($_POST['mail']);
-                $z = $m->once_fetch_array("SELECT COUNT(*) AS total FROM `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE email='{$mail}'");
+                $mail = trim((string) $_POST['mail']);
+                $dup = $m->pquery("SELECT COUNT(*) AS total FROM `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE `email` = ?", array($mail));
+                $z = $dup ? $m->fetch_array($dup) : array('total' => 0);
                 if ($z['total'] > 0) {
                     msg('修改失败：邮箱已经存在');
                 }
-                $m->query("UPDATE `" . DB_PREFIX . "users` SET `email` = '{$mail}' WHERE `id` = '" . UID . "';");
+                $m->pquery("UPDATE `" . DB_PREFIX . "users` SET `email` = ? WHERE `id` = ?", array($mail, UID));
             } else {
                 msg('邮箱格式有误，请检查');
             }

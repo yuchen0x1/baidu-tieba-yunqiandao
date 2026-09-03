@@ -187,12 +187,18 @@ class SignManager
         self::ensureHistoryTable();
         $days = min(366, max(1, (int) $days));
         $since = time() - ($days * 86400);
-        $where = $uid > 0 ? ' AND `uid` = ' . (int) $uid : '';
-        $rows = array();
-        $result = $m->query("SELECT DATE(FROM_UNIXTIME(`created_at`)) AS `day`,
+        $sql = "SELECT DATE(FROM_UNIXTIME(`created_at`)) AS `day`,
             SUM(`status` = 'success') AS `success`, SUM(`status` = 'error') AS `error`,
             COUNT(*) AS `total` FROM `" . DB_PREFIX . self::HISTORY_TABLE . "`
-            WHERE `created_at` >= {$since}{$where} GROUP BY `day` ORDER BY `day` ASC");
+            WHERE `created_at` >= ?";
+        $params = array($since);
+        if ($uid > 0) {
+            $sql .= ' AND `uid` = ?';
+            $params[] = (int) $uid;
+        }
+        $sql .= ' GROUP BY `day` ORDER BY `day` ASC';
+        $rows = array();
+        $result = $m->pquery($sql, $params);
         while ($row = $m->fetch_array($result)) {
             $rows[] = array(
                 'day' => $row['day'],

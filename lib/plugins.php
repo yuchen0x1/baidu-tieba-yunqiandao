@@ -161,7 +161,7 @@ function activePlugin($plugin)
         return false;
     }
     if (file_exists(SYSTEM_ROOT . '/plugins/' . $plugin . '/' . $plugin . '.php')) {
-        $m->query("UPDATE `" . DB_PREFIX . "plugins` SET `status` = '1' WHERE `name` = '{$plugin}';");
+        $m->pquery("UPDATE `" . DB_PREFIX . "plugins` SET `status` = '1' WHERE `name` = ?", array($plugin));
         $callback_file =  SYSTEM_ROOT . '/plugins/' . $plugin . '/' . $plugin . '_callback.php';
         if (file_exists($callback_file)) {
             require_once $callback_file;
@@ -188,7 +188,7 @@ function inactivePlugin($plugin)
         return false;
     }
     if (file_exists(SYSTEM_ROOT . '/plugins/' . $plugin . '/' . $plugin . '.php')) {
-        $m->query("UPDATE `" . DB_PREFIX . "plugins` SET `status` = '0' WHERE `name` = '{$plugin}';");
+        $m->pquery("UPDATE `" . DB_PREFIX . "plugins` SET `status` = '0' WHERE `name` = ?", array($plugin));
         $callback_file =  SYSTEM_ROOT . '/plugins/' . $plugin . '/' . $plugin . '_callback.php';
         if (file_exists($callback_file)) {
             require_once $callback_file;
@@ -227,7 +227,7 @@ function installPlugin($plugin)
         } else {
             $ver = '';
         }
-        $m->query("INSERT IGNORE INTO `" . DB_PREFIX . "plugins` (`name`,`status`,`ver`,`options`) VALUES ('{$plugin}','0','{$ver}','');");
+        $m->pquery("INSERT IGNORE INTO `" . DB_PREFIX . "plugins` (`name`,`status`,`ver`,`options`) VALUES (?,?,?,'')", array($plugin, '0', $ver));
         $callback_file =  SYSTEM_ROOT . '/plugins/' . $plugin . '/' . $plugin . '_callback.php';
         if (file_exists($callback_file)) {
             require_once $callback_file;
@@ -260,7 +260,7 @@ function uninstallPlugin($plugin, $delete = true)
             callback_remove();
         }
     }
-    $m->query("DELETE FROM `" . DB_PREFIX . "plugins` WHERE `name` = '{$plugin}';");
+    $m->pquery("DELETE FROM `" . DB_PREFIX . "plugins` WHERE `name` = ?", array($plugin));
     if ($delete) {
         DeleteFile(SYSTEM_ROOT . '/plugins/' . $plugin);
     }
@@ -309,7 +309,7 @@ function updatePlugin($plugin)
             if (!$ver) {
                 return false;
             } else {
-                $m->query("UPDATE `" . DB_PREFIX . "plugins` SET `ver` = '{$ver}' WHERE `name` = '{$plugin}'");
+                $m->pquery("UPDATE `" . DB_PREFIX . "plugins` SET `ver` = ? WHERE `name` = ?", array($ver, $plugin));
                 return true;
             }
         } else {
@@ -394,7 +394,8 @@ function getPluginInfo($plugin)
     $r['core']['public'] = file_exists($path . $plugin . '_public.php');
 //取插件加载顺序
     global $m;
-    $q = $m->once_fetch_array('Select `order` From `' . DB_NAME . '`.`' . DB_PREFIX . "plugins` Where `name`='{$plugin}' LIMIT 1");
+    $qRes = $m->pquery('Select `order` From `' . DB_NAME . '`.`' . DB_PREFIX . 'plugins` Where `name` = ? LIMIT 1', array($plugin));
+    $q = $qRes ? $m->fetch_array($qRes) : array('order' => 0);
     $r['plugin']['order'] = empty($q['order']) ? 0 : intval($q['order']);
 //否则将会是00000001这样的数
 

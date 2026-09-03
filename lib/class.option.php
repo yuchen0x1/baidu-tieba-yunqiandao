@@ -83,9 +83,8 @@ class option
     */
     public static function del($name)
     {
-
         global $m;
-        return $m->query("DELETE FROM `" . DB_PREFIX . "options` WHERE `name` = '{$name}'") ? true : false;
+        return $m->pquery("DELETE FROM `" . DB_PREFIX . "options` WHERE `name` = ?", array((string) $name)) ? true : false;
     }
 
     /**
@@ -233,7 +232,7 @@ class option
     {
 
         global $m,$i;
-        if ($m->query("UPDATE `" . DB_PREFIX . "plugins` SET `options` = '" . sqladds(serialize($value)) . "' WHERE `name` = '{$plug}';")) {
+        if ($m->pquery("UPDATE `" . DB_PREFIX . "plugins` SET `options` = ? WHERE `name` = ?", array(serialize($value), (string) $plug))) {
             $i['plugins']['info'][$plug]['options'] = $value;
             return true;
         } else {

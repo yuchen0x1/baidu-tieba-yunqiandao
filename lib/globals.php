@@ -76,7 +76,7 @@ if (isset($_COOKIE['uid']) && isset($_COOKIE['pwd'])) {
     }
     $uid = isset($_COOKIE['uid']) ? (int) $_COOKIE['uid'] : 0;
     $pw = isset($_COOKIE['pwd']) ? (string) $_COOKIE['pwd'] : '';
-    $osq = $m->query("SELECT * FROM  `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE `id` = '{$uid}' LIMIT 1");
+    $osq = $m->pquery("SELECT * FROM  `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE `id` = ? LIMIT 1", array($uid));
     if ($m->num_rows($osq) == 0) {
         clear_site_cookie('uid');
         clear_site_cookie('pwd');
@@ -183,7 +183,7 @@ if (SYSTEM_PAGE == 'admin:login') {
         ReDirect("index.php?mod=login&error_msg=" . urlencode('登录失败次数过多，请 ' . (int) ceil($loginLockRemain / 60) . ' 分钟后再试'));
         die;
     }
-    $osq = $m->query("SELECT * FROM  `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE `name` = '{$name}' OR `email` = '{$name}' LIMIT 1");
+    $osq = $m->pquery("SELECT * FROM  `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE `name` = ? OR `email` = ? LIMIT 1", array($rawLoginName, $rawLoginName));
     if ($m->num_rows($osq) == 0) {
         LoginGuard::auditLogin(false, $loginRawName);
         ReDirect("index.php?mod=login&error_msg=" . urlencode('账户不存在 [ 提示：账户不是昵称，账户可为用户名或者邮箱地址 ]'));
@@ -252,12 +252,15 @@ if (SYSTEM_PAGE == 'admin:login') {
         }
     }
     // 正常注册流程
-    $name = sqladds(request_scalar_value($_POST, 'user'));
+    $name = trim((string) request_scalar_value($_POST, 'user'));
 // 用户名不得含有@符号，避免登录时与邮箱混淆
     if (stripos($name, '@') !== false) {
         msg('注册失败：用户名不得含有@符号');
     }
-    $mail = sqladds(request_scalar_value($_POST, 'mail'));
+    if (!preg_match('/^[A-Za-z0-9_\x{4e00}-\x{9fa5}]{1,20}$/u', $name)) {
+        msg('注册失败：用户名只允许字母、数字、下划线、中文，长度不超过 20');
+    }
+    $mail = trim((string) request_scalar_value($_POST, 'mail'));
     $pw = request_scalar_value($_POST, 'pw');
     $repeatPw = request_scalar_value($_POST, 'rpw');
     $yr = sqladds(request_scalar_value($_POST, 'yr'));
@@ -267,7 +270,7 @@ if (SYSTEM_PAGE == 'admin:login') {
     if ($pw !== $repeatPw) {
         msg('注册失败：两次输入的密码不一致，请重新输入');
     }
-    $x = $m->once_fetch_array("SELECT COUNT(*) AS total FROM `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE `name` = '{$name}' OR `email` = '{$mail}' LIMIT 1");
+    $x = $m->once_fetch_array("SELECT COUNT(*) AS total FROM `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE `name` = '" . sqladds($name) . "' OR `email` = '" . sqladds($mail) . "' LIMIT 1");
     $y = $m->once_fetch_array("SELECT COUNT(*) AS total FROM `" . DB_NAME . "`.`" . DB_PREFIX . "users`");
     if ($x['total'] > 0) {
         msg('注册失败：用户名或邮箱已经被注册');
@@ -291,7 +294,7 @@ if (SYSTEM_PAGE == 'admin:login') {
         $role = 'user';
     }
     doAction('admin_reg_2');
-    $m->query('INSERT INTO `' . DB_NAME . '`.`' . DB_PREFIX . 'users` (`id`, `name`, `pw`, `email`, `role`, `t`) VALUES (NULL, \'' . $name . '\', \'' . EncodePwd($pw) . '\', \'' . $mail . '\', \'' . $role . '\', \'' . getfreetable() . '\');');
+    $m->pquery('INSERT INTO `' . DB_NAME . '`.`' . DB_PREFIX . 'users` (`name`, `pw`, `email`, `role`, `t`) VALUES (?, ?, ?, ?, ?)', array($name, EncodePwd($pw), $mail, $role, getfreetable()));
     $newUid = (int) $m->insert_id();
     $regMsg = '成功注册，请输入账号信息登录本站 [ 账号为用户名或邮箱地址 ]';
     //邮箱验证注册：标记未验证并发送验证邮件
@@ -336,8 +339,8 @@ if (SYSTEM_PAGE == 'admin:login') {
         if ((string) option::get('mail_name') === '') {
             msg('本站未配置邮件服务，无法自助找回密码，请联系管理员');
         }
-        $mailEsc = sqladds($mailIn);
-        $u = $m->once_fetch_array("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE `email` = '{$mailEsc}' LIMIT 1");
+        $uRes = $m->pquery("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE `email` = ? LIMIT 1", array($mailIn));
+        $u = $uRes ? $m->fetch_array($uRes) : array();
         if (!empty($u['id'])) {
             $lastKey = 'lostpw:last:' . (int) $u['id'];
             $last = (int) option::get($lastKey);
@@ -367,7 +370,7 @@ if (SYSTEM_PAGE == 'admin:login') {
         if ($pw === '' || $pw !== $rpw) {
             msg('两次输入的密码不一致或为空');
         }
-        $m->query("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "users` SET `pw` = '" . $m->real_escape_string(EncodePwd($pw)) . "' WHERE `id` = " . (int) $info['uid']);
+        $m->pquery("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "users` SET `pw` = ? WHERE `id` = ?", array(EncodePwd($pw), (int) $info['uid']));
         option::del('lostpw:token:' . $token);
         ReDirect('index.php?mod=login&msg=' . urlencode('密码重置成功，请使用新密码登录'));
     }

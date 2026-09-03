@@ -46,8 +46,9 @@ class wmysql
         if (!class_exists('mysqli')) {
             throw new Exception('服务器不支持MySqli类');
         }
-        $coninfo = strpos($host, ':');
-        
+        $endpoint = parse_database_endpoint($host);
+        $host = $endpoint['host'];
+        $port = $endpoint['port'];
         $flags = 0;
         $mysqli = mysqli_init();
         if ($useSSL) {
@@ -55,18 +56,10 @@ class wmysql
         }
 
         $connected = false;
-        if ($coninfo === false) {
-            if ($long) {
-                $host = 'p:' . $host;
-            }
-            $connected = $mysqli->real_connect($host, $user, $pw, $name, null, null, $flags);
-        } else {
-            if ($long) {
-                $connected = $mysqli->real_connect('p:' . substr($host, 0, $coninfo), $user, $pw, $name, substr($host, $coninfo + 1), null, $flags);
-            } else {
-                $connected = $mysqli->real_connect(substr($host, 0, $coninfo), $user, $pw, $name, substr($host, $coninfo + 1), null, $flags);
-            }
+        if ($long) {
+            $host = 'p:' . $host;
         }
+        $connected = $mysqli->real_connect($host, $user, $pw, $name, $port, null, $flags);
         
         if (!$connected) {
             throw new Exception("连接数据库失败，原因：{$mysqli->error}");
@@ -108,7 +101,7 @@ class wmysql
     }
 
     /**
-     * [弃用] 静态方法，返回数据库连接实例
+     * 静态方法，返回底层 mysqli 连接实例（供预处理语句等高级用法使用）
      */
     public static function con()
     {
@@ -185,6 +178,47 @@ class wmysql
     public function multi_query($sql, $noerror = false)
     {
         return $this->xquery($sql, $noerror);
+    }
+
+    /**
+     * 预处理参数化查询：值经 bind_param 绑定，永不参与 SQL 拼接
+     * @param string $sql    含 ? 占位符的 SQL（列名/表名等标识符仍需代码内白名单控制）
+     * @param array  $params 顺序绑定的参数值
+     * @return mysqli_result|bool SELECT 返回结果集，其余语句返回 true；失败返回 false
+     */
+    public function pquery($sql, $params = array())
+    {
+        $this->queryCount++;
+        $stmt = $this->conn->prepare($sql);
+        if ($stmt === false) {
+            error_log('MySQL 预处理失败: ' . $sql . ' | ' . $this->geterror());
+            return false;
+        }
+        if (!empty($params)) {
+            $types = '';
+            $bind = array();
+            foreach ($params as $v) {
+                if (is_int($v)) {
+                    $types .= 'i';
+                } elseif (is_float($v)) {
+                    $types .= 'd';
+                } else {
+                    $types .= 's';
+                }
+                $bind[] = $v;
+            }
+            $stmt->bind_param($types, ...$bind);
+        }
+        $ok = $stmt->execute();
+        if (!$ok) {
+            error_log('MySQL 执行失败: ' . $sql . ' | ' . $stmt->error);
+            $stmt->close();
+            return false;
+        }
+        // mysqlnd 为 PHP 默认内置驱动，get_result 始终可用；防御性判断兜底
+        $result = method_exists($stmt, 'get_result') ? $stmt->get_result() : true;
+        $stmt->close();
+        return $result;
     }
 
     /**

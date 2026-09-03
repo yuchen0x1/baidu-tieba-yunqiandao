@@ -1,20 +1,11 @@
 <?php
 
-function parse_database_endpoint($endpoint)
-{
-    $endpoint = trim((string) $endpoint);
-    if (preg_match('/^\[([^]]+)\](?::(\d+))?$/', $endpoint, $matches) === 1) {
-        return array('host' => $matches[1], 'port' => isset($matches[2]) ? (int) $matches[2] : null);
-    }
-    if (substr_count($endpoint, ':') === 1) {
-        list($host, $port) = explode(':', $endpoint, 2);
-        if ($host !== '' && ctype_digit($port)) {
-            return array('host' => $host, 'port' => (int) $port);
-        }
-    }
-    return array('host' => $endpoint, 'port' => null);
-}
-
+/**
+ * 项目健康检查（healthz.php 就绪探针使用）
+ * @param string $root 站点根目录
+ * @param string $mode live=仅进程级检查（不依赖安装与数据库），ready=含数据库与核心表 Schema
+ * @return array{ok: bool, status: string, mode: string, checks: array<string, bool>}
+ */
 function project_health_check($root, $mode = 'ready')
 {
     $root = rtrim((string) $root, '/\\');
@@ -37,7 +28,7 @@ function project_health_check($root, $mode = 'ready')
     if ($checks['config'] && $checks['mysqli']) {
         require_once $root . '/config.php';
         if (defined('DB_HOST') && defined('DB_USER') && defined('DB_PASSWD') && defined('DB_NAME') && defined('DB_PREFIX')) {
-            $endpoint = parse_database_endpoint(DB_HOST);
+    $endpoint = parse_database_endpoint(DB_HOST);
             $connection = @mysqli_init();
             try {
                 if ($connection) {
@@ -54,19 +45,24 @@ function project_health_check($root, $mode = 'ready')
                     $flags
                 );
                 if ($checks['database']) {
-                    $requiredTables = array('baiduid', 'cron', 'options', 'plugins', 'tieba', 'users', 'users_options');
+                    $requiredTables = array('baiduid', 'cron', 'options', 'plugins', 'tieba', 'users', 'users_options', 'sign_history');
                     $checks['schema'] = true;
-                    foreach ($requiredTables as $table) {
-                        $name = $connection->real_escape_string(DB_PREFIX . $table);
-                        $result = $connection->query("SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '{$name}' LIMIT 1");
-                        if (!$result || $result->num_rows !== 1) {
-                            $checks['schema'] = false;
-                            if ($result) {
-                                $result->free();
+                    $tableStmt = $connection->prepare("SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1");
+                    if (!$tableStmt) {
+                        $checks['schema'] = false;
+                    } else {
+                        $tableName = '';
+                        $tableStmt->bind_param('s', $tableName);
+                        foreach ($requiredTables as $table) {
+                            $tableName = DB_PREFIX . $table;
+                            $tableStmt->execute();
+                            $tableStmt->store_result();
+                            if ($tableStmt->num_rows !== 1) {
+                                $checks['schema'] = false;
+                                break;
                             }
-                            break;
                         }
-                        $result->free();
+                        $tableStmt->close();
                     }
                 }
             } catch (Throwable $exception) {

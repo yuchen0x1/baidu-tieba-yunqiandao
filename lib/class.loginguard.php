@@ -54,12 +54,12 @@ class LoginGuard
         if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
             return;
         }
-        //规范化（白名单字符集 + 截断）后内联转义，避免跨方法传递削弱静态可见性
-        $username = $m->real_escape_string(self::normalizeUsername($username));
-        $ip = $m->real_escape_string(substr(self::clientIp(), 0, 45));
-        $ua = $m->real_escape_string(substr((string) (isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : ''), 0, 255));
+        //规范化（白名单字符集 + 截断）后经预处理语句写入，请求输入不参与 SQL 拼接
+        $username = self::normalizeUsername($username);
+        $ip = substr(self::clientIp(), 0, 45);
+        $ua = substr((string) (isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : ''), 0, 255);
         $successValue = $success ? 1 : 0;
-        $m->query("INSERT INTO `{$table}` (`username`, `ip`, `ua`, `success`, `ts`) VALUES ('{$username}', '{$ip}', '{$ua}', {$successValue}, UNIX_TIMESTAMP());");
+        $m->pquery("INSERT INTO `{$table}` (`username`, `ip`, `ua`, `success`, `ts`) VALUES (?, ?, ?, ?, UNIX_TIMESTAMP());", array($username, $ip, $ua, $successValue));
     }
 
     public static function normalizeUsername($username)

@@ -166,14 +166,13 @@ switch ($action) {
         $limit = isset($_GET['limit']) ? min(200, max(1, (int) $_GET['limit'])) : 50;
         $rows = array();
         if ($apiUserId > 0) {
-            $historyWhere = ' WHERE `uid` = ' . $apiUserId;
             $historyTable = DB_PREFIX . 'sign_history';
+            $rs = $m->pquery("SELECT * FROM `{$historyTable}` WHERE `uid` = ? ORDER BY `id` DESC LIMIT ?", array($apiUserId, $limit));
         } else {
             //旧全局 Token 保持原有批次日志接口兼容
-            $historyWhere = '';
             $historyTable = DB_PREFIX . 'cron_log_batch';
+            $rs = $m->pquery("SELECT * FROM `{$historyTable}` ORDER BY `id` DESC LIMIT ?", array($limit));
         }
-        $rs = $m->query("SELECT * FROM `{$historyTable}`{$historyWhere} ORDER BY `id` DESC LIMIT {$limit};");
         while ($r = $m->fetch_array($rs)) {
             $rows[] = $r;
         }
