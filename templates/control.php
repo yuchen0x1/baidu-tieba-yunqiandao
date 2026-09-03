@@ -57,6 +57,11 @@ switch ($i['mode'][0]) {
                 template('admin-users');
 
                 break;
+            case 'invite':
+                          loadhead('邀请码管理');
+                template('admin-invite');
+
+                break;
             case 'plugins':
                           loadhead('插件管理');
                 template('admin-plugins');

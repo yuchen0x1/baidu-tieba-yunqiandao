@@ -273,6 +273,27 @@ switch (SYSTEM_PAGE) {
 
                 die;
             break;
+            case 'dbbackup_save':
+                option::set('db_backup_enable', isset($_POST['db_backup_enable']) && $_POST['db_backup_enable'] == '1' ? '1' : '0');
+                option::set('db_backup_keep', min(90, max(1, (int) request_scalar_value($_POST, 'db_backup_keep', 7))));
+                $dbBackupEmail = trim((string) request_text_value($_POST, 'db_backup_email'));
+                if ($dbBackupEmail !== '' && !checkMail($dbBackupEmail)) {
+                    msg('备份通知邮箱格式不正确');
+                }
+                option::set('db_backup_email', $dbBackupEmail);
+                Redirect('index.php?mod=admin:tools&ok');
+
+                break;
+            case 'dbbackup_run':
+                require_once SYSTEM_ROOT . '/lib/cron_system_dbbackup.php';
+                msg(cron_system_dbbackup(), 'index.php?mod=admin:tools');
+
+                break;
+            case 'dbbackup_init':
+                $m->query("INSERT IGNORE INTO `" . DB_PREFIX . "cron` (`name`, `orde`, `file`, `no`, `desc`, `freq`, `lastdo`, `log`) VALUES ('system_dbbackup', '9', 'lib/cron_system_dbbackup.php', '0', '每日自动备份数据库到 data/backups 目录', '86400', '0', '')");
+                Redirect('index.php?mod=admin:tools&ok');
+
+                break;
             case 'remtab':
                 global $m;
                 $tabs = isset($_POST['tab']) ? (array) $_POST['tab'] : array();
@@ -503,6 +524,28 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
                 doAction('admin_users_cset');
 
                 break;
+            case 'mailblast':
+                //向全部留有邮箱的用户群发邮件；misc::mail 成功返回 true、失败返回错误消息字符串
+                $mailSubject = trim((string) request_text_value($_POST, 'mail_subject'));
+                $mailContent = trim((string) request_scalar_value($_POST, 'mail_content'));
+                if ($mailSubject === '' || $mailContent === '') {
+                    msg('邮件群发失败：请填写主题与正文');
+                }
+                $mailRs = $m->query("SELECT `email`, `name` FROM `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE `email` != ''");
+                $mailSent = 0;
+                $mailFailed = 0;
+                while ($mailUser = $m->fetch_array($mailRs)) {
+                    $mailBody = str_replace(array('{name}', '{site}'), array($mailUser['name'], SYSTEM_NAME), $mailContent);
+                    if (misc::mail($mailUser['email'], $mailSubject, nl2br(htmlspecialchars($mailBody, ENT_QUOTES, 'UTF-8'))) === true) {
+                        $mailSent++;
+                    } else {
+                        $mailFailed++;
+                    }
+                    usleep(300000);
+                }
+                msg("邮件群发完成：成功 {$mailSent}，失败 {$mailFailed}", 'index.php?mod=admin:users');
+
+                break;
             case 'add':
                 $name = isset($_POST['name']) ? strip_tags(trim($_POST['name'])) : '';
                 $mail = isset($_POST['mail']) ? strip_tags(trim($_POST['mail'])) : '';
@@ -537,6 +580,41 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
                 break;
         }
         Redirect('index.php?mod=admin:users&ok');
+
+        break;
+    case 'admin:invite':
+        if (ROLE != 'admin') {
+            msg('权限不足！');
+        }
+        invite_ensure_table();
+        $inviteAction = isset($_POST['invite_action']) ? (string) $_POST['invite_action'] : '';
+        if ($inviteAction === 'multi') {
+            option::set('yr_reg_multi', isset($_POST['yr_reg_multi']) && $_POST['yr_reg_multi'] == '1' ? '1' : '0');
+        } elseif ($inviteAction === 'generate') {
+            $count = min(100, max(1, (int) request_scalar_value($_POST, 'count', 1)));
+            $maxUses = min(9999, max(1, (int) request_scalar_value($_POST, 'max_uses', 1)));
+            $days = min(3650, max(0, (int) request_scalar_value($_POST, 'days', 0)));
+            $note = trim((string) request_text_value($_POST, 'note'));
+            $expire = $days > 0 ? time() + $days * 86400 : 0;
+            $made = 0;
+            for ($ix = 0; $ix < $count; $ix++) {
+                try {
+                    $code = 'TCS-' . strtoupper(bin2hex(random_bytes(4)));
+                } catch (Throwable $e) {
+                    $code = 'TCS-' . strtoupper(substr(md5(uniqid('', true) . mt_rand()), 0, 8));
+                }
+                $m->pquery("INSERT IGNORE INTO `" . DB_PREFIX . "invites` (`code`, `max_uses`, `used_count`, `expire`, `status`, `note`, `created_at`) VALUES (?, ?, 0, ?, 1, ?, ?)", array($code, $maxUses, $expire, $note, time()));
+                $made++;
+            }
+            msg("已生成 {$made} 个邀请码", 'index.php?mod=admin:invite');
+        } elseif ($inviteAction === 'toggle') {
+            $inviteId = (int) request_scalar_value($_POST, 'id', 0);
+            $m->pquery("UPDATE `" . DB_PREFIX . "invites` SET `status` = 1 - `status` WHERE `id` = ?", array($inviteId));
+        } elseif ($inviteAction === 'delete') {
+            $inviteId = (int) request_scalar_value($_POST, 'id', 0);
+            $m->pquery("DELETE FROM `" . DB_PREFIX . "invites` WHERE `id` = ?", array($inviteId));
+        }
+        Redirect('index.php?mod=admin:invite&ok');
 
         break;
     case 'admin:cron':
@@ -817,6 +895,30 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
 
         break;
     case 'set':
+        //用户自主修改登录密码：验证当前密码后更新，旧会话 cookie 随哈希变化自动失效
+        if (isset($_POST['pw_action']) && $_POST['pw_action'] === 'change') {
+            $curPw = (string) request_scalar_value($_POST, 'cur_pw');
+            $newPw = (string) request_scalar_value($_POST, 'new_pw');
+            $newPw2 = (string) request_scalar_value($_POST, 'new_pw2');
+            if ($curPw === '' || $newPw === '' || $newPw2 === '') {
+                msg('修改密码失败：请填写当前密码与新密码');
+            }
+            if (strlen($newPw) < 6 || strlen($newPw) > 64) {
+                msg('修改密码失败：新密码长度需为 6-64 位');
+            }
+            if ($newPw !== $newPw2) {
+                msg('修改密码失败：两次输入的新密码不一致');
+            }
+            $pwRow = $m->once_fetch_array("SELECT `pw` FROM `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE `id` = " . (int) UID . " LIMIT 1");
+            if (empty($pwRow['pw']) || !VerifyPwd($curPw, $pwRow['pw'])) {
+                msg('修改密码失败：当前密码不正确');
+            }
+            $m->pquery("UPDATE `" . DB_PREFIX . "users` SET `pw` = ? WHERE `id` = ?", array(EncodePwd($newPw), UID));
+            doAction('set_pw_changed');
+            clear_site_cookie('uid');
+            clear_site_cookie('pwd');
+            msg('密码修改成功，请使用新密码重新登录', 'index.php?mod=login');
+        }
         $apiAction = isset($_POST['api_action']) ? (string) $_POST['api_action'] : '';
         if ($apiAction === 'generate') {
             try {

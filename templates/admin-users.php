@@ -92,6 +92,27 @@ if (isset($_GET['add'])) {  ?>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 <button type="button" class="btn btn-default" onclick="location = 'index.php?mod=admin:users&add'">添加用户</button>
 </form>
+
+<h4>邮件群发</h4>
+<form action="setting.php?mod=admin:users" method="post" onsubmit="return confirm('确定向全部留有邮箱的用户群发邮件吗？');">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
+<input type="hidden" name="do" value="mailblast">
+<div class="table-responsive">
+<table class="table table-hover">
+    <tbody>
+        <tr>
+            <td style="width:20%">邮件主题</td>
+            <td><input type="text" name="mail_subject" class="form-control" maxlength="200" required></td>
+        </tr>
+        <tr>
+            <td>邮件正文（HTML）<br/><span class="text-muted">可用变量：{name} 用户名、{site} 站点名</span></td>
+            <td><textarea name="mail_content" class="form-control" style="height:140px" required></textarea></td>
+        </tr>
+    </tbody>
+</table>
+</div>
+<input type="submit" class="btn btn-primary" value="群发邮件">
+</form>
 <?php } ?>
 <script>
     function userAdminSubmit() {

@@ -58,6 +58,51 @@ if (isset($_GET['ok'])) {
 
 <br/><br/>
 <!--Part 2 Warning-->
+<h4>定时数据库备份</h4>
+<?php
+$bkEnabled = option::get('db_backup_enable') == '1';
+$bkCron = $m->once_fetch_array("SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "cron` WHERE `name` = 'system_dbbackup'");
+$bkDir = SYSTEM_ROOT . '/data/backups';
+$bkFiles = is_dir($bkDir) ? glob($bkDir . '/dbbackup_*.sql') : array();
+$bkCount = is_array($bkFiles) ? count($bkFiles) : 0;
+?>
+<form action="<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=dbbackup_save" method="post">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
+<div class="table-responsive">
+<table class="table table-striped">
+    <tbody>
+        <tr>
+            <td style="width:20%">启用定时备份</td>
+            <td><label class="checkbox"><input type="checkbox" name="db_backup_enable" value="1" <?php if ($bkEnabled) {
+                echo 'checked="checked"';
+                     } ?>> 启用后计划任务 system_dbbackup 每日将本站数据表导出到 data/backups 目录</label></td>
+        </tr>
+        <tr>
+            <td>保留份数（1-90）</td>
+            <td><input type="number" name="db_backup_keep" min="1" max="90" class="form-control" style="width:120px" value="<?php echo htmlspecialchars((string) option::get('db_backup_keep'), ENT_QUOTES, 'UTF-8') == '' ? '7' : htmlspecialchars((string) option::get('db_backup_keep'), ENT_QUOTES, 'UTF-8'); ?>"></td>
+        </tr>
+        <tr>
+            <td>通知邮箱（可选）<br/><span class="text-muted">备份完成后邮件通知该地址</span></td>
+            <td><input type="text" name="db_backup_email" class="form-control" style="width:280px" value="<?php echo htmlspecialchars((string) option::get('db_backup_email'), ENT_QUOTES, 'UTF-8'); ?>"></td>
+        </tr>
+    </tbody>
+</table>
+</div>
+<input type="submit" class="btn btn-primary" value="保存备份设置">
+</form>
+<form style="display:inline" action="<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=dbbackup_init" method="post">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
+<button type="submit" class="btn btn-default" onclick="return confirm('确定注册定时备份计划任务吗？已注册时无副作用。');">注册定时备份任务<?php echo (int) $bkCron['c'] > 0 ? '（已注册）' : '（未注册）'; ?></button>
+</form>
+&nbsp;&nbsp;
+<form style="display:inline" action="<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=dbbackup_run" method="post">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
+<button type="submit" class="btn btn-default" onclick="return confirm('立即执行一次备份吗？');">立即备份一次</button>
+</form>
+&nbsp;&nbsp;&nbsp;&nbsp;当前已有 <b><?php echo $bkCount; ?></b> 份备份存于 data/backups 目录（Apache 已由 .htaccess 拦截直接下载，Nginx 等环境请自行屏蔽该目录）
+
+<br/><br/>
+<!--Part 2 Warning-->
 <br/><br/><input type="button" data-toggle="modal" data-target="#TruncateTableLabel" class="btn btn-warning" value="清空指定数据表" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;请慎用此功能，一般用于清空无用的分表
 
 <br/><br/><input type="button" data-toggle="modal" data-target="#RemoveTable" class="btn btn-warning" value="删除指定数据表" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;请慎用此功能，一般用于删除无用的分表

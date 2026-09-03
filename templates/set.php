@@ -68,5 +68,36 @@ function addset($name, $type, $x, $other = '', $text = '')
         <?php doAction('set_2'); ?>
     </tbody>
 </table></div><input type="submit" class="btn btn-primary" value="提交更改">
-<br/><br/><?php echo SYSTEM_FN ?> V<?php echo SYSTEM_VER  . ' ' . SYSTEM_VER_NOTE ?> // 作者: <a href="https://kenvix.com" target="_blank">Kenvix</a>  &amp; <a href="http://www.mokeyjay.com/" target="_blank">mokeyjay</a> &amp;  <a href="http://fyy1999.lofter.com/" target="_blank">FYY</a>
+</form>
+
+<h3>修改密码</h3>
+<form action="setting.php?mod=set" method="post" onsubmit="return confirm('确定要修改登录密码吗？修改后需要使用新密码重新登录。');">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
+<input type="hidden" name="pw_action" value="change">
+<div class="table-responsive">
+<table class="table table-hover">
+    <thead>
+        <tr>
+            <th style="width:40%">参数</th>
+            <th>值</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>当前密码</td>
+            <td><input type="password" name="cur_pw" class="form-control" required autocomplete="current-password"></td>
+        </tr>
+        <tr>
+            <td>新密码<br/><span class="text-muted">长度 6-64 位</span></td>
+            <td><input type="password" name="new_pw" class="form-control" required minlength="6" maxlength="64" autocomplete="new-password"></td>
+        </tr>
+        <tr>
+            <td>确认新密码</td>
+            <td><input type="password" name="new_pw2" class="form-control" required minlength="6" maxlength="64" autocomplete="new-password"></td>
+        </tr>
+    </tbody>
+</table></div>
+<input type="submit" class="btn btn-primary" value="修改密码">
+</form>
+<br/><?php echo SYSTEM_FN ?> V<?php echo SYSTEM_VER  . ' ' . SYSTEM_VER_NOTE ?> // 作者: <a href="https://kenvix.com" target="_blank">Kenvix</a>  &amp; <a href="http://www.mokeyjay.com/" target="_blank">mokeyjay</a> &amp;  <a href="http://fyy1999.lofter.com/" target="_blank">FYY</a>
 

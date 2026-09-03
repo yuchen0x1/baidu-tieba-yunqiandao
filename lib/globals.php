@@ -31,6 +31,61 @@ if (!function_exists('lostpw_token_info')) {
 }
 
 /**
+ * 确保邀请码表存在（多邀请码功能）
+ */
+if (!function_exists('invite_ensure_table')) {
+    function invite_ensure_table()
+    {
+        global $m;
+        $m->query("CREATE TABLE IF NOT EXISTS `" . DB_PREFIX . "invites` (
+            `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `code` VARCHAR(32) NOT NULL DEFAULT '',
+            `max_uses` INT UNSIGNED NOT NULL DEFAULT 1,
+            `used_count` INT UNSIGNED NOT NULL DEFAULT 0,
+            `expire` INT UNSIGNED NOT NULL DEFAULT 0,
+            `status` TINYINT NOT NULL DEFAULT 1,
+            `note` VARCHAR(255) NOT NULL DEFAULT '',
+            `created_at` INT UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `code` (`code`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+    }
+}
+
+/**
+ * 校验邀请码是否可用
+ * @return array|false 可用返回邀请码行，否则 false
+ */
+if (!function_exists('invite_check')) {
+    function invite_check($code)
+    {
+        global $m;
+        $code = trim((string) $code);
+        if ($code === '' || strlen($code) > 32) {
+            return false;
+        }
+        invite_ensure_table();
+        $rs = $m->pquery("SELECT * FROM `" . DB_PREFIX . "invites` WHERE `code` = ? AND `status` = 1 AND (`expire` = 0 OR `expire` > " . time() . ") LIMIT 1", array($code));
+        $row = $rs ? $m->fetch_array($rs) : array();
+        if (empty($row['id']) || (int) $row['used_count'] >= (int) $row['max_uses']) {
+            return false;
+        }
+        return $row;
+    }
+}
+
+/**
+ * 核销一次邀请码（原子递增，超上限不再计数）
+ */
+if (!function_exists('invite_consume')) {
+    function invite_consume($inviteId)
+    {
+        global $m;
+        $m->pquery("UPDATE `" . DB_PREFIX . "invites` SET `used_count` = `used_count` + 1 WHERE `id` = ? AND `used_count` < `max_uses`", array((int) $inviteId));
+    }
+}
+
+/**
  * 生成注册验证令牌并发送验证邮件
  * @return bool 邮件是否发送成功
  */
@@ -279,7 +334,18 @@ if (SYSTEM_PAGE == 'admin:login') {
         msg('注册失败：邮箱格式不正确');
     }
     $yr_reg = option::get('yr_reg');
-    if (!empty($yr_reg)) {
+    $inviteRow = false;
+    if (option::get('yr_reg_multi') == '1') {
+        //多邀请码模式：校验邀请码表，单码设置失效
+        if (empty($yr)) {
+            msg('注册失败：请输入邀请码');
+        } else {
+            $inviteRow = invite_check($yr);
+            if ($inviteRow === false) {
+                msg('注册失败：邀请码无效、已过期或已用尽');
+            }
+        }
+    } elseif (!empty($yr_reg)) {
         if (empty($yr)) {
             msg('注册失败：请输入邀请码');
         } else {
@@ -296,6 +362,9 @@ if (SYSTEM_PAGE == 'admin:login') {
     doAction('admin_reg_2');
     $m->pquery('INSERT INTO `' . DB_NAME . '`.`' . DB_PREFIX . 'users` (`name`, `pw`, `email`, `role`, `t`) VALUES (?, ?, ?, ?, ?)', array($name, EncodePwd($pw), $mail, $role, getfreetable()));
     $newUid = (int) $m->insert_id();
+    if ($inviteRow !== false) {
+        invite_consume($inviteRow['id']);
+    }
     $regMsg = '成功注册，请输入账号信息登录本站 [ 账号为用户名或邮箱地址 ]';
     //邮箱验证注册：标记未验证并发送验证邮件
     if (option::get('reg_mail_verify') == '1') {

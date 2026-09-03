@@ -14,6 +14,7 @@ $pageLabels = array(
     'admin:tools' => '工具箱',
     'admin:set' => '设置中心',
     'admin:users' => '用户管理',
+    'admin:invite' => '邀请码管理',
     'admin:stat' => '统计信息',
     'admin:sign' => '签到看板',
     'admin:cron' => '计划任务',
@@ -64,6 +65,7 @@ $userInitial = function_exists('mb_substr') ? mb_substr($userName, 0, 1, 'UTF-8'
                     <li class="<?php checkIfActive('admin:stat'); ?>"><a href="index.php?mod=admin:stat"><span class="sidebar-icon glyphicon glyphicon-stats"></span><span>统计信息</span></a></li>
                     <li class="<?php checkIfActive('admin:sign'); ?>"><a href="index.php?mod=admin:sign"><span class="sidebar-icon glyphicon glyphicon-dashboard"></span><span>签到看板</span></a></li>
                     <li class="<?php checkIfActive('admin:users'); ?>"><a href="index.php?mod=admin:users"><span class="sidebar-icon glyphicon glyphicon-user"></span><span>用户管理</span></a></li>
+                    <li class="<?php checkIfActive('admin:invite'); ?>"><a href="index.php?mod=admin:invite"><span class="sidebar-icon glyphicon glyphicon-envelope"></span><span>邀请码管理</span></a></li>
                     <li class="<?php checkIfActive('admin:cron'); ?>"><a href="index.php?mod=admin:cron"><span class="sidebar-icon glyphicon glyphicon-time"></span><span>计划任务</span></a></li>
                     <li class="<?php checkIfActive('admin:tools'); ?>"><a href="index.php?mod=admin:tools"><span class="sidebar-icon glyphicon glyphicon-wrench"></span><span>工具箱</span></a></li>
                     <li class="<?php checkIfActive('admin:set'); ?>"><a href="index.php?mod=admin:set"><span class="sidebar-icon glyphicon glyphicon-adjust"></span><span>设置中心</span></a></li>
