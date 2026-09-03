@@ -20,6 +20,11 @@ switch ($i['mode'][0]) {
         template('calendar');
 
         break;
+    case 'messages':
+                      loadhead('贴吧消息中心');
+        template('messages');
+
+        break;
     case 'signlogs':
                       loadhead('签到日志详情');
         template('sign-logs');

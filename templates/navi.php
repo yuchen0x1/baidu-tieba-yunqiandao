@@ -12,6 +12,7 @@ $pageLabels = array(
     'account' => '账号中心',
     'calendar' => '签到日历',
     'signlogs' => '签到日志',
+    'messages' => '贴吧消息中心',
     'ranking' => '签到排行',
     'achievements' => '成就勋章',
     'admin:tools' => '工具箱',
@@ -55,6 +56,17 @@ $userInitial = function_exists('mb_substr') ? mb_substr($userName, 0, 1, 'UTF-8'
                     <li class="<?php checkIfActive('showtb'); ?>"><a href="index.php?mod=showtb"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-calendar-grid"/></svg><span>贴吧与签到</span></a></li>
                     <li class="<?php checkIfActive('calendar'); ?>"><a href="index.php?mod=calendar"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-calendar"/></svg><span>签到日历</span></a></li>
                     <li class="<?php checkIfActive('signlogs'); ?>"><a href="index.php?mod=signlogs"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-list"/></svg><span>签到日志</span></a></li>
+                    <li class="<?php checkIfActive('messages'); ?>"><a href="index.php?mod=messages" id="nav-messages-link"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-mail"/></svg><span>消息中心</span><?php
+                        // 服务端渲染消息未读徽章
+                        $messageUnread = 0;
+                        if (file_exists(SYSTEM_ROOT . '/lib/class.MessageCenter.php') && defined('UID') && UID > 0) {
+                            require_once SYSTEM_ROOT . '/lib/class.MessageCenter.php';
+                            $messageUnread = MessageCenter::unreadCount(UID);
+                        }
+                        if ($messageUnread > 0) {
+                            echo '<span class="nav-badge nav-badge-show">' . ($messageUnread > 99 ? '99+' : (int) $messageUnread) . '</span>';
+                        }
+                    ?></a></li>
                     <li class="<?php checkIfActive('ranking'); ?>"><a href="index.php?mod=ranking"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-trophy"/></svg><span>签到排行</span></a></li>
                     <li class="<?php checkIfActive('achievements'); ?>"><a href="index.php?mod=achievements"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-award"/></svg><span>成就勋章</span></a></li>
                     <li class="<?php checkIfActive('notices'); ?>"><a href="index.php?mod=notices" id="nav-notices-link"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-bell"/></svg><span>站内通知</span><?php

@@ -15,12 +15,13 @@ $page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
 $actionResult = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $opAction = isset($_POST['op']) ? (string) $_POST['op'] : '';
-    if ($opAction === 'mark_read' && isset($_POST['notice_id'])) {
-        Notice::markRead((int) $_POST['notice_id'], $viewUid);
+    $noticeId = isset($_POST['notice_id']) ? (int) $_POST['notice_id'] : 0;
+    if ($opAction === 'mark_read' && $noticeId > 0) {
+        Notice::markRead($noticeId, $viewUid);
     } elseif ($opAction === 'mark_all_read') {
         Notice::markAllRead($viewUid);
-    } elseif ($opAction === 'delete' && isset($_POST['notice_id'])) {
-        Notice::delete((int) $_POST['notice_id'], $viewUid);
+    } elseif ($opAction === 'delete' && $noticeId > 0) {
+        Notice::delete($noticeId, $viewUid);
     }
     // 操作后重定向，避免重复提交
     $redirectParams = array('mod' => 'notices');
