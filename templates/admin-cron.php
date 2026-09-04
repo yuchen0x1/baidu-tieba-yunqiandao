@@ -23,20 +23,20 @@ foreach ($i['cron'] as $cs) {
     // V5.13：启用状态（兼容旧 no 与新 enable；未迁移库无 enable 列时视为启用）
     $enabled = ((int) $cs['no'] !== 1 && (!isset($cs['enable']) || (int) $cs['enable'] !== 0));
     if ($enabled) {
-        $status = '<font color="green">启用</font>';
+        $status = '<span class="cs-badge cs-badge-success">启用</span>';
         $status .= ' | <a href="setting.php?mod=admin:cron&dis=' . htmlspecialchars($cs['name'], ENT_QUOTES, 'UTF-8') . '">禁用</a>';
     } else {
-        $status = '<font color="gray">已禁用</font> | <a href="setting.php?mod=admin:cron&act=' . htmlspecialchars($cs['name'], ENT_QUOTES, 'UTF-8') . '">启用</a>';
+        $status = '<span class="cs-badge cs-badge-neutral">已禁用</span> | <a href="setting.php?mod=admin:cron&act=' . htmlspecialchars($cs['name'], ENT_QUOTES, 'UTF-8') . '">启用</a>';
     }
     // V5.13：最近执行状态徽标
     $ls = isset($cs['last_status']) ? $cs['last_status'] : '';
     $badge = '';
     if ($ls === 'success') {
-        $badge = '<font color="green">[上次成功]</font> ';
+        $badge = '<span class="cs-text-success">[上次成功]</span> ';
     } elseif ($ls === 'error') {
-        $badge = '<font color="red">[上次失败]</font> ';
+        $badge = '<span class="cs-text-danger">[上次失败]</span> ';
     } elseif ($ls === 'running') {
-        $badge = '<font color="blue">[运行中]</font> ';
+        $badge = '<span class="cs-text-info">[运行中]</span> ';
     }
     // V5.13：下次执行时间
     $nextrun = isset($cs['nextrun']) ? (int) $cs['nextrun'] : 0;
@@ -77,17 +77,17 @@ $runs = cron::recentRuns(20);
 $runRows = '';
 foreach ($runs as $r) {
     $rs = $r['status'];
-    $color = 'gray';
+    $statusClass = 'cs-badge-neutral';
     if ($rs === 'success') {
-        $color = 'green';
+        $statusClass = 'cs-badge-success';
     } elseif ($rs === 'error' || $rs === 'skipped') {
-        $color = 'red';
+        $statusClass = 'cs-badge-danger';
     } elseif ($rs === 'running') {
-        $color = 'blue';
+        $statusClass = 'cs-badge-info';
     }
     $durText2 = (int) $r['duration_ms'] > 0 ? ((int) $r['duration_ms'] >= 1000 ? number_format($r['duration_ms'] / 1000, 2) . ' 秒' : $r['duration_ms'] . ' 毫秒') : '—';
     $timeText = !empty($r['started_at']) ? date('Y-m-d H:i:s', $r['started_at']) : '—';
-    $runRows .= '<tr><td>' . htmlspecialchars($r['name'], ENT_QUOTES, 'UTF-8') . '</td><td><font color="' . $color . '">' . htmlspecialchars($rs, ENT_QUOTES, 'UTF-8') . '</font></td><td>' . htmlspecialchars($timeText, ENT_QUOTES, 'UTF-8') . '</td><td>' . $durText2 . '</td><td style="max-width:380px;word-break:break-all;">' . htmlspecialchars($r['message'], ENT_QUOTES, 'UTF-8') . '</td></tr>';
+    $runRows .= '<tr><td>' . htmlspecialchars($r['name'], ENT_QUOTES, 'UTF-8') . '</td><td><span class="cs-badge ' . $statusClass . '">' . htmlspecialchars($rs, ENT_QUOTES, 'UTF-8') . '</span></td><td>' . htmlspecialchars($timeText, ENT_QUOTES, 'UTF-8') . '</td><td>' . $durText2 . '</td><td style="max-width:380px;word-break:break-all;">' . htmlspecialchars($r['message'], ENT_QUOTES, 'UTF-8') . '</td></tr>';
 }
 ?>
 <div class="alert alert-info" id="tb_num">当前共有 <?php echo $count['c'] ?> 个计划任务，您需要添加根目录下 do.php 到您主机的计划任务后，下面的任务才能被执行<br/><a href="index.php?mod=admin:editcron">添加新计划任务</a> | <form action="do.php" method="post" style="display:inline;"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>"><input type="hidden" name="pw" value="<?php echo htmlspecialchars(option::get('cron_pw'), ENT_QUOTES, 'UTF-8'); ?>"><button type="submit" class="btn btn-link" style="padding:0;border:0;">运行全部计划任务</button></form></div>

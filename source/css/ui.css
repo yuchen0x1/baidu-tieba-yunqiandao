@@ -655,6 +655,22 @@ h3.former-title::before {
   border-radius: 999px;
 }
 
+/* 首屏快捷操作行 */
+.hero-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.hero-action-result {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -948,6 +964,34 @@ h3.former-title::before {
 
   .dashboard-hero h1 {
     font-size: 25px;
+  }
+
+  /* 设置类表单表格在手机上改为逐行堆叠（标签在上、控件在下） */
+  table.form-table,
+  table.form-table tbody,
+  table.form-table tr,
+  table.form-table th,
+  table.form-table td {
+    display: block;
+    width: 100%;
+  }
+
+  table.form-table th,
+  table.form-table td {
+    padding: 6px 0;
+  }
+
+  /* 移动端取消内联定宽控件，避免挤压换行 */
+  .form-inline .form-control,
+  .form-table .form-control {
+    max-width: 100%;
+  }
+
+  .form-table .form-control[style*="width"],
+  .form-inline .form-control[style*="width"] {
+    width: 100% !important;
+    display: block !important;
+    margin: 4px 0;
   }
 }
 

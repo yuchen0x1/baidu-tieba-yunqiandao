@@ -51,7 +51,7 @@ foreach ($x as $key => $val) {
             $fortc = '<br/>适用版本：不限';
         } elseif ($val['plugin']['for'] > SYSTEM_VER) {
             $for = "&ver=" . htmlspecialchars($val['plugin']['for'], ENT_QUOTES, 'UTF-8');
-            $fortc = '<br/>适用版本：<font color="red">V' . htmlspecialchars($val['plugin']['for'], ENT_QUOTES, 'UTF-8') . '+</font>';
+            $fortc = '<br/>适用版本：<span class="cs-text-danger">V' . htmlspecialchars($val['plugin']['for'], ENT_QUOTES, 'UTF-8') . '+</span>';
         } else {
             $for = '';
             $fortc = '<br/>适用版本：V' . htmlspecialchars($val['plugin']['for'], ENT_QUOTES, 'UTF-8') . '+';
@@ -62,7 +62,7 @@ foreach ($x as $key => $val) {
     }
     if (in_array($val['plugin']['id'], $i['plugins']['all'])) {
         if ($i['plugins']['info'][$val['plugin']['id']]['status'] == '1') {
-            $status = '<font color="green">已激活</font> | <a href="setting.php?mod=admin:plugins&dis=' . htmlspecialchars($val['plugin']['id'], ENT_QUOTES, 'UTF-8') . '">禁用插件</a>';
+            $status = '<span class="cs-badge cs-badge-success">已激活</span> | <a href="setting.php?mod=admin:plugins&dis=' . htmlspecialchars($val['plugin']['id'], ENT_QUOTES, 'UTF-8') . '">禁用插件</a>';
             if (isset($val['core']) && ($val['core']['setting'] && $val['view']['setting']) || (isset($val['plugin']['old']) && file_exists(SYSTEM_ROOT . '/plugins/' . $val['plugin']['id'] . '/' . $val['plugin']['id'] . '_setting.php'))) {
                 $action .= '<a href="index.php?mod=admin:setplug&plug=' . htmlspecialchars($val['plugin']['id'], ENT_QUOTES, 'UTF-8') . '" title="查看设置"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span style="padding:0 3px">设置</span></a> ';
             }
@@ -70,11 +70,11 @@ foreach ($x as $key => $val) {
                 $action .= '<a href="index.php?plugin=' . htmlspecialchars($val['plugin']['id'], ENT_QUOTES, 'UTF-8') . '" title="查看页面"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span style="padding:0 3px">页面</span></a> ';
             }
         } else {
-            $status = '<font color="black">已禁用</font> | <a href="setting.php?mod=admin:plugins&act=' . htmlspecialchars($val['plugin']['id'], ENT_QUOTES, 'UTF-8') . '">激活插件</a>';
+            $status = '<span class="cs-badge cs-badge-neutral">已禁用</span> | <a href="setting.php?mod=admin:plugins&act=' . htmlspecialchars($val['plugin']['id'], ENT_QUOTES, 'UTF-8') . '">激活插件</a>';
         }
         $action .= '<br/><a data-plugin-name="' . htmlspecialchars($val['plugin']['name'], ENT_QUOTES, 'UTF-8') . '" data-plugin-version="' . htmlspecialchars($val['plugin']['version'], ENT_QUOTES, 'UTF-8') . '" onclick="return confirm(\'你想要清除此插件的数据吗？文件会得到保留。\\n\' + this.getAttribute(\'data-plugin-name\') + \' V\' + this.getAttribute(\'data-plugin-version\'));" href="setting.php?mod=admin:plugins&clean=' . htmlspecialchars($val['plugin']['id'], ENT_QUOTES, 'UTF-8') . '" style="color:#FF6A00;" title="清除数据"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg><span style="padding:0 3px">重置</span></a> ';
     } else {
-        $status = '<font color="#977C00">未安装</font> | <a href="setting.php?mod=admin:plugins&install=' . htmlspecialchars($val['plugin']['id'], ENT_QUOTES, 'UTF-8') . $for . '">安装插件</a>';
+        $status = '<span class="cs-badge cs-badge-warning">未安装</span> | <a href="setting.php?mod=admin:plugins&install=' . htmlspecialchars($val['plugin']['id'], ENT_QUOTES, 'UTF-8') . $for . '">安装插件</a>';
     }
 
     $plugins .= '<tr><td>' . $pluginfo . '</td><td>' . $authinfo . '<br/>' . htmlspecialchars($val['plugin']['id'], ENT_QUOTES, 'UTF-8') . $fortc . '</td><td>' . $status . '<br/>';

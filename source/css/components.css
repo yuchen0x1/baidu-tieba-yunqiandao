@@ -612,6 +612,10 @@
 .cs-badge-danger { color: var(--color-danger-deep); background: var(--color-danger-soft); border-color: var(--color-danger); }
 .cs-badge-info { color: var(--color-info-deep); background: var(--color-info-soft); border-color: var(--color-info); }
 .cs-badge-brand { color: var(--color-brand-deep); background: var(--color-brand-soft); border-color: var(--color-brand); }
+.cs-text-success { color: var(--color-success-deep); }
+.cs-text-warning { color: var(--color-warning-deep); }
+.cs-text-danger { color: var(--color-danger-deep); }
+.cs-text-info { color: var(--color-info-deep); }
 
 /* ============================================================
    9. Alert — 提示条原语（替代 BS3 .alert）

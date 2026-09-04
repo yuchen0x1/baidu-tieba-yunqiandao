@@ -126,7 +126,7 @@ $cronOn = !empty($cronRow['enable']);
 </form>
 <p class="text-muted" style="margin-top:10px;">
     用户在个人面板的「<a href="index.php?plugin=ver4_ai">AI 发帖/回帖</a>」页配置自己的大模型与目标贴吧；
-    计划任务 <code>ver4_ai_do</code> <?php echo $cronOn ? '<font color="green"><b>已注册</b></font>' : '<font color="red"><b>未注册（请重新激活插件）</b></font>'; ?>，
+    计划任务 <code>ver4_ai_do</code> <?php echo $cronOn ? '<span class="cs-badge cs-badge-success">已注册</span>' : '<span class="cs-badge cs-badge-danger">未注册（请重新激活插件）</span>'; ?>，
     请在 <a href="index.php?mod=admin:cron">计划任务</a> 页确认其处于启用状态（建议每 5 分钟执行一次）。
 </p>
 <div class="alert alert-warning">

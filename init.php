@@ -6,8 +6,8 @@
  */
 
 define('SYSTEM_FN', '百度贴吧云签到');
-define('SYSTEM_VER', '6.5');
-define('SYSTEM_VER_NOTE', 'V6.5：数据分析增强——吧明细导出、监控命中统计、账号健康度趋势');
+define('SYSTEM_VER', '6.6');
+define('SYSTEM_VER_NOTE', 'V6.6：移动端适配深化、视觉细节统一（cs-badge 体系全覆盖）、工作台首屏快捷操作');
 define('SYSTEM_ROOT', dirname(__FILE__));
 require_once SYSTEM_ROOT . '/lib/request.php';
 define('PLUGIN_ROOT', dirname(__FILE__) . '/plugins/');

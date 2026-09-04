@@ -223,8 +223,8 @@ if ($hasOwnKey) {
     $sourceText = '未配置';
 }
 $statusBadge = $aiEnable == '1'
-    ? ($resolved !== false ? '<font color="green"><b>运行中</b></font>' : '<font color="red"><b>已启用但配置不可用</b></font>')
-    : '<font color="gray"><b>未开启</b></font>';
+    ? ($resolved !== false ? '<span class="cs-badge cs-badge-success">运行中</span>' : '<span class="cs-badge cs-badge-danger">已启用但配置不可用</span>')
+    : '<span class="cs-badge cs-badge-neutral">未开启</span>';
 
 //我的百度账号列表
 $myAccounts = array();
@@ -259,7 +259,8 @@ while ($r = $m->fetch_array($logRs)) {
 
 <?php if (!empty($drafts)): ?>
 <h4 style="margin:20px 1% 8px">📮 发帖草稿箱（半自动模式候选，7 天后自动清理）</h4>
-<div style="margin:0 1%;overflow-x:auto">
+<div style="margin:0 1%">
+<div class="cs-table-wrap"><div class="cs-table-scroll">
 <table class="table table-striped">
     <tr><th style="width:110px">目标贴吧</th><th>候选内容</th><th style="width:150px">生成时间</th><th style="width:170px">操作</th></tr>
     <?php foreach ($drafts as $d): ?>
@@ -282,6 +283,7 @@ while ($r = $m->fetch_array($logRs)) {
     </tr>
     <?php endforeach; ?>
 </table>
+</div></div>
 </div>
 <?php elseif ($threadSemi == '1'): ?>
 <div class="alert alert-info" style="margin:10px 1% 0">半自动模式已开启：计划任务到点后会为「目标贴吧」各生成 3 条候选，出现在这里的「发帖草稿箱」供你挑选发布。当前暂无待发布候选。</div>
@@ -290,14 +292,14 @@ while ($r = $m->fetch_array($logRs)) {
 <?php if (!empty($draftHistory)): ?>
 <p style="margin:6px 1%">最近处理：<span class="text-muted" style="font-size:12px">
     <?php foreach ($draftHistory as $i => $h): ?>
-        <?php echo ($i > 0 ? '　|　' : '') . htmlspecialchars((string) $h['kw'], ENT_QUOTES, 'UTF-8') . '吧《' . htmlspecialchars(mb_substr((string) $h['title'], 0, 14), ENT_QUOTES, 'UTF-8') . '》' . ((int) $h['status'] === 1 ? '<font color="green">已发布</font>' : '<font color="gray">已丢弃</font>'); ?>
+        <?php echo ($i > 0 ? '　|　' : '') . htmlspecialchars((string) $h['kw'], ENT_QUOTES, 'UTF-8') . '吧《' . htmlspecialchars(mb_substr((string) $h['title'], 0, 14), ENT_QUOTES, 'UTF-8') . '》' . ((int) $h['status'] === 1 ? '<span class="cs-badge cs-badge-success">已发布</span>' : '<span class="cs-badge cs-badge-neutral">已丢弃</span>'); ?>
     <?php endforeach; ?>
 </span></p>
 <?php endif; ?>
 
 <form method="post" action="index.php?plugin=ver4_ai">
     <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
-    <table class="table table-striped">
+    <table class="table table-striped form-table">
         <tr><th colspan="2"><h4>① 开关与模型服务</h4></th></tr>
         <tr>
             <td style="width:35%"><b>AI 功能总开关</b></td>
@@ -514,6 +516,8 @@ while ($r = $m->fetch_array($logRs)) {
 </form>
 <?php if (!empty($recentRows)): ?>
 <h4 style="margin-top:20px;">最近执行记录</h4>
+<div style="margin:0 1%">
+<div class="cs-table-wrap"><div class="cs-table-scroll">
 <table class="table table-striped">
     <tr><th>时间</th><th>账号</th><th>类型</th><th>结果</th><th>详情</th></tr>
     <?php foreach ($recentRows as $r): ?>
@@ -523,19 +527,21 @@ while ($r = $m->fetch_array($logRs)) {
         <td><?php echo (int) $r['type'] === 1 ? '发帖' : '回帖'; ?></td>
         <td><?php
             $st = (int) $r['status'];
-            echo $st === 1 ? '<font color="green">成功</font>' : ($st === 4 ? '<font color="orange">生成失败</font>' : ($st === 3 ? '<font color="orange">频率限制</font>' : ($st === 5 ? '<font color="orange">审查拦截</font>' : ($st === 6 ? '<font color="blue">候选待发布</font>' : '<font color="red">失败</font>'))));
+            echo $st === 1 ? '<span class="cs-badge cs-badge-success">成功</span>' : ($st === 4 ? '<span class="cs-badge cs-badge-warning">生成失败</span>' : ($st === 3 ? '<span class="cs-badge cs-badge-warning">频率限制</span>' : ($st === 5 ? '<span class="cs-badge cs-badge-warning">审查拦截</span>' : ($st === 6 ? '<span class="cs-badge cs-badge-info">候选待发布</span>' : '<span class="cs-badge cs-badge-danger">失败</span>'))));
         ?></td>
         <td><?php echo htmlspecialchars(mb_substr((string) $r['msg'], 0, 60), ENT_QUOTES, 'UTF-8'); ?></td>
     </tr>
     <?php endforeach; ?>
 </table>
+</div></div>
 <?php endif; ?>
 
 <h4 style="margin-top:20px;">内容审查拦截记录 <span class="text-muted" style="font-size:12px">（命中敏感词或内容重复而被跳过的内容，最近 20 条，用于排查人设/敏感词配置）</span></h4>
 <?php if (empty($auditRows)): ?>
 <p class="text-muted" style="margin:6px 1%">暂无拦截记录：AI 生成的内容均通过了敏感词与重复检查。</p>
 <?php else: ?>
-<div style="margin:0 1%;overflow-x:auto">
+<div style="margin:0 1%">
+<div class="cs-table-wrap"><div class="cs-table-scroll">
 <table class="table table-striped">
     <tr><th style="width:110px">时间</th><th style="width:70px">账号</th><th style="width:60px">类型</th><th style="width:80px">目标</th><th>拦截原因</th></tr>
     <?php foreach ($auditRows as $r): ?>
@@ -548,6 +554,7 @@ while ($r = $m->fetch_array($logRs)) {
     </tr>
     <?php endforeach; ?>
 </table>
+</div></div>
 </div>
 <?php endif; ?>
 

@@ -59,6 +59,13 @@ doAction('index_1');
         <span class="hero-tag">用户组：<?php echo htmlspecialchars(getrole(ROLE), ENT_QUOTES, 'UTF-8'); ?></span>
         <?php if (ISVIP) { ?><span class="hero-tag">增强权限已启用</span><?php } ?>
     </div>
+    <div class="hero-actions">
+        <button type="button" class="cs-btn cs-btn-primary cs-btn-sm" id="hero-sign-run"<?php echo $accountCount === 0 ? ' disabled title="请先绑定百度账号"' : ''; ?>>立即签到</button>
+        <a class="cs-btn cs-btn-secondary cs-btn-sm" href="index.php?mod=baiduid">绑定百度账号</a>
+        <a class="cs-btn cs-btn-secondary cs-btn-sm" href="index.php?mod=calendar">签到记录</a>
+        <a class="cs-btn cs-btn-secondary cs-btn-sm" href="index.php?mod=analysis">数据分析</a>
+        <span id="hero-sign-result" class="hero-action-result" aria-live="polite"></span>
+    </div>
 </section>
 
 <?php if (defined('CON_NAME')) { ?>
@@ -331,6 +338,37 @@ doAction('index_1');
     var tb = Math.min(100, Math.round($('#tb_used').html() / $('#tb_limit').html() * 100));
     $('#tb_prog').css('width', tb + '%').attr('aria-valuenow', tb);
     <?php } ?>
+
+    // 首屏快捷操作：立即签到（ajax sign:run，单次上限内处理我的账号）
+    $('#hero-sign-run').on('click', function () {
+        var $btn = $(this);
+        if ($btn.prop('disabled')) { return; }
+        if (!window.confirm('立即为我的全部账号执行签到？未到时段或超过单次上限的部分由计划任务继续完成。')) { return; }
+        $btn.prop('disabled', true);
+        $('#hero-sign-result').text('正在签到，请稍候…');
+        $.ajax({
+            url: 'ajax.php?mod=sign:run',
+            dataType: 'json',
+            type: 'POST',
+            data: { 'pid': 0, 'csrf_token': $('meta[name="csrf-token"]').attr('content') },
+            success: function (x) {
+                $btn.prop('disabled', false);
+                var $res = $('#hero-sign-result');
+                if (x.error !== 0) {
+                    $res.text(x.msg || '签到未执行');
+                    if (window.CS && CS.toast) { CS.toast('签到未执行', { type: 'warning', body: x.msg || '' }); }
+                    return;
+                }
+                var msg = '今日已签 ' + x.signed + ' · 失败 ' + x.failed + ' · 等待 ' + x.waiting + (x.done > 0 ? '（本次处理 ' + x.done + ' 个吧）' : '');
+                $res.text(msg);
+                if (window.CS && CS.toast) { CS.toast('签到完成', { type: 'success', body: msg }); }
+            },
+            error: function () {
+                $btn.prop('disabled', false);
+                $('#hero-sign-result').text('签到请求失败，请稍后重试');
+            }
+        });
+    });
 
     // 阶段 D：工作台 ECharts 图表初始化（components.js 为 defer 加载，CS 须等 DOMContentLoaded 后才可用）
     function initDashboardCharts() {
