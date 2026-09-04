@@ -29,5 +29,35 @@ function ver4_monitor_uopt_set($uid, $name, $value)
     }
 }
 
+/**
+ * 命中记录表结构（主文件内定义：插件主文件全局加载，API/用户页/计划任务均可调用）
+ */
+function ver4_monitor_ensure_table()
+{
+    static $ready = false;
+    if ($ready) {
+        return;
+    }
+    global $m;
+    //notified：实时推送已发送或无需推送记 1；每日汇总模式下待推送记 0
+    $m->query("CREATE TABLE IF NOT EXISTS `" . DB_PREFIX . "ver4_monitor_hit` (
+        `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        `uid` INT UNSIGNED NOT NULL DEFAULT 0,
+        `pid` INT UNSIGNED NOT NULL DEFAULT 0,
+        `forum` VARCHAR(60) NOT NULL DEFAULT '',
+        `kw` VARCHAR(60) NOT NULL DEFAULT '',
+        `tid` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+        `title` VARCHAR(255) NOT NULL DEFAULT '',
+        `notified` TINYINT NOT NULL DEFAULT 1,
+        `created_at` INT UNSIGNED NOT NULL,
+        PRIMARY KEY (`id`),
+        UNIQUE KEY `uid_tid` (`uid`, `tid`),
+        KEY `uid_created` (`uid`, `created_at`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+    //旧版本表结构补齐 notified 列
+    $m->addColumn('ver4_monitor_hit', 'notified', 'tinyint', 'NOT NULL DEFAULT 1');
+    $ready = true;
+}
+
 addAction('navi_1', 'ver4_monitor_user_nav');
 addAction('navi_7', 'ver4_monitor_user_nav');

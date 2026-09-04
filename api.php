@@ -230,6 +230,36 @@ switch ($action) {
         echo json_encode(array('ok' => true, 'data' => SignManager::failureBreakdown($apiUserId, $limit)), JSON_UNESCAPED_UNICODE);
         break;
 
+    case 'monitor':
+        //帖子监控命中记录（仅个人 Token 可访问）
+        if ($apiUserId <= 0) {
+            http_response_code(403);
+            echo json_encode(array('error' => '监控数据仅支持个人 Token 访问'), JSON_UNESCAPED_UNICODE);
+            break;
+        }
+        $monLimit = isset($_GET['limit']) ? min(100, max(1, (int) $_GET['limit'])) : 20;
+        $monRows = array();
+        try {
+            $monRs = $m->pquery("SELECT `forum`, `kw`, `tid`, `title`, `notified`, `created_at` FROM `" . DB_PREFIX . "ver4_monitor_hit` WHERE `uid` = ? ORDER BY `id` DESC LIMIT ?", array($apiUserId, $monLimit));
+            if ($monRs !== false) {
+                while ($monRow = $monRs->fetch_array()) {
+                    $monRows[] = array(
+                        'forum' => (string) $monRow['forum'],
+                        'keyword' => (string) $monRow['kw'],
+                        'tid' => (int) $monRow['tid'],
+                        'title' => (string) $monRow['title'],
+                        'url' => 'https://tieba.baidu.com/p/' . (int) $monRow['tid'],
+                        'notified' => (int) $monRow['notified'] === 1,
+                        'created_at' => (int) $monRow['created_at'],
+                    );
+                }
+            }
+        } catch (Throwable $monE) {
+            $monRows = array();
+        }
+        echo json_encode(array('ok' => true, 'data' => $monRows), JSON_UNESCAPED_UNICODE);
+        break;
+
     case 'trend':
         require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
         $days = isset($_GET['days']) ? max(1, min(365, (int) $_GET['days'])) : 30;

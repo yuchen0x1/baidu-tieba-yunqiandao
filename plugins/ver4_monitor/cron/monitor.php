@@ -19,31 +19,6 @@ function ver4_monitor_log($msg)
     cron::aset('ver4_monitor_do', array('log' => '[' . date('Y-m-d H:i:s') . ']' . $msg));
 }
 
-function ver4_monitor_ensure_table()
-{
-    static $ready = false;
-    if ($ready) {
-        return;
-    }
-    global $m;
-    $m->query("CREATE TABLE IF NOT EXISTS `" . DB_PREFIX . "ver4_monitor_hit` (
-        `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-        `uid` INT UNSIGNED NOT NULL DEFAULT 0,
-        `pid` INT UNSIGNED NOT NULL DEFAULT 0,
-        `forum` VARCHAR(60) NOT NULL DEFAULT '',
-        `kw` VARCHAR(60) NOT NULL DEFAULT '',
-        `tid` BIGINT UNSIGNED NOT NULL DEFAULT 0,
-        `title` VARCHAR(255) NOT NULL DEFAULT '',
-        `notified` TINYINT NOT NULL DEFAULT 0,
-        `created_at` INT UNSIGNED NOT NULL,
-        PRIMARY KEY (`id`),
-        UNIQUE KEY `uid_tid` (`uid`, `tid`),
-        KEY `uid_created` (`uid`, `created_at`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
-    //旧版本表结构补齐 notified 列（实时推送已发送的记 1，汇总模式下未推送的记 0）
-    $m->addColumn('ver4_monitor_hit', 'notified', 'tinyint', 'NOT NULL DEFAULT 1');
-    $ready = true;
-}
 
 /**
  * 拉取贴吧第一页最新主题帖
