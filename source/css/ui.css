@@ -1524,3 +1524,149 @@ a:focus {
     transform: none;
   }
 }
+/* ============================================================
+   Glass v5 深化层 —— 玻璃拟态质感强化
+   1) 环境光斑升级为品牌紫罗兰光谱（玻璃拟态的核心：背后要有"可透的光"）
+   2) 清理深色主题残留的旧青绿色（顶栏/模态头尾/输入框聚焦）
+   3) 深色下白色分隔线统一降噪，与玻璃 border token 对齐
+   4) 下拉菜单玻璃化
+   5) 不支持 backdrop-filter 的浏览器回退为高不透明玻璃
+   ============================================================ */
+
+/* 1. 环境光斑 —— 紫罗兰光谱（浅色） */
+body.app-body {
+  background-image:
+    radial-gradient(1100px 720px at 8% -14%, rgba(91, 58, 255, .15), transparent 60%),
+    radial-gradient(900px 620px at 106% 6%, rgba(64, 156, 255, .11), transparent 62%),
+    radial-gradient(820px 600px at 92% 104%, rgba(168, 85, 247, .1), transparent 60%),
+    radial-gradient(700px 540px at -6% 98%, rgba(45, 212, 191, .08), transparent 62%),
+    radial-gradient(520px 400px at 55% 42%, rgba(255, 255, 255, .6), transparent 62%);
+}
+
+[data-theme="dark"] body.app-body {
+  background-image:
+    radial-gradient(1100px 720px at 8% -14%, rgba(124, 99, 255, .2), transparent 60%),
+    radial-gradient(900px 620px at 106% 6%, rgba(64, 156, 255, .12), transparent 62%),
+    radial-gradient(820px 600px at 92% 104%, rgba(168, 85, 247, .12), transparent 60%),
+    radial-gradient(700px 540px at -6% 98%, rgba(45, 212, 191, .08), transparent 62%),
+    radial-gradient(520px 400px at 55% 42%, rgba(255, 255, 255, .04), transparent 62%);
+}
+
+/* 2. 深色主题残留色清理（旧青绿 → 中性玻璃） */
+[data-theme="dark"] .app-topbar {
+  background: var(--glass-bg);
+  border-bottom-color: var(--glass-border);
+}
+
+[data-theme="dark"] .modal-header,
+[data-theme="dark"] .modal-footer {
+  background: rgba(255, 255, 255, .04);
+  border-color: var(--glass-border);
+}
+
+[data-theme="dark"] .form-control:focus,
+[data-theme="dark"] select.form-control:focus,
+[data-theme="dark"] textarea.form-control:focus {
+  background: rgba(28, 34, 42, .92);
+}
+
+[data-theme="dark"] .panel-heading {
+  background: rgba(255, 255, 255, .045);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+/* 3. 深色下玻璃表面分隔线降噪（白色高亮分隔线仅用于浅色） */
+[data-theme="dark"] .table > tbody > tr > td,
+[data-theme="dark"] .table > thead > tr > th {
+  border-top: 1px solid rgba(255, 255, 255, .08);
+}
+
+[data-theme="dark"] .table > thead > tr > th {
+  border-bottom: 1px solid rgba(255, 255, 255, .12);
+}
+
+[data-theme="dark"] .list-group-item {
+  background: rgba(255, 255, 255, .04);
+  border-color: rgba(255, 255, 255, .08);
+}
+
+[data-theme="dark"] .progress {
+  background: rgba(255, 255, 255, .08);
+  border-color: rgba(255, 255, 255, .1);
+}
+
+/* 4. 下拉菜单玻璃化 */
+.dropdown-menu {
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
+  overflow: hidden;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+.dropdown-menu > li > a:hover,
+.dropdown-menu > li > a:focus {
+  background: rgba(91, 58, 255, .12);
+  color: var(--color-brand-deep);
+}
+
+[data-theme="dark"] .dropdown-menu > li > a:hover,
+[data-theme="dark"] .dropdown-menu > li > a:focus {
+  background: rgba(124, 99, 255, .2);
+  color: #c4b8ff;
+}
+
+/* 5. 不支持 backdrop-filter 时的可读性回退：玻璃提浓 */
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .panel,
+  .well,
+  .thumbnail,
+  .list-group,
+  .table-responsive,
+  .metric-card,
+  .auth-layout,
+  .bs-callout,
+  .alert,
+  .modal-content,
+  .dropdown-menu {
+    background: var(--glass-bg-strong);
+  }
+}
+
+/* Glass v5 追加：深色下接回 BS5 变量指向的实白/实色表面 */
+[data-theme="dark"] .table {
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--color-text);
+}
+
+[data-theme="dark"] .alert {
+  background: rgba(255, 255, 255, .05);
+  border-color: var(--glass-border-dark);
+}
+
+[data-theme="dark"] .alert-info {
+  background: rgba(74, 111, 165, .22);
+  border-color: var(--glass-border-dark);
+}
+
+[data-theme="dark"] .alert-success {
+  background: rgba(91, 138, 114, .22);
+  border-color: var(--glass-border-dark);
+}
+
+[data-theme="dark"] .alert-warning {
+  background: rgba(168, 132, 44, .22);
+  border-color: var(--glass-border-dark);
+}
+
+[data-theme="dark"] .alert-danger {
+  background: rgba(192, 85, 79, .22);
+  border-color: var(--glass-border-dark);
+}
+
+/* Glass v5 追加：浅色表格同样接回透明底，行内容直接坐在玻璃上 */
+.table {
+  --bs-table-bg: transparent;
+}

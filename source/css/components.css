@@ -1343,3 +1343,107 @@ textarea.cs-form-control { min-height: 80px; resize: vertical; }
   .cs-achievement-card, .cs-page, .cs-form-control { transition: none; }
   .cs-achievement-progress-bar { transition: none; }
 }
+
+/* ============================================================
+   16. Glass v5 补齐 —— cs-* 原语容器玻璃化
+   与 ui.css Glass v2/v5 玻璃语言对齐（本文件加载在 ui.css 之后，
+   此前 cs-* 容器为实心表面，会挡住页面环境光斑）
+   ============================================================ */
+
+/* Alert 提示条 → 彩色玻璃（语义色降为低透明度着色） */
+.cs-alert {
+  background: var(--glass-bg);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--shadow-xs);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+.cs-alert-info {
+  background: rgba(74, 111, 165, .13);
+  border-color: var(--glass-border);
+}
+
+.cs-alert-success {
+  background: rgba(91, 138, 114, .14);
+  border-color: var(--glass-border);
+}
+
+.cs-alert-warning {
+  background: rgba(168, 132, 44, .14);
+  border-color: var(--glass-border);
+}
+
+.cs-alert-danger {
+  background: rgba(192, 85, 79, .13);
+  border-color: var(--glass-border);
+}
+
+[data-theme="dark"] .cs-alert-info { background: rgba(74, 111, 165, .18); }
+[data-theme="dark"] .cs-alert-success { background: rgba(91, 138, 114, .18); }
+[data-theme="dark"] .cs-alert-warning { background: rgba(168, 132, 44, .18); }
+[data-theme="dark"] .cs-alert-danger { background: rgba(192, 85, 79, .18); }
+
+/* 列表容器玻璃化，条目改半透叠层 */
+.cs-list {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-highlight), var(--shadow-xs);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+.cs-list-item {
+  background: rgba(255, 255, 255, .16);
+  border-bottom-color: rgba(255, 255, 255, .35);
+}
+
+.cs-list-item:last-child { border-bottom: 0; }
+
+[data-theme="dark"] .cs-list-item {
+  background: rgba(255, 255, 255, .04);
+  border-bottom-color: rgba(255, 255, 255, .08);
+}
+
+/* 折叠面板玻璃化 */
+.cs-collapse {
+  background: var(--glass-bg);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--shadow-xs);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+/* 数据表/图表容器：补齐玻璃高光与饱和度（此前只有半透底） */
+.cs-table-wrap,
+.cs-chart-card {
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--shadow-sm);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+/* 表格工具条内的小控件提为玻璃 strong，保证可读 */
+.cs-table-search,
+.cs-table-pagination button {
+  background: var(--glass-bg-strong);
+  border-color: var(--glass-border);
+}
+
+[data-theme="dark"] .cs-table-search,
+[data-theme="dark"] .cs-table-pagination button {
+  background: rgba(255, 255, 255, .06);
+  border-color: var(--glass-border-dark);
+}
+
+/* 不支持 backdrop-filter 时的回退 */
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .cs-alert,
+  .cs-list,
+  .cs-collapse,
+  .cs-table-wrap,
+  .cs-chart-card {
+    background: var(--glass-bg-strong);
+  }
+}
