@@ -383,10 +383,10 @@ class ProjectUpdater
             throw new RuntimeException('无法创建更新临时目录');
         }
         try {
-            //多通道回退：源码归档 → Release 附件 → Gitee 自动源码包
+            //多通道回退：Release 附件（预上传固定文件，通常不走归档风控）→ 源码归档 → Gitee 自动源码包
             //（部分服务器出口 IP 会被 Gitee 风控拦截匿名归档下载，返回 HTML 页而非 ZIP）
             $candidates = array();
-            foreach (array($release['source_download_url'], $release['asset_download_url']) as $url) {
+            foreach (array($release['asset_download_url'], $release['source_download_url']) as $url) {
                 if (!empty($url) && self::isAllowedUrl($url) && !in_array($url, $candidates, true)) {
                     $candidates[] = (string) $url;
                 }
@@ -415,7 +415,8 @@ class ProjectUpdater
                 break;
             }
             if (!$downloaded) {
-                throw new RuntimeException('更新包下载失败，已尝试 ' . count($candidates) . ' 个地址：' . implode('；', $errors));
+                throw new RuntimeException('更新包下载失败，已尝试 ' . count($candidates) . ' 个地址：' . implode('；', $errors)
+                    . '。部分数据中心 IP 会被 Gitee 匿名风控拦截：可在服务器环境变量配置 UPDATE_GITEE_TOKEN（站长自己的 Gitee 个人令牌，仅发送至 gitee.com）后重试，或到 Release 页手动下载更新包覆盖安装');
             }
             $zip = new ZipArchive();
             $opened = $zip->open($zipPath);
