@@ -363,9 +363,6 @@ class ProjectUpdater
 
     public static function installSourceRelease(array $release)
     {
-        if (empty($release['source_download_url']) || !self::isAllowedUrl($release['source_download_url'])) {
-            throw new RuntimeException('Release 没有可信的源码下载地址');
-        }
         if (!class_exists('ZipArchive')) {
             throw new RuntimeException('服务器缺少 PHP zip 扩展');
         }
@@ -386,14 +383,44 @@ class ProjectUpdater
             throw new RuntimeException('无法创建更新临时目录');
         }
         try {
-            $contents = self::download($release['source_download_url']);
+            //多通道回退：源码归档 → Release 附件 → Gitee 自动源码包
+            //（部分服务器出口 IP 会被 Gitee 风控拦截匿名归档下载，返回 HTML 页而非 ZIP）
+            $candidates = array();
+            foreach (array($release['source_download_url'], $release['asset_download_url']) as $url) {
+                if (!empty($url) && self::isAllowedUrl($url) && !in_array($url, $candidates, true)) {
+                    $candidates[] = (string) $url;
+                }
+            }
+            if (preg_match('#^(https://gitee\.com/[^/]+/[^/]+)/#', $release['release_url'], $m) && !empty($release['tag_name'])) {
+                $candidates[] = $m[1] . '/archive/refs/tags/' . rawurlencode((string) $release['tag_name']) . '.zip';
+            }
+            if (empty($candidates)) {
+                throw new RuntimeException('Release 没有可信的下载地址');
+            }
             $zipPath = $workDir . '/source.zip';
-            if ($contents === '' || $contents === false || file_put_contents($zipPath, $contents, LOCK_EX) === false) {
-                throw new RuntimeException('无法下载更新包');
+            $errors = array();
+            $downloaded = false;
+            foreach ($candidates as $url) {
+                $res = self::downloadToFile($url, $zipPath);
+                if (!$res['ok']) {
+                    $errors[] = '下载失败（HTTP ' . $res['status'] . '）';
+                    continue;
+                }
+                if (!$res['is_zip']) {
+                    //典型场景：Gitee 风控/登录页 HTML。给出类型与片段便于定位
+                    $errors[] = '返回内容不是 ZIP（' . $res['content_type'] . '，开头 ' . $res['snippet'] . '）';
+                    continue;
+                }
+                $downloaded = true;
+                break;
+            }
+            if (!$downloaded) {
+                throw new RuntimeException('更新包下载失败，已尝试 ' . count($candidates) . ' 个地址：' . implode('；', $errors));
             }
             $zip = new ZipArchive();
-            if ($zip->open($zipPath) !== true) {
-                throw new RuntimeException('更新包不是有效的 ZIP 文件');
+            $opened = $zip->open($zipPath);
+            if ($opened !== true) {
+                throw new RuntimeException('更新包无法解析为有效 ZIP（错误码 ' . $opened . '，文件大小 ' . filesize($zipPath) . ' 字节）');
             }
             if (!function_exists('safe_zip_extract') || !safe_zip_extract($zip, $extractDir)) {
                 $zip->close();
@@ -455,14 +482,18 @@ class ProjectUpdater
         return strtolower($parts['host']) === 'gitee.com';
     }
 
-    private static function download($url)
+    /**
+     * 下载到文件并做 ZIP 魔数校验，附诊断信息（HTTP 状态/Content-Type/开头字节）
+     * @return array {ok, is_zip, status, content_type, snippet}
+     */
+    private static function downloadToFile($url, $zipPath)
     {
         $curl = curl_init($url);
         if ($curl === false) {
-            return false;
+            return array('ok' => false, 'is_zip' => false, 'status' => 0, 'content_type' => '', 'snippet' => 'curl 初始化失败');
         }
-        $headers = array('User-Agent: Tieba-Cloud-Sign-Updater');
-        $host = strtolower((string) parse_url((string) $url, PHP_URL_HOST));
+        $headers = array('User-Agent: Tieba-Cloud-Sign-Updater/' . (defined('SYSTEM_VER') ? SYSTEM_VER : 'unknown'));
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
         // 国内 Gitee 私有 Release 的源码包使用独立只读令牌。
         $giteeToken = getenv('UPDATE_GITEE_TOKEN');
         if ($giteeToken !== false && trim((string) $giteeToken) !== '' && $host === 'gitee.com') {
@@ -483,9 +514,19 @@ class ProjectUpdater
         }
         $body = curl_exec($curl);
         $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        $contentType = (string) curl_getinfo($curl, CURLINFO_CONTENT_TYPE);
         $error = curl_error($curl);
         curl_close($curl);
-        return $body !== false && $error === '' && $status >= 200 && $status < 300 ? $body : false;
+        if ($body === false || $error !== '' || $status < 200 || $status >= 300) {
+            return array('ok' => false, 'is_zip' => false, 'status' => $status, 'content_type' => $contentType, 'snippet' => $error);
+        }
+        if (file_put_contents($zipPath, $body, LOCK_EX) === false) {
+            return array('ok' => false, 'is_zip' => false, 'status' => $status, 'content_type' => $contentType, 'snippet' => '写入临时文件失败');
+        }
+        //ZIP 魔数校验：Gitee 对部分出口 IP 会返回风控/登录 HTML 页
+        $isZip = strlen($body) >= 2 && substr($body, 0, 2) === 'PK';
+        $snippet = $isZip ? '' : strtolower(substr(preg_replace('/\s+/', ' ', strip_tags((string) $body)), 0, 80));
+        return array('ok' => true, 'is_zip' => $isZip, 'status' => $status, 'content_type' => $contentType, 'snippet' => $snippet);
     }
 
     private static function findSingleRootDirectory($directory)
