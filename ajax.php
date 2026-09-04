@@ -138,6 +138,71 @@ switch (SYSTEM_PAGE) {
     //     }
     //     break;
 
+    case 'baiduid:moindex':
+        //我的贴吧：关注列表 + 每吧等级 + 今日签到状态（mo/q/newmoindex），结果缓存 30 分钟
+        global $m;
+        if (!defined('UID')) {
+            msg('请先登录');
+        }
+        $moPid = isset($_POST['pid']) ? (int) $_POST['pid'] : 0;
+        $moForce = isset($_POST['force']) && $_POST['force'] == '1';
+        $own = $m->pquery("SELECT `id`, `bduss` FROM `" . DB_PREFIX . "baiduid` WHERE `id` = ? AND `uid` = ?", array($moPid, UID));
+        $ownRow = $own !== false ? $own->fetch_array() : false;
+        if (empty($ownRow)) {
+            echo json_encode(array('error' => 1, 'msg' => '账号不存在或无权访问'), JSON_UNESCAPED_UNICODE);
+            die;
+        }
+        $cacheKey = 'baiduid_moindex_' . $moPid;
+        $cacheTimeKey = 'baiduid_moindex_time_' . $moPid;
+        $cached = option::get($cacheKey);
+        $cachedTime = (int) option::get($cacheTimeKey);
+        if (!$moForce && $cached !== '' && $cached !== null && time() - $cachedTime < 1800) {
+            echo $cached;
+            die;
+        }
+        $moBduss = P::decrypt($ownRow['bduss']);
+        if (empty($moBduss)) {
+            echo json_encode(array('error' => 2, 'msg' => '账号凭证无效'), JSON_UNESCAPED_UNICODE);
+            die;
+        }
+        $moCh = new wcurl('https://tieba.baidu.com/mo/q/newmoindex');
+        misc::applyProxy($moCh, $moPid);
+        $moCh->addCookie(array('BDUSS' => $moBduss));
+        $moRaw = $moCh->get();
+        $moJson = json_decode((string) $moRaw, true);
+        if (!is_array($moJson) || (isset($moJson['no']) && $moJson['no'] != 0) || empty($moJson['data']['like_forum'])) {
+            echo json_encode(array('error' => 3, 'msg' => '贴吧接口暂时不可用，请稍后再试'), JSON_UNESCAPED_UNICODE);
+            die;
+        }
+        $forums = array();
+        $signed = 0;
+        foreach ($moJson['data']['like_forum'] as $f) {
+            $isSign = !empty($f['is_sign']);
+            $forums[] = array(
+                'name' => (string) $f['forum_name'],
+                'level' => (int) (isset($f['user_level']) ? $f['user_level'] : 0),
+                'exp' => (int) (isset($f['user_exp']) ? $f['user_exp'] : 0),
+                'signed' => $isSign,
+            );
+            if ($isSign) {
+                $signed++;
+            }
+        }
+        usort($forums, function ($a, $b) {
+            return $b['level'] === $a['level'] ? $b['exp'] - $a['exp'] : $b['level'] - $a['level'];
+        });
+        $out = json_encode(array(
+            'error' => 0,
+            'forums' => $forums,
+            'signed' => $signed,
+            'total' => count($forums),
+            'fetched_at' => time(),
+        ), JSON_UNESCAPED_UNICODE);
+        option::set($cacheKey, $out);
+        option::set($cacheTimeKey, (string) time());
+        echo $out;
+        die;
+
     case 'baiduid:getverify':
         global $m;
         if (option::get('bduss_num') == '-1' && ROLE != 'admin') {

@@ -87,6 +87,61 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
   </tbody>
 </table>
 </div>
+<div style="margin-top:18px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+        <b>我的贴吧 · 关注与等级</b>
+        <select id="mo-pid" class="form-control" style="width:auto">
+            <?php
+            foreach ($i['user']['bduss'] as $moKey => $moVal) {
+                $moName = empty($i['user']['baidu'][$moKey]) ? ('PID ' . $moKey) : $i['user']['baidu'][$moKey];
+                echo '<option value="' . (int) $moKey . '">' . htmlspecialchars($moName, ENT_QUOTES, 'UTF-8') . '（ID ' . (int) $moKey . '）</option>';
+            }
+            ?>
+        </select>
+        <button type="button" class="cs-btn cs-btn-primary cs-btn-sm" id="mo-view">查看关注与等级</button>
+        <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm" id="mo-refresh">强制刷新</button>
+        <span class="text-muted" style="font-size:12px">数据缓存 30 分钟，来自手机端贴吧接口</span>
+    </div>
+    <div id="mo-summary" class="text-muted" style="margin-bottom:8px"></div>
+    <div id="mo-forums" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+</div>
+<script type="text/javascript">
+    (function () {
+        var moLoading = false;
+        function moLoad(force) {
+            if (moLoading) { return; }
+            var pid = $('#mo-pid').val();
+            if (!pid) { return; }
+            moLoading = true;
+            $('#mo-summary').text(force ? '正在强制刷新…' : '正在加载…');
+            $.ajax({
+                url: 'ajax.php?mod=baiduid:moindex',
+                dataType: 'json',
+                type: 'POST',
+                data: { 'pid': pid, 'force': force ? '1' : '0', 'csrf_token': $('input[name="csrf_token"]').val() },
+                success: function (x) {
+                    moLoading = false;
+                    if (x.error !== 0) { $('#mo-summary').text(x.msg || '加载失败'); return; }
+                    var box = $('#mo-forums');
+                    box.empty();
+                    $.each(x.forums, function (i, f) {
+                        var badge = $('<span class="cs-badge" style="font-size:12px;padding:4px 8px"></span>')
+                            .text(f.name + ' Lv.' + f.level + (f.signed ? ' · 已签' : ' · 未签'))
+                            .css(f.signed ? { 'background': 'rgba(60,180,90,.15)', 'color': '#3cb45a' } : { 'background': 'rgba(255,160,0,.15)', 'color': '#ff9800' });
+                        box.append(badge);
+                    });
+                    $('#mo-summary').text('共关注 ' + x.total + ' 个吧，今日已签 ' + x.signed + ' / ' + x.total + '（更新于 ' + new Date(x.fetched_at * 1000).toLocaleTimeString() + '）');
+                },
+                error: function () {
+                    moLoading = false;
+                    $('#mo-summary').text('加载失败，请稍后重试');
+                }
+            });
+        }
+        $('#mo-view').on('click', function () { moLoad(false); });
+        $('#mo-refresh').on('click', function () { moLoad(true); });
+    })();
+</script>
     <?php
 } ?>
 </div>
