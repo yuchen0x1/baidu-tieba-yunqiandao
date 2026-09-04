@@ -675,14 +675,6 @@ while ($r = $m->fetch_array($logRs)) {
         });
     }
 
-    // 带确认文案的表单：confirm 文本从 data-confirm 属性读取，避免把动态文本拼进 JS 字符串
-    Array.prototype.forEach.call(document.querySelectorAll('form[data-confirm]'), function (form) {
-        if (form.dataset.csConfirm === '1') { return; }
-        form.dataset.csConfirm = '1';
-        form.addEventListener('submit', function (e) {
-            if (!window.confirm(form.getAttribute('data-confirm'))) { e.preventDefault(); }
-        });
-    });
 })();
 </script>
 <?php loadfoot(); ?>
