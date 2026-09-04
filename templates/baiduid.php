@@ -48,9 +48,41 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
 </div>
     <?php
 } if (!empty($i['user']['bduss'])) {
+    //账号分组映射（pid => 分组名）
+    $groupMapRaw = option::uget('ver4_account_groups', UID);
+    $groupMap = is_string($groupMapRaw) && $groupMapRaw !== '' ? json_decode($groupMapRaw, true) : array();
+    if (!is_array($groupMap)) {
+        $groupMap = array();
+    }
     ?>
+<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 1% 10px">
+    <span class="text-muted" style="font-size:12px">分组筛选：</span>
+    <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm group-filter is-active" data-group="">全部</button>
+    <?php
+    $groupNames = array_unique(array_values($groupMap));
+    foreach ($groupNames as $gn) {
+        echo '<button type="button" class="cs-btn cs-btn-ghost cs-btn-sm group-filter" data-group="' . htmlspecialchars($gn, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($gn, ENT_QUOTES, 'UTF-8') . '</button>';
+    }
+    ?>
+    <details style="margin-left:auto">
+        <summary style="cursor:pointer;font-size:12px">设置分组</summary>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px;min-width:260px">
+            <?php
+            foreach ($i['user']['bduss'] as $gpKey => $gpVal) {
+                $gpName = empty($i['user']['baidu'][$gpKey]) ? ('PID ' . $gpKey) : $i['user']['baidu'][$gpKey];
+                $gpCur = isset($groupMap[(int) $gpKey]) ? $groupMap[(int) $gpKey] : '';
+                echo '<div style="display:flex;gap:6px;align-items:center">'
+                    . '<span style="min-width:120px;font-size:12px">' . htmlspecialchars($gpName, ENT_QUOTES, 'UTF-8') . '</span>'
+                    . '<input type="text" class="form-control group-input" data-pid="' . (int) $gpKey . '" value="' . htmlspecialchars($gpCur, ENT_QUOTES, 'UTF-8') . '" placeholder="分组名，留空清除" style="width:160px">'
+                    . '</div>';
+            }
+            ?>
+            <div><input type="submit" class="cs-btn cs-btn-primary cs-btn-sm" id="group-save" value="保存分组"></div>
+        </div>
+    </details>
+</div>
 <div class="cs-table-wrap">
-<table class="cs-table">
+<table class="cs-table" id="baiduid-table">
   <thead>
     <tr>
       <th>PID</th>
@@ -94,7 +126,8 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
         }
     }
     foreach ($i['user']['bduss'] as $key => $value) {
-        echo '<tr><td>' . $key . '</td>';
+        $groupAttr = isset($groupMap[(int) $key]) ? htmlspecialchars($groupMap[(int) $key], ENT_QUOTES, 'UTF-8') : '';
+        echo '<tr data-group="' . $groupAttr . '"><td>' . $key . '</td>';
         $name = empty($i['user']['baidu'][$key]) ? '未记录百度ID' : htmlspecialchars($i['user']['baidu'][$key], ENT_QUOTES, 'UTF-8');
         if ($name == '[E]') {
             $name = '<span class="cs-badge cs-badge-danger">已失效</span>';
@@ -237,6 +270,40 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
             });
         }
         $('#mo-view').on('click', function () { moLoad(false); });
+
+        //账号分组：筛选 + 保存
+        $('.group-filter').on('click', function () {
+            $('.group-filter').removeClass('is-active');
+            $(this).addClass('is-active');
+            var g = $(this).attr('data-group') || '';
+            $('#baiduid-table tbody tr').each(function () {
+                var rowGroup = $(this).attr('data-group') || '';
+                $(this).toggle(g === '' || rowGroup === g);
+            });
+        });
+        $('#group-save').on('click', function () {
+            var map = {};
+            $('.group-input').each(function () {
+                var pid = parseInt($(this).attr('data-pid'), 10);
+                var name = $.trim($(this).val());
+                if (pid > 0 && name !== '') { map[pid] = name; }
+            });
+            $.ajax({
+                url: 'ajax.php?mod=baiduid:groups',
+                dataType: 'json',
+                type: 'POST',
+                data: { 'groups': JSON.stringify(map), 'csrf_token': $('input[name="csrf_token"]').val() },
+                success: function (x) {
+                    if (x.error === 0) {
+                        if (window.CS && CS.toast) { CS.toast('分组已保存', { type: 'success', body: '已保存 ' + x.updated + ' 个分组' }); }
+                        setTimeout(function () { window.location.reload(); }, 700);
+                    } else {
+                        alert(x.msg || '保存失败');
+                    }
+                },
+                error: function () { alert('请求失败，请稍后重试'); }
+            });
+        });
         $('#mo-refresh').on('click', function () { moLoad(true); });
         $('#mo-export').on('click', function () {
             if (!moLastData || !moLastData.forums) { alert('请先加载我的贴吧数据'); return; }

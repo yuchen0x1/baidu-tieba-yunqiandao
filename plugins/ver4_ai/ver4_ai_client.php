@@ -91,6 +91,15 @@ function ver4_ai_user_cfg($uid)
     $persona = trim((string) option::uget('uai_persona', $uid));
     $cfg['persona'] = $persona !== '' ? $persona : ($shared !== false ? $shared['persona'] : '');
 
+    //内容风格
+    $cfg['style_emoji']  = option::uget('uai_style_emoji', $uid) !== '' ? option::uget('uai_style_emoji', $uid) : '';
+    $cfg['style_tags']   = trim((string) option::uget('uai_style_tags', $uid));
+    $cfg['style_length'] = option::uget('uai_style_length', $uid) !== '' ? option::uget('uai_style_length', $uid) : 'medium';
+    $cfg['style_prompt'] = ver4_ai_style_prompt(array(
+        'style_emoji'  => $cfg['style_emoji'],
+        'style_length' => $cfg['style_length'],
+    ), 'reply');
+
     //回帖参数
     $cfg['reply_enable']    = option::uget('uai_reply_enable', $uid) === '1';
     $cfg['reply_kws']       = ver4_ai_lines(option::uget('uai_reply_kws', $uid));
@@ -239,6 +248,31 @@ function ver4_ai_chat($cfg, array $messages, &$err = null)
     return $text;
 }
 
+/**
+ * 内容风格提示词片段（emoji / 字数偏好），追加到生成要求
+ * @param array $cfg 用户配置
+ * @param string $kind reply|thread
+ * @return string
+ */
+function ver4_ai_style_prompt($cfg, $kind)
+{
+    $parts = array();
+    if (isset($cfg['style_emoji']) && $cfg['style_emoji'] === 'ban') {
+        $parts[] = '不要使用任何 emoji 表情符号。';
+    } elseif (!empty($cfg['style_emoji']) && $cfg['style_emoji'] === 'allow') {
+        $parts[] = '可以适当使用 1-2 个 emoji 表情，但不要堆砌。';
+    }
+    $len = isset($cfg['style_length']) ? $cfg['style_length'] : 'medium';
+    if ($kind === 'reply') {
+        if ($len === 'short') { $parts[] = '回帖控制在 10 到 25 个字。'; }
+        elseif ($len === 'long') { $parts[] = '回帖写在 40 到 90 个字，可以多聊两句。'; }
+    } else {
+        if ($len === 'short') { $parts[] = '正文控制在 50 到 100 个字。'; }
+        elseif ($len === 'long') { $parts[] = '正文写在 150 到 300 个字，内容更充实。'; }
+    }
+    return $parts === array() ? '' : implode('', $parts);
+}
+
 /** 通用提取：去掉模型可能附带的引号/前后空白 */
 function ver4_ai_clean_text($text)
 {
@@ -260,6 +294,9 @@ function ver4_ai_gen_reply($cfg, $kw, $title, $content, &$err = null)
         $user .= '楼主内容：' . mb_substr($content, 0, 300) . "\n";
     }
     $user .= "\n请根据以上帖子写一条回帖：15到60个字，口语化、自然、符合上下文，可以直接输出回帖内容本身，不要任何前缀或解释。";
+    if (!empty($cfg['style_prompt'])) {
+        $user .= "\n风格要求：" . $cfg['style_prompt'];
+    }
     return ver4_ai_chat($cfg, array(
         array('role' => 'system', 'content' => $sys),
         array('role' => 'user', 'content' => $user),
@@ -278,6 +315,9 @@ function ver4_ai_gen_thread($cfg, $kw, &$err = null)
         $sys .= '主题方向：' . $topic . '。';
     }
     $user = "请生成这个主题帖，严格按以下格式输出，不要输出其他任何内容：\n标题：12到20字的标题\n正文：80到200字的正文，口语化自然，像真实贴吧用户发的帖子，可分1到2段。";
+    if (!empty($cfg['style_prompt'])) {
+        $user .= "\n风格要求：" . $cfg['style_prompt'];
+    }
     $text = ver4_ai_chat($cfg, array(
         array('role' => 'system', 'content' => $sys),
         array('role' => 'user', 'content' => $user),
@@ -297,7 +337,11 @@ function ver4_ai_gen_thread($cfg, $kw, &$err = null)
         $body = ver4_ai_clean_text(implode("\n", array_slice($lines, 1)));
     }
     $title = mb_substr($title, 0, 40);
-    $body = mb_substr($body, 0, 500);
+    //话题标签：追加到正文末尾（已包含则不重复）
+    if (!empty($cfg['style_tags']) && mb_stripos($body, $cfg['style_tags']) === false) {
+        $body .= "\n\n" . $cfg['style_tags'];
+    }
+    $body = mb_substr($body, 0, 600);
     if ($title === '' || $body === '') {
         $err = '生成内容解析失败：' . mb_substr($text, 0, 120);
         return false;

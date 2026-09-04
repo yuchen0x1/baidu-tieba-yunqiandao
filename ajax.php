@@ -12,6 +12,19 @@ if (ROLE != 'admin' && strpos(SYSTEM_PAGE, 'admin:') === 0) {
     msg('权限不足');
 }
 
+/** 保存用户账号分组映射（pid=>分组名），存 users_options 的 ver4_account_groups */
+function baiduid_groups_save($uid, array $map)
+{
+    global $m;
+    $json = json_encode($map, JSON_UNESCAPED_UNICODE);
+    $exists = $m->pquery("SELECT `uid` FROM `" . DB_PREFIX . "users_options` WHERE `uid` = ? AND `name` = 'ver4_account_groups' LIMIT 1", array((int) $uid));
+    if ($exists !== false && $exists->fetch_array()) {
+        $m->pquery("UPDATE `" . DB_PREFIX . "users_options` SET `value` = ? WHERE `uid` = ? AND `name` = 'ver4_account_groups'", array($json, (int) $uid));
+    } else {
+        $m->pquery("INSERT INTO `" . DB_PREFIX . "users_options` (`uid`, `name`, `value`) VALUES (?, 'ver4_account_groups', ?)", array((int) $uid, $json));
+    }
+}
+
 switch (SYSTEM_PAGE) {
     case 'ajax:status':
         global $m,$i;
@@ -194,6 +207,33 @@ switch (SYSTEM_PAGE) {
             'failed' => (int) $signStat['error'],
             'waiting' => (int) $signStat['waiting'],
         ), JSON_UNESCAPED_UNICODE);
+        die;
+
+    case 'baiduid:groups':
+        //账号分组：保存当前用户的 pid→分组名 映射（JSON 存 users_options）
+        if (!defined('UID')) {
+            msg('请先登录');
+        }
+        $grJson = (string) (isset($_POST['groups']) ? $_POST['groups'] : '');
+        $grMap = json_decode($grJson, true);
+        if (!is_array($grMap)) {
+            echo json_encode(array('error' => 1, 'msg' => '数据格式错误'), JSON_UNESCAPED_UNICODE);
+            die;
+        }
+        $clean = array();
+        foreach ($grMap as $grPid => $grName) {
+            $grPid = (int) $grPid;
+            $grName = mb_substr(trim((string) $grName), 0, 20);
+            //仅允许当前用户自己的账号，分组名留空表示移除
+            $own = $m->pquery("SELECT `id` FROM `" . DB_PREFIX . "baiduid` WHERE `id` = ? AND `uid` = ?", array($grPid, UID));
+            if ($own !== false && $own->fetch_array()) {
+                if ($grName !== '') {
+                    $clean[$grPid] = $grName;
+                }
+            }
+        }
+        baiduid_groups_save(UID, $clean);
+        echo json_encode(array('error' => 0, 'updated' => count($clean)), JSON_UNESCAPED_UNICODE);
         die;
 
     case 'baiduid:proxyall':

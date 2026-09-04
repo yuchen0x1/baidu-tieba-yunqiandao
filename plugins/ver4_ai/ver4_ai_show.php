@@ -48,6 +48,9 @@ if (isset($_POST['uai_save'])) {
     ver4_ai_uopt_set($uid, 'uai_temperature', (string) min(2, max(0, (float) $_POST['uai_temperature'])));
     ver4_ai_uopt_set($uid, 'uai_max_tokens', (string) min(8000, max(256, (int) $_POST['uai_max_tokens'])));
     ver4_ai_uopt_set($uid, 'uai_persona', trim((string) $_POST['uai_persona']));
+    ver4_ai_uopt_set($uid, 'uai_style_emoji', $_POST['uai_style_emoji'] === 'ban' ? 'ban' : 'allow');
+    ver4_ai_uopt_set($uid, 'uai_style_length', $_POST['uai_style_length'] === 'short' ? 'short' : ($_POST['uai_style_length'] === 'long' ? 'long' : 'medium'));
+    ver4_ai_uopt_set($uid, 'uai_style_tags', trim((string) $_POST['uai_style_tags']));
     //回帖
     ver4_ai_uopt_set($uid, 'uai_reply_enable', $_POST['uai_reply_enable'] == '1' ? '1' : '0');
     ver4_ai_uopt_set($uid, 'uai_reply_kws', trim((string) $_POST['uai_reply_kws']));
@@ -246,6 +249,26 @@ while ($r = $m->fetch_array($logRs)) {
                 </select>
                 <textarea class="form-control" name="uai_persona" id="uai_persona" style="height:90px" placeholder="例如：你是一个热爱分享生活的贴吧老哥，说话自然、口语化…"><?php echo $aiPersona; ?></textarea>
             </td>
+        </tr>
+        <tr>
+            <td><b>内容风格</b><br/>emoji 与字数偏好，叠加在人设之上</td>
+            <td>
+                emoji：
+                <select name="uai_style_emoji" class="form-control" style="width:120px;display:inline-block">
+                    <option value="allow" <?php echo $g('uai_style_emoji', 'allow') == 'allow' ? 'selected' : ''; ?>>允许</option>
+                    <option value="ban" <?php echo $g('uai_style_emoji', 'allow') == 'ban' ? 'selected' : ''; ?>>禁止</option>
+                </select>
+                　字数：
+                <select name="uai_style_length" class="form-control" style="width:140px;display:inline-block">
+                    <option value="short" <?php echo $g('uai_style_length', 'medium') == 'short' ? 'selected' : ''; ?>>偏短</option>
+                    <option value="medium" <?php echo $g('uai_style_length', 'medium') == 'medium' ? 'selected' : ''; ?>>适中</option>
+                    <option value="long" <?php echo $g('uai_style_length', 'medium') == 'long' ? 'selected' : ''; ?>>偏长</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td><b>话题标签</b><br/>发主题帖时自动附加在正文末尾，留空不附加</td>
+            <td><input type="text" class="form-control" name="uai_style_tags" value="<?php echo htmlspecialchars($g('uai_style_tags'), ENT_QUOTES, 'UTF-8'); ?>" placeholder="例如：#日常分享# #记录生活#"></td>
         </tr>
         <tr><th colspan="2"><h4>② AI 智能回帖</h4></th></tr>
         <tr>
