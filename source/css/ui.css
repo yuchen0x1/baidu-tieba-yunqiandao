@@ -47,7 +47,7 @@ a:focus {
   height: 100vh;
   padding: 24px 16px 18px;
   overflow-y: auto;
-  color: #e9f5f1;
+  color: #eceef4;
   background: var(--color-ink);
   border-right: 1px solid rgba(255, 255, 255, .06);
 }
@@ -71,11 +71,11 @@ a:focus {
   justify-content: center;
   width: 38px;
   height: 38px;
-  color: var(--color-ink);
+  color: #fff;
   font-size: 20px;
   font-weight: 800;
-  background: var(--color-accent);
-  border-radius: 10px 4px 10px 4px;
+  background: var(--color-brand);
+  border-radius: var(--radius-md);
 }
 
 .brand-copy {
@@ -98,13 +98,13 @@ a:focus {
 
 .brand-subtitle {
   margin-top: 1px;
-  color: #91aaa4;
+  color: #9aa2b5;
   font-size: 11px;
 }
 
 .sidebar-label {
   padding: 0 12px 8px;
-  color: #78918b;
+  color: #8b93a6;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: .12em;
@@ -133,7 +133,7 @@ a:focus {
   gap: 11px;
   min-height: 42px;
   padding: 9px 12px;
-  color: #b6c9c4;
+  color: #c6ccda;
   font-size: 13px;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
@@ -160,7 +160,7 @@ a:focus {
   align-items: center;
   justify-content: center;
   width: 18px;
-  color: #8ea9a2;
+  color: #99a2b6;
   font-size: 14px;
 }
 
@@ -178,14 +178,14 @@ a:focus {
 .sidebar-footer {
   margin-top: auto;
   padding: 16px 12px 0;
-  color: #78918b;
+  color: #868ea1;
   font-size: 11px;
   line-height: 1.6;
   border-top: 1px solid rgba(255, 255, 255, .09);
 }
 
 .sidebar-footer a {
-  color: #abc1bb;
+  color: #b4bcd0;
 }
 
 .app-main {
@@ -286,7 +286,7 @@ a:focus {
 .topbar-action:focus {
   color: var(--color-brand-deep);
   background: var(--color-brand-soft);
-  border-color: #b9ded6;
+  border-color: var(--color-brand);
 }
 
 .app-content {
@@ -444,7 +444,7 @@ textarea.form-control {
 
 .form-control:focus {
   border-color: var(--color-brand);
-  box-shadow: 0 0 0 3px rgba(15, 118, 110, .13);
+  box-shadow: var(--focus-ring);
 }
 
 .input-group-addon {
@@ -523,7 +523,7 @@ textarea.form-control {
 }
 
 .table-hover > tbody > tr:hover {
-  background: #f5faf8;
+  background: var(--color-brand-soft);
 }
 
 .progress {
@@ -562,6 +562,42 @@ textarea.form-control {
   border-radius: var(--radius-md);
 }
 
+/* former::create 输出的表单区块标题：作为分组标签而非页面级标题 */
+h3.former-title {
+  margin: 22px 0 10px;
+  color: var(--color-ink);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0;
+}
+
+h3.former-title::before {
+  content: "";
+  display: inline-block;
+  width: 3px;
+  height: 12px;
+  margin-right: 8px;
+  background: var(--color-brand);
+  border-radius: 2px;
+  vertical-align: -1px;
+}
+
+/* v6: 内容区裸 h2/h3 统一为区块标题层级（页面主标题由 .page-heading h1 承担）
+ * 用 :not([class]) 限定，避免压掉 .cs-chart-card-title 等自带类名的标题 */
+.app-content h2:not([class]) {
+  margin: 26px 0 12px;
+  font-size: 22px;
+  font-weight: var(--fw-semibold);
+  letter-spacing: -.01em;
+}
+
+.app-content h3:not([class]) {
+  margin: 22px 0 10px;
+  font-size: 18px;
+  font-weight: var(--fw-semibold);
+  letter-spacing: -.01em;
+}
+
 .dashboard-hero {
   position: relative;
   padding: 30px;
@@ -598,7 +634,7 @@ textarea.form-control {
   z-index: 1;
   max-width: 720px;
   margin: 8px 0 0;
-  color: #b9d9d1;
+  color: rgba(255, 255, 255, .86);
 }
 
 .dashboard-hero-meta {
@@ -693,11 +729,11 @@ textarea.form-control {
   width: 46px;
   height: 46px;
   margin-bottom: 54px;
-  color: var(--color-ink);
+  color: #fff;
   font-size: 22px;
   font-weight: 850;
-  background: var(--color-accent);
-  border-radius: 12px 4px 12px 4px;
+  background: var(--color-brand);
+  border-radius: var(--radius-md);
 }
 
 .auth-aside h1 {
@@ -833,7 +869,7 @@ textarea.form-control {
     inset: 0;
     z-index: 20;
     display: block;
-    background: rgba(21, 35, 33, .42);
+    background: rgba(15, 18, 26, .5);
   }
 
   .topbar-menu {
@@ -922,8 +958,6 @@ textarea.form-control {
 /* Glass surface system. Keep dense data surfaces readable and opaque enough. */
 body.app-body {
   background-color: var(--color-canvas);
-  background-image: linear-gradient(135deg, rgba(15, 118, 110, .055), transparent 42%),
-    linear-gradient(315deg, rgba(245, 158, 11, .045), transparent 38%);
 }
 
 .glass-panel {
@@ -996,7 +1030,13 @@ textarea.form-control {
 }
 
 .hero-eyebrow {
-  color: #b9d9d1;
+  color: rgba(255, 255, 255, .78);
+}
+
+/* v6: hero 内 eyebrow 需压过文件后段 .eyebrow 品牌色规则 */
+.dashboard-hero .eyebrow,
+.auth-aside .eyebrow {
+  color: rgba(255, 255, 255, .78);
 }
 
 .dashboard-grid--spaced {
@@ -1051,25 +1091,23 @@ textarea.form-control {
    覆盖 ui.css 基础层，提供更强的玻璃质感与背景光斑
    ============================================================ */
 
-/* 1. 页面背景光斑 —— 玻璃感的核心：背后有可透的光 */
+/* 1. 页面背景光斑 —— 玻璃感的核心：背后有可透的光（v6：降低强度，保证内容可读；去掉 fixed 避免滚动重绘） */
 body.app-body {
-  background-color: var(--color-canvas);
   background-image:
-    radial-gradient(1000px 640px at 10% -12%, rgba(120, 132, 146, .15), transparent 58%),
-    radial-gradient(860px 600px at 104% 10%, rgba(74, 111, 165, .09), transparent 60%),
-    radial-gradient(760px 560px at 90% 102%, rgba(168, 132, 44, .09), transparent 58%),
-    radial-gradient(680px 520px at -4% 96%, rgba(91, 138, 114, .07), transparent 60%),
-    radial-gradient(460px 360px at 55% 40%, rgba(255, 255, 255, .55), transparent 60%);
-  background-attachment: fixed;
+    radial-gradient(1100px 720px at 8% -14%, rgba(91, 58, 255, .14), transparent 62%),
+    radial-gradient(900px 640px at 106% 4%, rgba(64, 156, 255, .09), transparent 64%),
+    radial-gradient(840px 620px at 94% 104%, rgba(168, 85, 247, .09), transparent 62%),
+    radial-gradient(720px 560px at -6% 98%, rgba(45, 212, 191, .06), transparent 64%),
+    radial-gradient(520px 400px at 55% 42%, rgba(255, 255, 255, .5), transparent 62%);
 }
 
 [data-theme="dark"] body.app-body {
   background-image:
-    radial-gradient(1000px 640px at 10% -12%, rgba(120, 132, 146, .18), transparent 58%),
-    radial-gradient(860px 600px at 104% 10%, rgba(74, 111, 165, .12), transparent 60%),
-    radial-gradient(760px 560px at 90% 102%, rgba(168, 132, 44, .11), transparent 58%),
-    radial-gradient(680px 520px at -4% 96%, rgba(91, 138, 114, .09), transparent 60%),
-    radial-gradient(460px 360px at 55% 40%, rgba(255, 255, 255, .03), transparent 60%);
+    radial-gradient(1100px 720px at 8% -14%, rgba(124, 99, 255, .16), transparent 62%),
+    radial-gradient(900px 640px at 106% 4%, rgba(64, 156, 255, .09), transparent 64%),
+    radial-gradient(840px 620px at 94% 104%, rgba(168, 85, 247, .09), transparent 62%),
+    radial-gradient(720px 560px at -6% 98%, rgba(45, 212, 191, .05), transparent 64%),
+    radial-gradient(520px 400px at 55% 42%, rgba(255, 255, 255, .03), transparent 62%);
 }
 
 /* 2. 玻璃工具类 */
@@ -1159,22 +1197,10 @@ body.app-body {
   background: rgba(120,132,146,.1);
 }
 
-/* 7. 按钮 —— 渐变玻璃 */
+/* 7. 按钮 —— 渐变玻璃（主/语义色渐变由 v4 紫罗兰层与语义 token 提供） */
 .btn {
   border-radius: var(--radius-sm);
   border-width: 1px;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, #2f3640, #1f252d);
-  border-color: rgba(47,54,64,.6);
-  box-shadow: 0 6px 18px rgba(23,29,36,.28);
-}
-
-.btn-primary:hover,
-.btn-primary:focus {
-  background: linear-gradient(135deg, #3b4450, #252d36);
-  box-shadow: 0 8px 24px rgba(23,29,36,.4);
 }
 
 .btn-success {
@@ -1211,7 +1237,7 @@ body.app-body {
   background: rgba(255,255,255,.92);
   border-color: var(--color-brand);
   color: var(--color-brand-deep);
-  box-shadow: 0 0 0 3px rgba(15,118,110,.14);
+  box-shadow: 0 0 0 3px rgba(91, 58, 255, .14);
 }
 
 [data-theme="dark"] .btn-default,
@@ -1221,12 +1247,12 @@ body.app-body {
   box-shadow: none;
 }
 
-/* 8. 表单 —— 半透明输入 + 聚焦发光 */
+/* 8. 表单 —— 半透明输入 + 聚焦发光（v6：边框回归中性线色，白底上可见） */
 .form-control,
 select.form-control,
 textarea.form-control {
   background: var(--glass-bg-strong);
-  border-color: rgba(255,255,255,.6);
+  border-color: var(--color-line-strong);
   box-shadow: inset 0 1px 2px rgba(21,35,33,.04);
 }
 
@@ -1244,7 +1270,7 @@ textarea.form-control:focus {
 
 .input-group-addon {
   background: var(--glass-bg-strong);
-  border-color: rgba(255,255,255,.6);
+  border-color: var(--color-line-strong);
 }
 
 /* 9. 提示条 —— 彩色玻璃 */
@@ -1328,23 +1354,7 @@ h4,
   border-color: rgba(255,255,255,.4);
 }
 
-/* 13. Dashboard hero 发光 */
-.dashboard-hero {
-  background: linear-gradient(135deg, rgba(31,37,45,.94), rgba(47,54,64,.88));
-  box-shadow: 0 24px 60px rgba(23,29,36,.38), inset 0 1px 0 rgba(255,255,255,.16);
-}
-
-/* 14. 侧边栏 active 项发光 */
-.sidebar-nav .active > a,
-.sidebar-nav a.active {
-  background: linear-gradient(135deg, rgba(47,54,64,.96), rgba(31,37,45,.96));
-  box-shadow: inset 3px 0 0 var(--color-accent), 0 6px 18px rgba(23,29,36,.32);
-}
-
-.sidebar-nav a:hover,
-.sidebar-nav a:focus {
-  background: rgba(255,255,255,.1);
-}
+/* 13/14. Dashboard hero 与侧边栏 active 项由 v4 紫罗兰层统一定义 */
 
 /* 15. 深色主题补强 */
 [data-theme="dark"] .panel-heading,
@@ -1481,7 +1491,23 @@ h4,
 .sidebar-nav .active > a,
 .sidebar-nav a.active {
   background: linear-gradient(135deg, rgba(91, 58, 255, .96), rgba(61, 29, 156, .96));
-  box-shadow: inset 3px 0 0 var(--color-accent), 0 6px 18px rgba(91, 58, 255, .32);
+  box-shadow: inset 3px 0 0 rgba(255, 255, 255, .35), 0 6px 18px rgba(91, 58, 255, .32);
+}
+
+/* v6: 工作台图表卡片统一为等宽响应网格（此前沿用 dashboard-grid 的 1.35/.65 不对称列） */
+.dashboard-charts {
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  align-items: stretch;
+}
+
+/* v6: 深色下渐变数值文字提升对比度 */
+[data-theme="dark"] .metric-card .metric-value,
+[data-theme="dark"] .cs-stat-pill-value {
+  background: none;
+  -webkit-background-clip: initial;
+  background-clip: initial;
+  color: #cabffd;
+  -webkit-text-fill-color: #cabffd;
 }
 
 /* v4: 链接 brand 色 */
@@ -1533,24 +1559,7 @@ a:focus {
    5) 不支持 backdrop-filter 的浏览器回退为高不透明玻璃
    ============================================================ */
 
-/* 1. 环境光斑 —— 紫罗兰光谱（浅色） */
-body.app-body {
-  background-image:
-    radial-gradient(1200px 800px at 8% -14%, rgba(91, 58, 255, .3), transparent 62%),
-    radial-gradient(1000px 700px at 106% 4%, rgba(64, 156, 255, .2), transparent 64%),
-    radial-gradient(900px 660px at 94% 104%, rgba(168, 85, 247, .2), transparent 62%),
-    radial-gradient(780px 600px at -6% 98%, rgba(45, 212, 191, .13), transparent 64%),
-    radial-gradient(560px 430px at 55% 42%, rgba(255, 255, 255, .65), transparent 62%);
-}
-
-[data-theme="dark"] body.app-body {
-  background-image:
-    radial-gradient(1200px 800px at 8% -14%, rgba(124, 99, 255, .34), transparent 62%),
-    radial-gradient(1000px 700px at 106% 4%, rgba(64, 156, 255, .2), transparent 64%),
-    radial-gradient(900px 660px at 94% 104%, rgba(168, 85, 247, .2), transparent 62%),
-    radial-gradient(780px 600px at -6% 98%, rgba(45, 212, 191, .12), transparent 64%),
-    radial-gradient(560px 430px at 55% 42%, rgba(255, 255, 255, .05), transparent 62%);
-}
+/* 1. 环境光斑已在 Glass v2 层统一为品牌紫罗兰光谱（本层原重复定义已合并，强度在 v6 下调整低） */
 
 /* 2. 深色主题残留色清理（旧青绿 → 中性玻璃） */
 [data-theme="dark"] .app-topbar {

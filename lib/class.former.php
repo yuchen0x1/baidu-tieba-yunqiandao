@@ -35,7 +35,7 @@ class former
         $set['th2'] = empty($set['th2']) ? '值' : $set['th2'];
         $set['width'] = empty($set['width']) ? '40%' : $set['width'];
 
-        $form = empty($set['title']) ? '' : '<h3>' . htmlspecialchars($set['title'], ENT_QUOTES, 'UTF-8') . '</h3>';
+        $form = empty($set['title']) ? '' : '<h3 class="former-title">' . htmlspecialchars($set['title'], ENT_QUOTES, 'UTF-8') . '</h3>';
         if ($set['method'] != 3) {
             $form .= '<form action="' . htmlspecialchars($set['url'], ENT_QUOTES, 'UTF-8') . '" method="';
             $form .= $set['method'] == 2 ? 'get">' : 'post">';

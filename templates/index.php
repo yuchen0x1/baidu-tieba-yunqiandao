@@ -382,7 +382,7 @@ doAction('index_1');
         if (rateEl && trendDates.length) {
             CS.chart.create(rateEl, {
                 tooltip: { trigger: 'axis', formatter: function (p) { return p[0].name + '<br/>成功率 ' + p[0].value + '%'; } },
-                grid: { left: '3%', right: '4%', top: 8, bottom: 20, containLabel: true },
+                grid: { left: '3%', right: 48, top: 8, bottom: 20, containLabel: true },
                 xAxis: { type: 'category', data: trendDates, axisLabel: { fontSize: 10, color: '#64748b' } },
                 yAxis: { type: 'value', min: 0, max: 100, axisLabel: { fontSize: 10, color: '#64748b', formatter: '{value}%' } },
                 series: [{

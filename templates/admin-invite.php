@@ -101,4 +101,3 @@ $active = $m->fetch_row($m->query("SELECT COUNT(*) FROM `" . DB_PREFIX . "invite
     </tbody>
 </table>
 </div>
-<br/><br/><?php echo SYSTEM_FN ?> V<?php echo SYSTEM_VER . ' ' . SYSTEM_VER_NOTE ?>

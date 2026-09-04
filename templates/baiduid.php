@@ -91,7 +91,7 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
       <th style="width:20%">Portrait</th>
       <th style="width:30%">BDUSS</th>
       <th style="width:20%">STOKEN</th>
-      <th>操作</th>
+      <th style="min-width:170px">操作</th>
     </tr>
   </thead>
   <tbody>
@@ -555,4 +555,3 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
 // v4: 初始化 baiduid tabs（CS.tabs 自动初始化 .cs-tabs，此处兜底）
 if (window.CS && CS.tabs) { CS.tabs.init(document.getElementById('PageTab')); }
 </script>
-<div style="text-align:center;color:var(--color-muted);font-size:12px;padding:24px 0 16px"><?php echo SYSTEM_FN ?> V<?php echo SYSTEM_VER  . ' ' . SYSTEM_VER_NOTE ?> // 作者: <a href="https://kenvix.com" target="_blank">Kenvix</a> &amp; <a href="http://www.mokeyjay.com/" target="_blank">mokeyjay</a> &amp; <a href="http://fyy1999.lofter.com/" target="_blank">FYY</a></div>

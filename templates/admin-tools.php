@@ -28,7 +28,6 @@ if(!empty($stat)){
         <button type="submit" class="cs-btn cs-btn-primary">提交</button>
     </form>
 </div>
-<br/><br/><?php echo SYSTEM_FN ?> V<?php echo SYSTEM_VER  . ' ' . SYSTEM_VER_NOTE ?> // 作者: <a href="https://kenvix.com" target="_blank">Kenvix</a>  &amp; <a href="http://www.mokeyjay.com/" target="_blank">mokeyjay</a> &amp;  <a href="http://fyy1999.lofter.com/" target="_blank">FYY</a> &amp; <a href="http://fyy1999.lofter.com/" target="_blank">FYY</a>
 
 <?php
 die;
@@ -199,7 +198,6 @@ if (empty($auditRows)) {
     </tbody>
 </table>
 </div>
-<br/><br/><?php echo SYSTEM_FN ?> V<?php echo SYSTEM_VER  . ' ' . SYSTEM_VER_NOTE ?> // 作者: <a href="https://kenvix.com" target="_blank">Kenvix</a>  &amp; <a href="http://www.mokeyjay.com/" target="_blank">mokeyjay</a> &amp;  <a href="http://fyy1999.lofter.com/" target="_blank">FYY</a>
 
 <div class="modal fade" id="BackupTable" tabindex="-1" role="dialog" aria-labelledby="BackupTableLabel" aria-hidden="true">
   <div class="modal-dialog">

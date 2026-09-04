@@ -29,7 +29,7 @@ function loadhead($title = '')
     echo '<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />';
     echo '<meta name="theme-color" content="#5b3aff" />';
     echo '<script>(function(){try{var t=localStorage.getItem("tc-theme");if(t==="dark"||t==="light"){document.documentElement.setAttribute("data-theme",t);}else{var m=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)");if(m&&m.matches){document.documentElement.setAttribute("data-theme","dark");}}}catch(e){}})();</script>';
-    $uiVer = SYSTEM_VER . '-g5';
+    $uiVer = SYSTEM_VER . '-g6';
     echo '<link rel="stylesheet" href="source/css/tokens.css?v=' . $uiVer . '">';
     echo '<link rel="stylesheet" href="source/css/b3-compat.css?v=' . SYSTEM_VER . '">';
     echo '<link rel="stylesheet" href="source/css/bootstrap.min.css?v=' . SYSTEM_VER . '">';
@@ -52,7 +52,8 @@ function loadhead($title = '')
     }
     template('navi');
     if ($pageHeading !== '') {
-        echo '<div class="page-heading"><div><div class="eyebrow">Control Center</div><h1>' . htmlspecialchars($pageHeading, ENT_QUOTES, 'UTF-8') . '</h1></div></div>';
+        // 顶栏已展示 kicker + 页名，此处仅输出页面主标题，避免重复页眉
+        echo '<div class="page-heading"><div><h1>' . htmlspecialchars($pageHeading, ENT_QUOTES, 'UTF-8') . '</h1></div></div>';
     }
     doAction('body');
 }
@@ -84,11 +85,14 @@ function loadfoot($copy = false)
         return;
     }
     $icp = option::get('icp');
+    $footerText = trim((string) option::get('footer'));
     echo '<footer class="app-footer">';
     if (!empty($icp)) {
         echo ' | <a href="http://beian.miit.gov.cn/" target="_blank">' . htmlspecialchars($icp, ENT_QUOTES, 'UTF-8') . '</a>';
     }
-    echo '<br/>' . sanitize_footer_html(option::get('footer'));
+    if ($footerText !== '') {
+        echo '<br/>' . sanitize_footer_html($footerText);
+    }
     doAction('footer');
     if (is_string(($copy))) {
         if (isset($i['plugins']['desc'][$copy])) {
@@ -106,9 +110,8 @@ function loadfoot($copy = false)
             }
         }
     }
-    if ($copy) {
-        echo '<br/><br/>' . SYSTEM_FN . ' V' . SYSTEM_VER . ' // 作者: <a href="https://kenvix.com" target="_blank">Kenvix</a>  &amp; <a href="http://www.mokeyjay.com" target="_blank">mokeyjay</a> &amp;  <a href="http://fyy1999.lofter.com/" target="_blank">FYY</a> ';
-    }
+    // 系统署名统一由全局页脚输出（各模板内旧的手写版权行已移除，避免重复）
+    echo '<br/><br/>' . SYSTEM_FN . ' V' . SYSTEM_VER . ' // 作者: <a href="https://kenvix.com" target="_blank">Kenvix</a>  &amp; <a href="http://www.mokeyjay.com" target="_blank">mokeyjay</a> &amp;  <a href="http://fyy1999.lofter.com/" target="_blank">FYY</a> ';
     echo '</footer></div></main></div></div></body></html>';
 }
 
