@@ -30,7 +30,20 @@ if (isset($_POST['ver4_monitor_submit'])) {
     ver4_monitor_uopt_set($uid, 'ver4_monitor_words', trim((string) $_POST['ver4_monitor_words']));
     ver4_monitor_uopt_set($uid, 'ver4_monitor_exclude', trim((string) $_POST['ver4_monitor_exclude']));
     ver4_monitor_uopt_set($uid, 'ver4_monitor_notify', $_POST['ver4_monitor_notify'] == '1' ? '1' : '0');
+    //个人通知渠道
+    ver4_monitor_uopt_set($uid, 'ver4_notify_channel', trim((string) $_POST['ver4_notify_channel']));
+    foreach (array('ver4_notify_serverchan_key', 'ver4_notify_telegram_token', 'ver4_notify_telegram_chatid', 'ver4_notify_bark_url', 'ver4_notify_pushplus_token', 'ver4_notify_webhook_url', 'ver4_notify_ntfy_server', 'ver4_notify_ntfy_topic') as $nfField) {
+        ver4_monitor_uopt_set($uid, $nfField, trim((string) (isset($_POST[$nfField]) ? $_POST[$nfField] : '')));
+    }
     redirect('index.php?plugin=ver4_monitor&success=' . urlencode('帖子监控设置已保存'));
+}
+
+//测试个人通知渠道推送
+if (isset($_POST['ver4_monitor_test_notify'])) {
+    csrf(true, true);
+    require_once SYSTEM_ROOT . '/lib/class.notify.php';
+    $testResult = Notify::sendForUser($uid, '帖子监控 · 通知测试', '这是一条来自帖子监控的测试推送，收到即表示你的个人通知渠道配置正确。', 'test');
+    echo '<div class="alert ' . ($testResult['ok'] ? 'alert-success">测试推送已提交：' . htmlspecialchars((string) $testResult['detail'], ENT_QUOTES, 'UTF-8') : 'alert-danger">测试推送失败：' . htmlspecialchars((string) $testResult['detail'], ENT_QUOTES, 'UTF-8')) . '</div>';
 }
 
 $g = function ($key, $default = '') use ($uid) {
@@ -42,7 +55,15 @@ $monKws = htmlspecialchars($g('ver4_monitor_kws'), ENT_QUOTES, 'UTF-8');
 $monWords = htmlspecialchars($g('ver4_monitor_words'), ENT_QUOTES, 'UTF-8');
 $monExclude = htmlspecialchars($g('ver4_monitor_exclude'), ENT_QUOTES, 'UTF-8');
 $monNotify = $g('ver4_monitor_notify', '1');
-$notifyEnabled = option::get('notify_enable') == '1';
+$nfChannel = $g('ver4_notify_channel', 'follow_site');
+$nfKey = htmlspecialchars($g('ver4_notify_serverchan_key'), ENT_QUOTES, 'UTF-8');
+$nfTgToken = htmlspecialchars($g('ver4_notify_telegram_token'), ENT_QUOTES, 'UTF-8');
+$nfTgChat = htmlspecialchars($g('ver4_notify_telegram_chatid'), ENT_QUOTES, 'UTF-8');
+$nfBark = htmlspecialchars($g('ver4_notify_bark_url'), ENT_QUOTES, 'UTF-8');
+$nfPushPlus = htmlspecialchars($g('ver4_notify_pushplus_token'), ENT_QUOTES, 'UTF-8');
+$nfWebhook = htmlspecialchars($g('ver4_notify_webhook_url'), ENT_QUOTES, 'UTF-8');
+$nfNtfyServer = htmlspecialchars($g('ver4_notify_ntfy_server'), ENT_QUOTES, 'UTF-8');
+$nfNtfyTopic = htmlspecialchars($g('ver4_notify_ntfy_topic'), ENT_QUOTES, 'UTF-8');
 
 //最近命中记录
 $recentRows = array();
@@ -81,13 +102,57 @@ while ($r = $m->fetch_array($logRs)) {
             <td><textarea class="form-control" name="ver4_monitor_exclude" style="height:90px" placeholder="例如：&#10;广告&#10;招聘"><?php echo $monExclude; ?></textarea></td>
         </tr>
         <tr>
-            <td><b>通知推送</b><br/>命中后通过站点通知渠道推送（Server酱/TG/邮件等，由站长在设置中心配置）<?php echo $notifyEnabled ? '' : '<br/><span class="text-danger">当前站点通知未启用，命中只记录在本页</span>'; ?></td>
+            <td><b>命中推送开关</b><br/>关闭时命中只记录在本页，不推送</td>
             <td>
                 <select name="ver4_monitor_notify" class="form-control" style="width:140px">
                     <option value="1" <?php echo $monNotify == '1' ? 'selected' : ''; ?>>推送</option>
                     <option value="0" <?php echo $monNotify != '1' ? 'selected' : ''; ?>>仅记录</option>
                 </select>
             </td>
+        </tr>
+        <tr>
+            <td><b>我的通知渠道</b><br/>默认跟随站点（由站长配置）；填写自己的渠道后，命中提醒直接推送给你个人</td>
+            <td>
+                <select name="ver4_notify_channel" class="form-control" style="width:180px">
+                    <option value="follow_site" <?php echo $nfChannel == 'follow_site' ? 'selected' : ''; ?>>跟随站点</option>
+                    <option value="serverchan" <?php echo $nfChannel == 'serverchan' ? 'selected' : ''; ?>>Server酱</option>
+                    <option value="telegram" <?php echo $nfChannel == 'telegram' ? 'selected' : ''; ?>>Telegram</option>
+                    <option value="bark" <?php echo $nfChannel == 'bark' ? 'selected' : ''; ?>>Bark</option>
+                    <option value="pushplus" <?php echo $nfChannel == 'pushplus' ? 'selected' : ''; ?>>PushPlus</option>
+                    <option value="webhook" <?php echo $nfChannel == 'webhook' ? 'selected' : ''; ?>>Webhook</option>
+                    <option value="ntfy" <?php echo $nfChannel == 'ntfy' ? 'selected' : ''; ?>>ntfy</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td><b>Server酱 SendKey</b></td>
+            <td><input type="text" class="form-control" name="ver4_notify_serverchan_key" value="<?php echo $nfKey; ?>" placeholder="SCT..."></td>
+        </tr>
+        <tr>
+            <td><b>Telegram Bot Token / Chat ID</b></td>
+            <td>
+                <input type="text" class="form-control" name="ver4_notify_telegram_token" value="<?php echo $nfTgToken; ?>" placeholder="Bot Token" style="width:46%;display:inline-block;">
+                <input type="text" class="form-control" name="ver4_notify_telegram_chatid" value="<?php echo $nfTgChat; ?>" placeholder="Chat ID" style="width:30%;display:inline-block;">
+            </td>
+        </tr>
+        <tr>
+            <td><b>Bark URL / PushPlus Token</b></td>
+            <td>
+                <input type="text" class="form-control" name="ver4_notify_bark_url" value="<?php echo $nfBark; ?>" placeholder="https://api.day.app/你的Key" style="width:46%;display:inline-block;">
+                <input type="text" class="form-control" name="ver4_notify_pushplus_token" value="<?php echo $nfPushPlus; ?>" placeholder="PushPlus Token" style="width:30%;display:inline-block;">
+            </td>
+        </tr>
+        <tr>
+            <td><b>Webhook URL / ntfy Topic / 服务器</b></td>
+            <td>
+                <input type="text" class="form-control" name="ver4_notify_webhook_url" value="<?php echo $nfWebhook; ?>" placeholder="https://..." style="width:40%;display:inline-block;">
+                <input type="text" class="form-control" name="ver4_notify_ntfy_topic" value="<?php echo $nfNtfyTopic; ?>" placeholder="ntfy Topic" style="width:20%;display:inline-block;">
+                <input type="text" class="form-control" name="ver4_notify_ntfy_server" value="<?php echo $nfNtfyServer; ?>" placeholder="https://ntfy.sh（可选）" style="width:30%;display:inline-block;">
+            </td>
+        </tr>
+        <tr>
+            <td><b>测试推送</b><br/>保存后点击，验证我的渠道是否可用</td>
+            <td><input type="submit" class="cs-btn cs-btn-secondary cs-btn-sm" name="ver4_monitor_test_notify" value="向我的渠道发送测试推送"></td>
         </tr>
         <tr>
             <td></td>

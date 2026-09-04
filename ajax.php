@@ -196,6 +196,22 @@ switch (SYSTEM_PAGE) {
         ), JSON_UNESCAPED_UNICODE);
         die;
 
+    case 'baiduid:proxyall':
+        //统一代理：一键应用到我的全部账号（留空恢复跟随全局，off 全部禁用）
+        if (!defined('UID')) {
+            msg('请先登录');
+        }
+        $paProxy = trim((string) (isset($_POST['proxy']) ? $_POST['proxy'] : ''));
+        if ($paProxy !== '' && strcasecmp($paProxy, 'off') !== 0 && misc::parseProxyUrl($paProxy) === false) {
+            echo json_encode(array('error' => 1, 'msg' => '代理格式不正确：支持 http://host:port 或 socks5://user:pass@host:port'), JSON_UNESCAPED_UNICODE);
+            die;
+        }
+        $m->pquery("UPDATE `" . DB_PREFIX . "baiduid` SET `proxy` = ? WHERE `uid` = ?", array($paProxy, UID));
+        $paCount = $m->pquery("SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "baiduid` WHERE `uid` = ?", array(UID));
+        $paRow = $paCount !== false ? $paCount->fetch_array() : array('c' => 0);
+        echo json_encode(array('error' => 0, 'updated' => (int) $paRow['c']), JSON_UNESCAPED_UNICODE);
+        die;
+
     case 'baiduid:moindex':
         //我的贴吧：关注列表 + 每吧等级 + 今日签到状态（mo/q/newmoindex），结果缓存 30 分钟
         global $m;

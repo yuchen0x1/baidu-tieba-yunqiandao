@@ -4,10 +4,13 @@ if (!defined('SYSTEM_ROOT')) {
     die('Insufficient Permissions');
 }
 
+require_once SYSTEM_ROOT . '/lib/class.notify.php';
+
 /**
  * 帖子监控计划任务（按用户配置执行）
  * 每个百度账号归属站点用户（baiduid.uid），扫描该用户配置的目标贴吧最新主题帖，
- * 标题命中关键词（留空=全部新帖）且未记录过时：写入命中表 + 可选站点通知渠道推送。
+ * 标题命中关键词（留空=全部新帖）且未记录过时：写入命中表 + 推送提醒
+ * （优先用户个人通知渠道 ver4_notify_*，未配置时回退站点渠道）。
  * 帖子列表接口 c/f/frs/page（tiebaclient 签名，实测可用）。
  */
 
@@ -188,7 +191,8 @@ function cron_ver4_monitor_do()
         if ($totalHits > 0) {
             ver4_monitor_log("用户 {$uid} 命中 {$totalHits} 条新帖");
             if ($doNotify) {
-                Notify::send('帖子监控提醒（' . $totalHits . ' 条新命中）', implode("\n\n", array_slice($lines, 0, 10)), 'monitor');
+                //优先用户个人通知渠道；未配置时回退站点渠道
+                Notify::sendForUser($uid, '帖子监控提醒（' . $totalHits . ' 条新命中）', implode("\n\n", array_slice($lines, 0, 10)), 'monitor');
             }
         }
     }

@@ -87,6 +87,12 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
   </tbody>
 </table>
 </div>
+<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 8px">
+    <b>统一代理</b>
+    <input type="text" class="form-control" id="proxy-input" style="width:300px" placeholder="http://host:port 或 socks5://user:pass@host:port">
+    <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm" id="proxy-apply">应用到我的全部账号</button>
+    <span class="text-muted" style="font-size:12px">留空并应用 = 全部恢复跟随全局；填 off = 全部禁用代理</span>
+</div>
 <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 16px">
     <b>聚合操作</b>
     <button type="button" class="cs-btn cs-btn-warning cs-btn-sm" id="sign-run-all">⚡ 立即签到（我的全部账号）</button>
@@ -182,6 +188,33 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
             var pid = $('#mo-pid').val();
             if (!pid) { return; }
             signRun(parseInt(pid, 10));
+        });
+
+        $('#proxy-apply').on('click', function () {
+            var val = $('#proxy-input').val();
+            var tip = val === '' ? '确定清空并让全部账号恢复跟随全局代理吗？' : (val.toLowerCase() === 'off' ? '确定禁用全部账号的代理吗？' : '确定将该代理应用到我的全部账号吗？');
+            if (!window.confirm(tip)) { return; }
+            $('#proxy-apply').prop('disabled', true);
+            $.ajax({
+                url: 'ajax.php?mod=baiduid:proxyall',
+                dataType: 'json',
+                type: 'POST',
+                data: { 'proxy': val, 'csrf_token': $('input[name="csrf_token"]').val() },
+                success: function (x) {
+                    $('#proxy-apply').prop('disabled', false);
+                    if (x.error !== 0) {
+                        if (window.CS && CS.toast) { CS.toast('设置失败', { type: 'warning', body: x.msg || '' }); }
+                        else { alert(x.msg || '设置失败'); }
+                        return;
+                    }
+                    if (window.CS && CS.toast) { CS.toast('统一代理已生效', { type: 'success', body: '已更新 ' + x.updated + ' 个账号的代理设置' }); }
+                    setTimeout(function () { window.location.reload(); }, 800);
+                },
+                error: function () {
+                    $('#proxy-apply').prop('disabled', false);
+                    alert('请求失败，请稍后重试');
+                }
+            });
         });
     })();
 </script>

@@ -13,6 +13,70 @@ if (!defined('SYSTEM_ROOT')) {
 class Notify
 {
     /**
+     * 按用户自己的通知渠道发送（个人面板配置，存于 users_options 的 ver4_notify_*）
+     * 渠道为「跟随站点」或未配置时回退到站点渠道（self::send）；
+     * 用户自有渠道不受站点 notify_enable 开关限制（是否推送由用户自行决定）。
+     * 支持：serverchan / telegram / bark / pushplus / webhook / ntfy
+     * @param int $uid 用户 UID
+     * @param string $title 标题
+     * @param string $content 内容 (纯文本)
+     * @param string $event 触发事件
+     * @return array [ok => bool, detail => string]
+     */
+    public static function sendForUser($uid, $title, $content, $event = '')
+    {
+        $channel = trim((string) option::uget('ver4_notify_channel', $uid));
+        if ($channel === '' || $channel === 'follow_site') {
+            return self::send($title, $content, $event);
+        }
+        $uget = function ($key) use ($uid) {
+            $v = option::uget($key, $uid);
+            return ($v === null || $v === '') ? '' : (string) $v;
+        };
+        switch ($channel) {
+            case 'serverchan':
+                $key = $uget('ver4_notify_serverchan_key');
+                if ($key === '') {
+                    return array('ok' => false, 'detail' => '未配置 Server酱 SendKey');
+                }
+                return self::sendServerChan($key, $title, $content);
+            case 'telegram':
+                $token = $uget('ver4_notify_telegram_token');
+                $chatId = $uget('ver4_notify_telegram_chatid');
+                if ($token === '' || $chatId === '') {
+                    return array('ok' => false, 'detail' => '未配置 Telegram Bot Token / Chat ID');
+                }
+                return self::sendTelegram($token, $chatId, $title, $content);
+            case 'bark':
+                $url = $uget('ver4_notify_bark_url');
+                if ($url === '') {
+                    return array('ok' => false, 'detail' => '未配置 Bark URL');
+                }
+                return self::sendBark($url, $title, $content);
+            case 'pushplus':
+                $token = $uget('ver4_notify_pushplus_token');
+                if ($token === '') {
+                    return array('ok' => false, 'detail' => '未配置 PushPlus Token');
+                }
+                return self::sendPushPlus($token, $title, $content);
+            case 'webhook':
+                $url = $uget('ver4_notify_webhook_url');
+                if ($url === '') {
+                    return array('ok' => false, 'detail' => '未配置 Webhook URL');
+                }
+                return self::sendWebhook($url, $title, $content);
+            case 'ntfy':
+                $topic = $uget('ver4_notify_ntfy_topic');
+                if ($topic === '' || preg_match('/^[A-Za-z0-9_-]{1,128}$/', $topic) !== 1) {
+                    return array('ok' => false, 'detail' => '未配置或配置了无效的 ntfy Topic');
+                }
+                return self::sendNtfy($uget('ver4_notify_ntfy_server'), $topic, $title, $content);
+            default:
+                return array('ok' => false, 'detail' => '该渠道暂不支持个人配置');
+        }
+    }
+
+    /**
      * 按配置发送通知
      * @param string $title 标题
      * @param string $content 内容 (纯文本)

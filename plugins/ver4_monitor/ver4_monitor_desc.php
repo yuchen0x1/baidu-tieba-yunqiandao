@@ -7,8 +7,8 @@ if (!defined('SYSTEM_ROOT')) {
 return array(
     'plugin' => array(
         'name'        => '帖子监控',
-        'version'     => '1.1',
-        'description' => '在个人面板配置目标贴吧与关键词，系统定时扫描最新主题帖，命中关键词立即通过站点通知渠道推送提醒，并保留命中历史（支持监控全部新帖）。',
+        'version'     => '1.2',
+        'description' => '在个人面板配置目标贴吧与关键词（支持排除词），系统定时扫描最新主题帖，命中后推送到你的个人通知渠道（Server酱/TG/Bark 等，可回退站点渠道），并保留命中历史。',
         'onsale'      => false,
         'url'         => 'https://gitee.com/yuchen0x1/baidu-tieba-yunqiandao',
         'for'         => 'all',
