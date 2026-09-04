@@ -31,6 +31,27 @@ switch ($i['mode'][0]) {
 
         break;
     case 'analysis':
+        //会话级 CSV 导出：每日聚合报表（成功/失败/总计/成功率）
+        if (isset($_GET['export']) && $_GET['export'] === 'csv') {
+            if (ROLE === 'visitor' || ROLE === 'banned') {
+                msg('请先登录');
+            }
+            require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
+            $expDays = isset($_GET['days']) && in_array((int) $_GET['days'], array(7, 30, 90, 365), true) ? (int) $_GET['days'] : 30;
+            $expUid = (int) UID;
+            $expRows = SignManager::trend($expDays, $expUid);
+            $stamp = date('Ymd_His');
+            header('Content-Type: text/csv; charset=UTF-8');
+            header('Content-Disposition: attachment; filename="sign-analysis-' . $expDays . 'd-' . $stamp . '.csv"');
+            header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+            echo "\xEF\xBB\xBF";
+            echo csv_line(array('日期', '成功', '失败', '总计', '成功率'));
+            foreach ($expRows as $r) {
+                $rate = (int) $r['total'] > 0 ? round((int) $r['success'] / (int) $r['total'] * 100, 2) . '%' : '';
+                echo csv_line(array($r['date'], (int) $r['success'], (int) $r['error'], (int) $r['total'], $rate));
+            }
+            exit;
+        }
                       loadhead('签到数据分析');
         template('analysis');
 

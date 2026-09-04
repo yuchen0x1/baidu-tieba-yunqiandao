@@ -57,6 +57,7 @@ $fmtTime = function ($ts) {
     <?php foreach (array(7, 30, 90, 365) as $d) { ?>
     <a class="cs-btn cs-btn-ghost cs-btn-sm <?php echo $d === $days ? 'is-active' : ''; ?>" href="index.php?mod=analysis&days=<?php echo $d; ?>"><?php echo $d === 365 ? '近一年' : ('近 ' . $d . ' 天'); ?></a>
     <?php } ?>
+    <a class="cs-btn cs-btn-secondary cs-btn-sm" href="index.php?mod=analysis&days=<?php echo $days; ?>&export=csv" style="margin-left:auto">导出报表 CSV</a>
 </div>
 
 <?php if ($overview['total'] === 0) { ?>

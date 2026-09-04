@@ -63,11 +63,41 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
   </thead>
   <tbody>
     <?php
+    //每个账号今日签到进度（按 pid 统计所有分表）
+    $signProgress = array();
+    if (!empty($i['table'])) {
+        $todayD = date('d');
+        foreach ($i['table'] as $spTable) {
+            $spQs = $m->query("SELECT `pid`, COUNT(*) AS total, SUM(`latest` = '{$todayD}') AS signed FROM `" . DB_NAME . "`.`" . DB_PREFIX . $spTable . "` WHERE `uid` = " . (int) UID . " GROUP BY `pid`");
+            if ($spQs === false) {
+                continue;
+            }
+            while ($spRow = $m->fetch_array($spQs)) {
+                $spPid = (int) $spRow['pid'];
+                if (!isset($signProgress[$spPid])) {
+                    $signProgress[$spPid] = array('total' => 0, 'signed' => 0);
+                }
+                $signProgress[$spPid]['total'] += (int) $spRow['total'];
+                $signProgress[$spPid]['signed'] += (int) $spRow['signed'];
+            }
+        }
+    }
     foreach ($i['user']['bduss'] as $key => $value) {
         echo '<tr><td>' . $key . '</td>';
         $name = empty($i['user']['baidu'][$key]) ? '未记录百度ID' : htmlspecialchars($i['user']['baidu'][$key], ENT_QUOTES, 'UTF-8');
         if ($name == '[E]') {
             $name = '<span class="cs-badge cs-badge-danger">已失效</span>';
+        }
+        //今日签到进度条
+        $progressHtml = '';
+        if (isset($signProgress[(int) $key]) && $signProgress[(int) $key]['total'] > 0) {
+            $sp = $signProgress[(int) $key];
+            $pct = min(100, round($sp['signed'] / $sp['total'] * 100));
+            $barColor = $pct >= 100 ? '#3cb45a' : '#5b3aff';
+            $progressHtml = '<div style="margin-top:5px;display:flex;align-items:center;gap:6px">'
+                . '<div style="flex:1;height:6px;background:rgba(128,128,128,.2);border-radius:3px;overflow:hidden;min-width:60px">'
+                . '<div style="height:100%;width:' . $pct . '%;background:' . $barColor . ';border-radius:3px"></div></div>'
+                . '<span style="font-size:11px;color:#888;white-space:nowrap">已签 ' . (int) $sp['signed'] . '/' . (int) $sp['total'] . '</span></div>';
         }
         //已缓存的我的贴吧概要徽章（点击下方「查看关注与等级」后生成）
         $moBadge = '';
@@ -79,7 +109,7 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
                 $moBadge = '<br/><span class="cs-badge" style="font-size:11px;margin-top:4px;display:inline-block;' . ($allSigned ? 'background:rgba(60,180,90,.15);color:#3cb45a' : 'background:rgba(255,160,0,.15);color:#ff9800') . '">关注 ' . (int) $moCache['total'] . ' 吧 · 已签 ' . (int) $moCache['signed'] . '</span>';
             }
         }
-        echo '<td>' . $name . $moBadge . '</td>';
+        echo '<td>' . $name . $progressHtml . $moBadge . '</td>';
         echo '<td><input type="text" class="form-control" readonly value="' . htmlspecialchars($i['user']['baidu_portrait'][$key], ENT_QUOTES, 'UTF-8') . '"></td>';
         echo '<td><input type="text" class="form-control" readonly value="' . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . '"></td>';
         echo '<td><input type="text" class="form-control" readonly value="' . htmlspecialchars($i['user']['stoken'][$key], ENT_QUOTES, 'UTF-8') . '"></td>';

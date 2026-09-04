@@ -11,9 +11,49 @@ if (!defined('UID')) {
     ReDirect('index.php?mod=login');
     die;
 }
-loadhead('帖子监控');
 global $m;
 $uid = UID;
+
+//AJAX：预览命中帖子的首楼内容（在任何 HTML 输出前处理）
+if (isset($_GET['preview'])) {
+    $pvTid = (int) $_GET['preview'];
+    $pvRow = $m->once_fetch_array("SELECT `pid`, `forum`, `title` FROM `" . DB_PREFIX . "ver4_monitor_hit` WHERE `uid` = {$uid} AND `tid` = {$pvTid} LIMIT 1");
+    header('Content-Type: application/json; charset=UTF-8');
+    if (empty($pvRow)) {
+        echo json_encode(array('error' => 1, 'msg' => '记录不存在'), JSON_UNESCAPED_UNICODE);
+        die;
+    }
+    $pvAcc = $m->once_fetch_array("SELECT `bduss` FROM `" . DB_PREFIX . "baiduid` WHERE `id` = " . (int) $pvRow['pid']);
+    $pvContent = '';
+    if (!empty($pvAcc['bduss'])) {
+        $pvBduss = P::decrypt($pvAcc['bduss']);
+        if (!empty($pvBduss) && wcurl::isAllowedPublicUrl('https://c.tieba.baidu.com/c/f/pb/page')) {
+            $pvData = array('BDUSS' => $pvBduss, 'kw' => $pvRow['forum'], 'pn' => 1, 'rn' => 5, 'tid' => (string) $pvTid);
+            misc::addTiebaSign($pvData, false);
+            $pvCh = new wcurl('https://c.tieba.baidu.com/c/f/pb/page');
+            misc::applyProxy($pvCh, (int) $pvRow['pid']);
+            $pvCh->addCookie(array('BDUSS' => $pvBduss));
+            $pvResp = json_decode($pvCh->post($pvData), true);
+            if (is_array($pvResp) && !empty($pvResp['post_list'][0]['content'])) {
+                foreach ($pvResp['post_list'][0]['content'] as $pvFrag) {
+                    if (isset($pvFrag['text']) && is_string($pvFrag['text'])) {
+                        $pvContent .= $pvFrag['text'];
+                    }
+                }
+            }
+        }
+    }
+    echo json_encode(array(
+        'error' => 0,
+        'title' => (string) $pvRow['title'],
+        'forum' => (string) $pvRow['forum'],
+        'content' => mb_substr(trim($pvContent), 0, 500),
+        'url' => 'https://tieba.baidu.com/p/' . $pvTid,
+    ), JSON_UNESCAPED_UNICODE);
+    die;
+}
+
+loadhead('帖子监控');
 
 $bdRow = $m->once_fetch_array("SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "baiduid` WHERE `uid` = {$uid}");
 if ((int) $bdRow['c'] < 1) {
@@ -78,6 +118,15 @@ while ($r = $m->fetch_array($logRs)) {
 ?>
 <div class="page-heading"><div><div class="eyebrow">THREAD MONITOR</div><h1>帖子监控</h1></div></div>
 <p class="text-muted">定时扫描目标贴吧的最新主题帖，标题命中关键词立即推送提醒（支持监控全部新帖）。命中记录保留在本页，方便随时回看。</p>
+<div id="monitor-preview" style="display:none;margin:10px 0" >
+    <div class="panel panel-default">
+        <div class="panel-heading" id="monitor-preview-title"></div>
+        <div class="panel-body">
+            <div id="monitor-preview-content" style="white-space:pre-wrap;color:#ccc;font-size:13px"></div>
+            <a id="monitor-preview-link" href="#" target="_blank" rel="noopener" class="cs-btn cs-btn-secondary cs-btn-sm" style="margin-top:8px;display:inline-block">在贴吧打开</a>
+        </div>
+    </div>
+</div>
 <?php if (isset($_GET['success'])): ?>
 <div class="alert alert-success"><?php echo htmlspecialchars((string) $_GET['success'], ENT_QUOTES, 'UTF-8'); ?></div>
 <?php endif; ?>
@@ -179,17 +228,49 @@ while ($r = $m->fetch_array($logRs)) {
 <div class="text-muted">暂无命中记录。开启监控后，命中的新帖会展示在这里。</div>
 <?php else: ?>
 <table class="table table-striped">
-    <tr><th>时间</th><th>贴吧</th><th>关键词</th><th>帖子标题</th><th>查看</th></tr>
+    <tr><th>时间</th><th>贴吧</th><th>关键词</th><th>帖子标题</th><th>操作</th></tr>
     <?php foreach ($recentRows as $r): ?>
     <tr>
         <td><?php echo htmlspecialchars(date('m-d H:i', (int) $r['created_at']), ENT_QUOTES, 'UTF-8'); ?></td>
         <td><?php echo htmlspecialchars($r['forum'], ENT_QUOTES, 'UTF-8'); ?>吧</td>
         <td><?php echo htmlspecialchars($r['kw'] !== '' ? $r['kw'] : '（全部新帖）', ENT_QUOTES, 'UTF-8'); ?></td>
         <td><?php echo htmlspecialchars(mb_substr((string) $r['title'], 0, 40), ENT_QUOTES, 'UTF-8'); ?></td>
-        <td><a class="cs-btn cs-btn-secondary cs-btn-sm" href="https://tieba.baidu.com/p/<?php echo (int) $r['tid']; ?>" target="_blank" rel="noopener">打开</a></td>
+        <td style="white-space:nowrap">
+            <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm monitor-preview" data-tid="<?php echo (int) $r['tid']; ?>">预览</button>
+            <a class="cs-btn cs-btn-secondary cs-btn-sm" href="https://tieba.baidu.com/p/<?php echo (int) $r['tid']; ?>" target="_blank" rel="noopener">打开</a>
+        </td>
     </tr>
     <?php endforeach; ?>
 </table>
+<script type="text/javascript">
+    (function () {
+        Array.prototype.forEach.call(document.querySelectorAll('.monitor-preview'), function (btn) {
+            btn.addEventListener('click', function () {
+                var tid = btn.getAttribute('data-tid');
+                var box = document.getElementById('monitor-preview');
+                document.getElementById('monitor-preview-title').textContent = '正在加载预览…';
+                document.getElementById('monitor-preview-content').textContent = '';
+                box.style.display = 'block';
+                box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                fetch('index.php?plugin=ver4_monitor&preview=' + tid, { credentials: 'include' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (x) {
+                        if (x.error !== 0) {
+                            document.getElementById('monitor-preview-title').textContent = '预览失败';
+                            document.getElementById('monitor-preview-content').textContent = x.msg || '';
+                            return;
+                        }
+                        document.getElementById('monitor-preview-title').textContent = '【' + x.forum + '吧】' + x.title;
+                        document.getElementById('monitor-preview-content').textContent = x.content !== '' ? x.content : '（楼主内容为空或媒体类型，请到贴吧查看）';
+                        document.getElementById('monitor-preview-link').href = x.url;
+                    })
+                    .catch(function () {
+                        document.getElementById('monitor-preview-title').textContent = '预览失败，请稍后重试';
+                    });
+            });
+        });
+    })();
+</script>
 <?php endif; ?>
 <style>
 @media (max-width: 768px) {
