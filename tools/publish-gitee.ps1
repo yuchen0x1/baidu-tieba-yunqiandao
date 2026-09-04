@@ -68,8 +68,12 @@ try {
         Write-Host "仅生成本地发布包。传入 -Publish 后才会创建 Gitee Release 并上传附件。"
         return
     }
-    if (-not $PSCmdlet.ShouldProcess("Gitee $Owner/$Repository Release $Tag", "创建 Release 并上传 Windows ZIP 和 SHA-256")) {
-        return
+    # -File 运行时 $PSCmdlet 可能为 null，改用通用参数 $Confirm 手动确认（-Confirm:$false 跳过询问）
+    if ($Confirm) {
+        $answer = Read-Host "确定创建 Gitee Release $Tag 并上传 Windows ZIP 和 SHA-256 吗？[y/N]"
+        if ($answer -notmatch '^[Yy]') {
+            return
+        }
     }
 
     $release = Invoke-RestMethod -Uri "$apiRoot/releases" -Method Post -Headers $headers -Body $releaseBody -ContentType "application/json"
