@@ -10,8 +10,8 @@ $pageLabels = array(
     'baiduid' => '百度账号',
     'showtb' => '贴吧与签到',
     'account' => '账号中心',
-    'calendar' => '签到日历',
-    'signlogs' => '签到日志',
+    'calendar' => '签到记录',
+    'signlogs' => '签到记录（日志）',
     'analysis' => '签到数据分析',
     'messages' => '贴吧消息中心',
     'ranking' => '签到排行',
@@ -55,8 +55,7 @@ $userInitial = function_exists('mb_substr') ? mb_substr($userName, 0, 1, 'UTF-8'
                     <li class="<?php checkIfActive('baiduid'); ?>"><a href="index.php?mod=baiduid"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-link"/></svg><span>百度账号</span></a></li>
                     <li class="<?php checkIfActive('account'); ?>"><a href="index.php?mod=account"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-user"/></svg><span>账号中心</span></a></li>
                     <li class="<?php checkIfActive('showtb'); ?>"><a href="index.php?mod=showtb"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-calendar-grid"/></svg><span>贴吧与签到</span></a></li>
-                    <li class="<?php checkIfActive('calendar'); ?>"><a href="index.php?mod=calendar"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-calendar"/></svg><span>签到日历</span></a></li>
-                    <li class="<?php checkIfActive('signlogs'); ?>"><a href="index.php?mod=signlogs"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-list"/></svg><span>签到日志</span></a></li>
+                    <li class="<?php checkIfActive('calendar'); checkIfActive('signlogs'); ?>"><a href="index.php?mod=calendar"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-calendar"/></svg><span>签到记录</span></a></li>
                     <li class="<?php checkIfActive('analysis'); ?>"><a href="index.php?mod=analysis"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-pulse"/></svg><span>数据分析</span></a></li>
                     <li class="<?php checkIfActive('messages'); ?>"><a href="index.php?mod=messages" id="nav-messages-link"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-mail"/></svg><span>消息中心</span><?php
                         // 服务端渲染消息未读徽章

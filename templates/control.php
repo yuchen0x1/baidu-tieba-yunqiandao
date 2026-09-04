@@ -16,8 +16,8 @@ switch ($i['mode'][0]) {
 
         break;
     case 'calendar':
-                      loadhead('签到日历');
-        template('calendar');
+                      loadhead('签到记录');
+        template('sign-records');
 
         break;
     case 'messages':
@@ -26,8 +26,8 @@ switch ($i['mode'][0]) {
 
         break;
     case 'signlogs':
-                      loadhead('签到日志详情');
-        template('sign-logs');
+                      loadhead('签到记录');
+        template('sign-records');
 
         break;
     case 'analysis':
