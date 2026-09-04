@@ -1117,8 +1117,8 @@ body.app-body {
 }
 
 .panel-heading {
-  background: rgba(255,255,255,.28);
-  border-bottom: 1px solid rgba(255,255,255,.5);
+  background: rgba(255,255,255,.32);
+  border-bottom: 1px solid rgba(255,255,255,.6);
 }
 
 /* 6. 表格 —— 玻璃化 */
@@ -1536,20 +1536,20 @@ a:focus {
 /* 1. 环境光斑 —— 紫罗兰光谱（浅色） */
 body.app-body {
   background-image:
-    radial-gradient(1100px 720px at 8% -14%, rgba(91, 58, 255, .15), transparent 60%),
-    radial-gradient(900px 620px at 106% 6%, rgba(64, 156, 255, .11), transparent 62%),
-    radial-gradient(820px 600px at 92% 104%, rgba(168, 85, 247, .1), transparent 60%),
-    radial-gradient(700px 540px at -6% 98%, rgba(45, 212, 191, .08), transparent 62%),
-    radial-gradient(520px 400px at 55% 42%, rgba(255, 255, 255, .6), transparent 62%);
+    radial-gradient(1200px 800px at 8% -14%, rgba(91, 58, 255, .3), transparent 62%),
+    radial-gradient(1000px 700px at 106% 4%, rgba(64, 156, 255, .2), transparent 64%),
+    radial-gradient(900px 660px at 94% 104%, rgba(168, 85, 247, .2), transparent 62%),
+    radial-gradient(780px 600px at -6% 98%, rgba(45, 212, 191, .13), transparent 64%),
+    radial-gradient(560px 430px at 55% 42%, rgba(255, 255, 255, .65), transparent 62%);
 }
 
 [data-theme="dark"] body.app-body {
   background-image:
-    radial-gradient(1100px 720px at 8% -14%, rgba(124, 99, 255, .2), transparent 60%),
-    radial-gradient(900px 620px at 106% 6%, rgba(64, 156, 255, .12), transparent 62%),
-    radial-gradient(820px 600px at 92% 104%, rgba(168, 85, 247, .12), transparent 60%),
-    radial-gradient(700px 540px at -6% 98%, rgba(45, 212, 191, .08), transparent 62%),
-    radial-gradient(520px 400px at 55% 42%, rgba(255, 255, 255, .04), transparent 62%);
+    radial-gradient(1200px 800px at 8% -14%, rgba(124, 99, 255, .34), transparent 62%),
+    radial-gradient(1000px 700px at 106% 4%, rgba(64, 156, 255, .2), transparent 64%),
+    radial-gradient(900px 660px at 94% 104%, rgba(168, 85, 247, .2), transparent 62%),
+    radial-gradient(780px 600px at -6% 98%, rgba(45, 212, 191, .12), transparent 64%),
+    radial-gradient(560px 430px at 55% 42%, rgba(255, 255, 255, .05), transparent 62%);
 }
 
 /* 2. 深色主题残留色清理（旧青绿 → 中性玻璃） */

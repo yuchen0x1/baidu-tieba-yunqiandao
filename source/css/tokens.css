@@ -118,18 +118,18 @@
   --ease-entrance: cubic-bezier(.0, .0, .2, 1);
   --ease-exit: cubic-bezier(.4, .0, 1, 1);
 
-  /* === 玻璃层（Glass v4） === */
-  --glass-bg: rgba(255, 255, 255, .62);
-  --glass-bg-soft: rgba(255, 255, 255, .42);
-  --glass-bg-strong: rgba(255, 255, 255, .82);
-  --glass-bg-dark: rgba(20, 25, 30, .62);
+  /* === 玻璃层（Glass v5：更通透、更强模糊、更高饱和） === */
+  --glass-bg: rgba(255, 255, 255, .46);
+  --glass-bg-soft: rgba(255, 255, 255, .3);
+  --glass-bg-strong: rgba(255, 255, 255, .78);
+  --glass-bg-dark: rgba(20, 25, 30, .5);
   --glass-bg-dark-strong: rgba(15, 19, 23, .84);
-  --glass-border: rgba(255, 255, 255, .72);
+  --glass-border: rgba(255, 255, 255, .8);
   --glass-border-dark: rgba(255, 255, 255, .14);
   --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, .9);
-  --glass-shadow: 0 22px 55px rgba(23, 29, 36, .14), 0 3px 10px rgba(23, 29, 36, .05);
-  --glass-blur: 20px;
-  --glass-saturate: 135%;
+  --glass-shadow: 0 22px 55px rgba(23, 29, 36, .16), 0 3px 10px rgba(23, 29, 36, .06);
+  --glass-blur: 28px;
+  --glass-saturate: 150%;
 
   /* === 焦点态（v4：双层 focus-visible） === */
   --focus-ring: 0 0 0 3px rgba(91, 58, 255, .25);
@@ -172,15 +172,15 @@
   --color-brand-soft: rgba(91, 58, 255, .18);
   --color-primary: #7c63ff;
 
-  --glass-bg: rgba(28, 34, 42, .5);
-  --glass-bg-soft: rgba(28, 34, 42, .32);
-  --glass-bg-strong: rgba(30, 37, 46, .82);
-  --glass-bg-dark: rgba(13, 17, 21, .66);
+  --glass-bg: rgba(28, 34, 42, .36);
+  --glass-bg-soft: rgba(28, 34, 42, .24);
+  --glass-bg-strong: rgba(30, 37, 46, .8);
+  --glass-bg-dark: rgba(13, 17, 21, .55);
   --glass-bg-dark-strong: rgba(10, 13, 16, .88);
-  --glass-border: rgba(214, 222, 232, .18);
+  --glass-border: rgba(214, 222, 232, .22);
   --glass-border-dark: rgba(255, 255, 255, .1);
   --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, .07);
-  --glass-shadow: 0 22px 55px rgba(0, 0, 0, .42), 0 3px 10px rgba(0, 0, 0, .2);
+  --glass-shadow: 0 22px 55px rgba(0, 0, 0, .45), 0 3px 10px rgba(0, 0, 0, .22);
 
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, .3);
   --shadow-sm: 0 6px 20px rgba(0, 0, 0, .35);
@@ -217,9 +217,9 @@
     --color-brand: #7c63ff;
     --color-brand-deep: #5b3aff;
     --color-brand-soft: rgba(91, 58, 255, .18);
-    --glass-bg: rgba(28, 34, 42, .5);
-    --glass-bg-strong: rgba(30, 37, 46, .82);
-    --glass-border: rgba(214, 222, 232, .18);
+    --glass-bg: rgba(28, 34, 42, .36);
+    --glass-bg-strong: rgba(30, 37, 46, .8);
+    --glass-border: rgba(214, 222, 232, .22);
   }
 }
 

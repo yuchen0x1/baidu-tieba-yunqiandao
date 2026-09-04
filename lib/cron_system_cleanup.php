@@ -23,14 +23,26 @@ function cron_system_cleanup()
     if (option::get('cleanup_enable') != '1') {
         return '自动清理未启用，跳过执行';
     }
+    //未保存过清理设置时按默认天数兜底（显式设 0 才是永久保留）
+    $defaults = array(
+        'cleanup_sign_history_days' => 180,
+        'cleanup_task_runs_days'    => 90,
+        'cleanup_cron_log_days'     => 30,
+        'cleanup_plugin_log_days'   => 90,
+        'cleanup_api_rate_days'     => 7,
+    );
+    $daysOpt = static function ($key) use ($defaults) {
+        $v = option::get($key);
+        return ($v === null || $v === '') ? $defaults[$key] : (int) $v;
+    };
     $jobs = array(
-        array('sign_history', (int) option::get('cleanup_sign_history_days'), '签到历史', 'created_at'),
-        array('task_runs', (int) option::get('cleanup_task_runs_days'), '任务运行历史', 'started_at'),
-        array('cron_log_batch', (int) option::get('cleanup_cron_log_days'), '批量签到日志', 'created_at'),
-        array('ver4_ai_log', (int) option::get('cleanup_plugin_log_days'), 'AI 执行记录', 'created_at'),
-        array('ver4_monitor_hit', (int) option::get('cleanup_plugin_log_days'), '帖子监控命中', 'created_at'),
-        array('ver4_reply_log', (int) option::get('cleanup_plugin_log_days'), '自动回帖记录', 'created_at'),
-        array('api_rate_limits', (int) option::get('cleanup_api_rate_days'), 'API 限流记录', 'window_start'),
+        array('sign_history', $daysOpt('cleanup_sign_history_days'), '签到历史', 'created_at'),
+        array('task_runs', $daysOpt('cleanup_task_runs_days'), '任务运行历史', 'started_at'),
+        array('cron_log_batch', $daysOpt('cleanup_cron_log_days'), '批量签到日志', 'created_at'),
+        array('ver4_ai_log', $daysOpt('cleanup_plugin_log_days'), 'AI 执行记录', 'created_at'),
+        array('ver4_monitor_hit', $daysOpt('cleanup_plugin_log_days'), '帖子监控命中', 'created_at'),
+        array('ver4_reply_log', $daysOpt('cleanup_plugin_log_days'), '自动回帖记录', 'created_at'),
+        array('api_rate_limits', $daysOpt('cleanup_api_rate_days'), 'API 限流记录', 'window_start'),
     );
     $summary = array();
     $removed = 0;

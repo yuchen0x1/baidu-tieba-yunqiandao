@@ -6,6 +6,7 @@ param(
     [string]$Repository = "baidu-tieba-yunqiandao",
     [string]$SourceRef = "main",
     [string]$OutputDirectory = "",
+    [string]$ReleaseNotesFile = "",
     [switch]$Publish
 )
 
@@ -51,7 +52,14 @@ try {
 
     $apiRoot = "https://gitee.com/api/v5/repos/$Owner/$Repository"
     $headers = @{ Authorization = "Bearer $token"; Accept = "application/json"; 'User-Agent' = 'Tieba-Cloud-Sign-Gitee-Publisher' }
-    $releaseBody = @{ tag_name = $Tag; name = "百度贴吧云签到 $Tag Windows 部署包"; body = "国内 Gitee 正式发布 $Tag"; target_commitish = $SourceRef } | ConvertTo-Json
+    $releaseBodyText = "国内 Gitee 正式发布 $Tag"
+    if (-not [string]::IsNullOrWhiteSpace($ReleaseNotesFile)) {
+        if (-not (Test-Path -LiteralPath $ReleaseNotesFile)) {
+            throw "ReleaseNotesFile 不存在：$ReleaseNotesFile"
+        }
+        $releaseBodyText = [IO.File]::ReadAllText($ReleaseNotesFile)
+    }
+    $releaseBody = @{ tag_name = $Tag; name = "百度贴吧云签到 $Tag Windows 部署包"; body = $releaseBodyText; target_commitish = $SourceRef } | ConvertTo-Json
 
     Write-Host "已生成：$package"
     Write-Host "校验文件：$checksum"
