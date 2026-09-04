@@ -23,8 +23,9 @@ class option
             if (isset($i['opt'][$plug])) {
                 return $i['opt'][$plug];
             }
-            $set = $m->once_fetch_array("SELECT `options` FROM `" . DB_PREFIX . "plugins` WHERE `name` = '{$plug}' LIMIT 1;");
-            return $set['options'];
+            $res = $m->pquery("SELECT `options` FROM `" . DB_PREFIX . "plugins` WHERE `name` = ? LIMIT 1", array((string) $plug));
+            $set = $res ? $m->fetch_array($res) : false;
+            return is_array($set) && isset($set['options']) ? $set['options'] : null;
         }
         return isset($i['opt'][$name]) ? $i['opt'][$name] : null;
     }
@@ -41,7 +42,7 @@ class option
 //用于兼容旧插件
         if (stripos($name, 'plugin_') === 0) {
             $plug = substr($name, '7');
-            if ($m->query("UPDATE `" . DB_PREFIX . "plugins` SET `options` = '" . $value . "' WHERE `name` = '{$plug}';")) {
+            if ($m->pquery("UPDATE `" . DB_PREFIX . "plugins` SET `options` = ? WHERE `name` = ?", array((string) $value, (string) $plug))) {
                 $i['opt'][$plug] = $value;
                 return true;
             } else {
@@ -119,6 +120,7 @@ class option
         if (empty($uid)) {
             $uid = $i['user']['uid'];
         }
+        $uid = (int) $uid;
 
         $name = sqladds($name);
         $value = sqladds($value);
@@ -148,6 +150,7 @@ class option
         if (empty($uid)) {
             $uid = $i['user']['uid'];
         }
+        $uid = (int) $uid;
         if ($m->query("DELETE FROM `" . DB_NAME . "`.`" . DB_PREFIX . "users_options` WHERE `uid` = " . $uid)) {
             if ($uid == $i['user']['uid']) {
                 $i['user']['opt'] = null;
@@ -171,6 +174,7 @@ class option
         if (empty($uid)) {
             $uid = $i['user']['uid'];
         }
+        $uid = (int) $uid;
         if ($m->query("DELETE FROM `" . DB_NAME . "`.`" . DB_PREFIX . "users_options` WHERE `name` = '{$name}' AND `uid` = " . $uid)) {
             if ($uid == $i['user']['uid']) {
                 unset($i['user']['opt'][$name]);
@@ -195,9 +199,10 @@ class option
         if (empty($uid)) {
             $uid = $i['user']['uid'];
         }
+        $uid = (int) $uid;
         $name = sqladds($name);
         $value = sqladds($value);
-        $existing = $m->once_fetch_array("SELECT uid FROM `" . DB_PREFIX . "users_options` WHERE `uid` = '{$uid}' AND `name` = '{$name}'");
+        $existing = $m->once_fetch_array("SELECT uid FROM `" . DB_PREFIX . "users_options` WHERE `uid` = {$uid} AND `name` = '{$name}'");
         if (empty($existing)) {
             if ($m->query("INSERT INTO  `" . DB_PREFIX . "users_options` (`uid`, `name`, `value`) VALUES ({$uid}, '{$name}', '{$value}');")) {
                 if ($uid == $i['user']['uid']) {

@@ -367,6 +367,13 @@ function DeleteUser($id)
 function MustAdminWarning($id_list)
 {
     global $m;
+    //调用方可能直接传入 $_POST 数组，边界处强制转 int，杜绝 NOT IN 拼接注入
+    $id_list = array_filter(array_map('intval', (array) $id_list), static function ($v) {
+        return $v > 0;
+    });
+    if (empty($id_list)) {
+        return;
+    }
     $id_list = implode(',', $id_list);
 // 收集欲处理的用户id
     $q = "SELECT COUNT(*) as num FROM `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE `role` = 'admin' AND `id` NOT IN ({$id_list})";
@@ -523,6 +530,10 @@ function listDir($dirpath, $order = 0)
 function dataBak($table)
 {
 
+    //表名拼进 SHOW CREATE TABLE / SELECT，必须白名单，反引号等一律拒绝
+    if (!is_string($table) || !preg_match('/^[A-Za-z0-9_]{1,64}$/', $table)) {
+        return false;
+    }
     global $m;
     $sql = "DROP TABLE IF EXISTS `$table`;\n";
     $createtable = $m->query("SHOW CREATE TABLE $table");
@@ -1235,6 +1246,10 @@ function csrf($strict = true, $requireToken = false)
     global $i;
     // Keep the legacy Referer fallback for existing admin/plugin links. New core
     // AJAX write requests opt into the signed-token requirement explicitly.
+    // 请求带了 token 但校验不过：不是过期就是伪造，直接拒绝，不再静默降级到 Referer。
+    if ($token !== '') {
+        msg('CSRF 防御：安全令牌校验失败。请刷新页面后重试。');
+    }
     $referer = isset($_SERVER['HTTP_REFERER']) ? trim((string) $_SERVER['HTTP_REFERER']) : '';
     $method = isset($_SERVER['REQUEST_METHOD']) ? strtoupper((string) $_SERVER['REQUEST_METHOD']) : 'GET';
     $isWriteMethod = in_array($method, array('POST', 'PUT', 'PATCH', 'DELETE'), true);

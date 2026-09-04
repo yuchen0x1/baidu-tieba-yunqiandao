@@ -27,13 +27,16 @@ if ($provided === '' && isset($_SERVER['HTTP_X_API_TOKEN'])) {
     $provided = trim((string) $_SERVER['HTTP_X_API_TOKEN']);
 }
 $metricsToken = (string) option::get('metrics_token');
+require_once SYSTEM_ROOT . '/lib/security.php';
 $valid = false;
 if ($metricsToken !== '') {
-    $valid = hash_equals($metricsToken, $provided);
+    //兼容哈希存储与明文存储（历史手工配置），推荐库里只存 SHA-256
+    $valid = api_token_matches($metricsToken, $provided);
 } else {
     $apiToken = (string) option::get('api_token');
     if ($apiToken !== '') {
-        $valid = hash_equals($apiToken, $provided);
+        //与 api.php 一致：兼容哈希存储与升级前旧站的明文存储两种形态
+        $valid = api_token_matches($apiToken, $provided);
     }
 }
 if (!$valid) {

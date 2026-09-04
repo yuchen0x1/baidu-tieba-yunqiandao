@@ -49,8 +49,10 @@ if (!empty($tokenRow['id'])) {
     $apiUser = $tokenRow;
 } else {
     //兼容旧版全局 Token；用户 Token 不存在时才回退到它。
+    //全局 Token 现仅存哈希，同时兼容升级前旧站的明文存储形态。
+    require_once SYSTEM_ROOT . '/lib/security.php';
     $globalToken = (string) option::get('api_token');
-    if ($globalToken === '' || !hash_equals($globalToken, $auth)) {
+    if ($globalToken === '' || !api_token_matches($globalToken, $auth)) {
         http_response_code(401);
         die(json_encode(array('error' => '认证失败'), JSON_UNESCAPED_UNICODE));
     }
@@ -99,6 +101,10 @@ if ($rateLimit > 0) {
 
 switch ($action) {
     case 'update':
+        if ($apiUserId > 0) {
+            http_response_code(403);
+            die(json_encode(array('error' => '用户 API Token 无权查询全站版本信息'), JSON_UNESCAPED_UNICODE));
+        }
         try {
             $release = ProjectUpdater::fetchLatestRelease();
             $status = ProjectUpdater::buildStatus(SYSTEM_VER, $release);

@@ -38,36 +38,35 @@ switch (SYSTEM_PAGE) {
             'allNo'       => 0,
             'allError'    => 0
         );
-        $signUser = $m->query("SELECT `latest`,`status` FROM `" . DB_NAME . "`.`" . DB_PREFIX . TABLE . "` WHERE `uid` = " . UID . " AND `no` = '0'");
-        while ($countUser = $m->fetch_array($signUser)) {
-            if ($countUser['latest'] == $today) {
-                if ($countUser['status'] != '0') {
-                    $count['userError']++;
-                } else {
-                    $count['userSigned']++;
-                }
-            } else {
-                $count['userWaiting']++;
-            }
+        $signUser = $m->pquery("SELECT
+            SUM(`latest` = ? AND `status` != 0) AS err_cnt,
+            SUM(`latest` = ? AND `status` = 0) AS signed_cnt,
+            SUM(`latest` != ?) AS waiting_cnt
+            FROM `" . DB_NAME . "`.`" . DB_PREFIX . TABLE . "` WHERE `uid` = ? AND `no` = '0'", array($today, $today, $today, UID));
+        $userRow = $signUser !== false ? $m->fetch_array($signUser) : false;
+        if (is_array($userRow)) {
+            $count['userError']   = (int) $userRow['err_cnt'];
+            $count['userSigned']  = (int) $userRow['signed_cnt'];
+            $count['userWaiting'] = (int) $userRow['waiting_cnt'];
         }
         echo "<br/><b>签到状态：</b>已签到 {$count['userSigned']} 个贴吧，{$count['userError']} 个出错， {$count['userWaiting']} 个贴吧等待签到";
         echo '<br/><b>您的签到数据表：</b>' . DB_PREFIX . TABLE;
 
         if (ROLE == 'admin') {
+            //全站统计用 SQL 聚合，不再把每张表全部行拉进 PHP 逐行计数
             foreach ($i['table'] as $value) {
-                $signTab = $m->query("SELECT `latest`,`status`,`no` FROM `" . DB_NAME . "`.`" . DB_PREFIX . $value . "`");
-                while ($countTab = $m->fetch_array($signTab)) {
-                    if ($countTab['no'] != '0') {
-                        $count['allNo']++;
-                    } elseif ($countTab['latest'] == $today) {
-                        if ($countTab['status'] != '0') {
-                            $count['allError']++;
-                        } else {
-                            $count['allSigned']++;
-                        }
-                    } else {
-                        $count['allWaiting']++;
-                    }
+                $signTab = $m->pquery("SELECT
+                    SUM(`no` != '0') AS no_cnt,
+                    SUM(`no` = '0' AND `latest` = ? AND `status` != '0') AS err_cnt,
+                    SUM(`no` = '0' AND `latest` = ? AND `status` = '0') AS signed_cnt,
+                    SUM(`no` = '0' AND `latest` != ?) AS waiting_cnt
+                    FROM `" . DB_NAME . "`.`" . DB_PREFIX . $value . "`", array($today, $today, $today));
+                $tabRow = $signTab !== false ? $m->fetch_array($signTab) : false;
+                if (is_array($tabRow)) {
+                    $count['allNo']      += (int) $tabRow['no_cnt'];
+                    $count['allError']   += (int) $tabRow['err_cnt'];
+                    $count['allSigned']  += (int) $tabRow['signed_cnt'];
+                    $count['allWaiting'] += (int) $tabRow['waiting_cnt'];
                 }
             }
             echo "<br/><b>签到状态[总体]：</b>已签到 {$count['allSigned']} 个贴吧，还有 {$count['allWaiting']} 个贴吧等待签到";
@@ -226,7 +225,8 @@ switch (SYSTEM_PAGE) {
                 misc::DoSign($sgTable, UID);
             }
         }
-        $signStat = SignManager::signSummary();
+        //「立即签到」只处理当前用户自己的账号，统计也必须限定本人，避免把全站数字回给普通用户
+        $signStat = SignManager::signSummary((int) UID);
         echo json_encode(array(
             'error' => 0,
             'done' => $done,
@@ -355,9 +355,13 @@ switch (SYSTEM_PAGE) {
                 msg('您当前绑定的账号数已达到管理员设置的上限<br/><br/>您当前已绑定 ' . $count['c'] . ' 个账号，最多只能绑定 ' . option::get('bduss_num') . ' 个账号');
             }
         }
-        $name  = !empty($_POST['bd_name']) ? $_POST['bd_name'] :
-        die();
-        $pw    = !empty($_POST['bd_pw'])   ? $_POST['bd_pw']   : die();
+        $name  = !empty($_POST['bd_name']) ? $_POST['bd_name'] : '';
+        $pw    = !empty($_POST['bd_pw'])   ? $_POST['bd_pw']   : '';
+        if ($name === '' || $pw === '') {
+            //前端期待 JSON；此前裸 die() 会输出空白页让用户无从判断
+            echo json_encode(array('error' => '-1', 'msg' => '请填写百度账号和密码'), JSON_UNESCAPED_UNICODE);
+            die;
+        }
         $vcode = !empty($_POST['vcode'])   ? $_POST['vcode']   : '';
         $vcodestr = !empty($_POST['vcodestr']) ? $_POST['vcodestr'] : '';
         $loginResult = misc::loginBaidu($name, $pw, $vcode, $vcodestr);

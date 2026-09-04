@@ -566,6 +566,10 @@ if (SYSTEM_PAGE == 'admin:login') {
     $token = isset($_GET['token']) ? trim((string) $_GET['token']) : '';
     $resendUid = isset($_GET['resend']) ? (int) $_GET['resend'] : 0;
     if ($token !== '') {
+        //token 由 bin2hex(random_bytes(20)) 生成，格式不符直接拒绝，杜绝拼接注入
+        if (strlen($token) > 64 || !ctype_xdigit($token)) {
+            msg('验证链接无效或已过期，请通过登录页的提示重新发送验证邮件');
+        }
         $row = $m->once_fetch_array("SELECT `value` FROM `" . DB_NAME . "`.`" . DB_PREFIX . "options` WHERE `name` = 'regverify:token:{$token}' LIMIT 1");
         $info = !empty($row['value']) ? json_decode((string) $row['value'], true) : false;
         if (!is_array($info) || empty($info['uid']) || empty($info['expire']) || $info['expire'] < time()) {

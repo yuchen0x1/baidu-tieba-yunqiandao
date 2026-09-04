@@ -198,7 +198,9 @@ switch (SYSTEM_PAGE) {
             @option::set('notify_wxpusher_uid', isset($sou['notify_wxpusher_uid']) ? trim($sou['notify_wxpusher_uid']) : '');
             @option::set('notify_ntfy_server', isset($sou['notify_ntfy_server']) ? trim($sou['notify_ntfy_server']) : 'https://ntfy.sh');
             @option::set('notify_ntfy_topic', isset($sou['notify_ntfy_topic']) ? trim($sou['notify_ntfy_topic']) : '');
-            @option::set('api_token', isset($sou['api_token']) ? $sou['api_token'] : '');
+            require_once SYSTEM_ROOT . '/lib/security.php';
+            //全局 API Token 只存哈希，防止拖库后直接拿到可用凭据
+            @option::set('api_token', api_token_storable(isset($sou['api_token']) ? $sou['api_token'] : ''));
             @option::set('oauth_github_enable', isset($sou['oauth_github_enable']) ? '1' : '0');
             @option::set('oauth_github_client_id', trim((string) (isset($sou['oauth_github_client_id']) ? $sou['oauth_github_client_id'] : '')));
             @option::set('oauth_github_client_secret', trim((string) (isset($sou['oauth_github_client_secret']) ? $sou['oauth_github_client_secret'] : '')));
@@ -257,7 +259,13 @@ switch (SYSTEM_PAGE) {
                 break;
             case 'backup':
                 global $m;
-                $list  = !empty($_POST['tab']) ? array_map('addslashes', $_POST['tab']) : msg('请至少选择一个需要导出的表');
+                $list  = !empty($_POST['tab']) ? (array) $_POST['tab'] : msg('请至少选择一个需要导出的表');
+                $list  = array_values(array_filter($list, static function ($t) {
+                    return is_string($t) && preg_match('/^[A-Za-z0-9_]{1,64}$/', $t);
+                }));
+                if (empty($list)) {
+                    msg('表名不合法，已终止导出');
+                }
                 $dump  = '#Warning: Do not change the comments!!!'  . "\n";
                 $dump .= '#Tieba-Cloud-Sign Database Backup' . "\n";
                 $dump .= '#Version:' . SYSTEM_VER . "\n";
@@ -968,17 +976,8 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
             CleanUser(UID);
             Redirect('index.php?mod=showtb');
         } elseif (isset($_GET['reset'])) {
-            $max = $m->fetch_array($m->query("select max(id) as id from `" . DB_NAME . "`.`" . DB_PREFIX . TABLE . "` where `uid`=" . UID));
-            $min = $m->fetch_array($m->query("select min(id) as id from `" . DB_NAME . "`.`" . DB_PREFIX . TABLE . "` where `uid`=" . UID));
-            $max = $max['id'];
-            $min = $min['id'];
-            while ($min < $max) {
-                $res = $m->fetch_array($m->query('SELECT * FROM `' . DB_NAME . '`.`' . DB_PREFIX . TABLE . '` WHERE `id` =' . $min . ' Limit 1'));
-                if ($res['status'] != 0) {
-                    $m->query('UPDATE `' . DB_NAME . '`.`' . DB_PREFIX . TABLE . '` SET `latest` = 0,`status` = 0,`last_error` = NULL WHERE `id` =' . $min);
-                }
-                $min = $min + 1;
-            }
+            //单条带 uid 的 UPDATE：仅重置当前用户出错的贴吧（共享表中不得触碰他人数据）
+            $m->pquery("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . TABLE . "` SET `latest` = 0, `status` = 0, `last_error` = NULL WHERE `uid` = ? AND `status` != 0", array(UID));
             Redirect('index.php?mod=showtb&ok');
         } elseif (isset($_POST['add'])) {
             if (option::get('enable_addtieba') == '1') {

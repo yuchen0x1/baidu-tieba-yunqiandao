@@ -17,6 +17,28 @@ class SignManager
      */
     public static function ensureTables()
     {
+        static $ready = false;
+        if ($ready) {
+            return;
+        }
+        global $m;
+        self::createLogTable();
+        $m->query("CREATE TABLE IF NOT EXISTS `" . DB_PREFIX . self::HEALTH_TABLE . "` (
+            `pid` INT UNSIGNED NOT NULL PRIMARY KEY,
+            `name` VARCHAR(40) NOT NULL DEFAULT '',
+            `status` VARCHAR(20) NOT NULL DEFAULT 'unknown',
+            `last_ok` INT UNSIGNED NOT NULL DEFAULT 0,
+            `last_fail` INT UNSIGNED NOT NULL DEFAULT 0,
+            `fail_count` INT UNSIGNED NOT NULL DEFAULT 0,
+            `error_msg` TEXT,
+            `updated_at` INT UNSIGNED NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+        self::ensureHistoryTable();
+        $ready = true;
+    }
+
+    private static function createLogTable()
+    {
         global $m;
         $m->query("CREATE TABLE IF NOT EXISTS `" . DB_PREFIX . self::LOG_TABLE . "` (
             `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -29,17 +51,6 @@ class SignManager
             PRIMARY KEY (`id`),
             KEY `pid` (`pid`), KEY `action` (`action`), KEY `status` (`status`), KEY `created_at` (`created_at`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
-        $m->query("CREATE TABLE IF NOT EXISTS `" . DB_PREFIX . self::HEALTH_TABLE . "` (
-            `pid` INT UNSIGNED NOT NULL PRIMARY KEY,
-            `name` VARCHAR(40) NOT NULL DEFAULT '',
-            `status` VARCHAR(20) NOT NULL DEFAULT 'unknown',
-            `last_ok` INT UNSIGNED NOT NULL DEFAULT 0,
-            `last_fail` INT UNSIGNED NOT NULL DEFAULT 0,
-            `fail_count` INT UNSIGNED NOT NULL DEFAULT 0,
-            `error_msg` TEXT,
-            `updated_at` INT UNSIGNED NOT NULL
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
-        self::ensureHistoryTable();
     }
 
     /**
@@ -48,26 +59,27 @@ class SignManager
     public static function log($pid, $action, $status, $message, $duration_ms = 0)
     {
         global $m;
-        $m->query("CREATE TABLE IF NOT EXISTS `" . DB_PREFIX . self::LOG_TABLE . "` (
-            `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            `pid` INT UNSIGNED NOT NULL DEFAULT 0,
-            `action` VARCHAR(50) NOT NULL DEFAULT '',
-            `status` VARCHAR(20) NOT NULL DEFAULT '',
-            `message` TEXT,
-            `duration_ms` INT UNSIGNED NOT NULL DEFAULT 0,
-            `created_at` INT UNSIGNED NOT NULL,
-            PRIMARY KEY (`id`),
-            KEY `pid` (`pid`),
-            KEY `action` (`action`),
-            KEY `status` (`status`),
-            KEY `created_at` (`created_at`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+        static $ddlDone = false;
+        if (!$ddlDone) {
+            self::createLogTable();
+            $ddlDone = true;
+        }
         $msg = $m->real_escape_string(substr($message, 0, 500));
-        $m->query("INSERT INTO `" . DB_PREFIX . self::LOG_TABLE . "`
-            (`pid`, `action`, `status`, `message`, `duration_ms`, `created_at`)
-            VALUES ('" . intval($pid) . "', '" . $m->real_escape_string($action) . "',
-             '" . $m->real_escape_string($status) . "', '" . $msg . "',
-             '" . intval($duration_ms) . "', UNIX_TIMESTAMP());");
+        try {
+            $m->query("INSERT INTO `" . DB_PREFIX . self::LOG_TABLE . "`
+                (`pid`, `action`, `status`, `message`, `duration_ms`, `created_at`)
+                VALUES ('" . intval($pid) . "', '" . $m->real_escape_string($action) . "',
+                 '" . $m->real_escape_string($status) . "', '" . $msg . "',
+                 '" . intval($duration_ms) . "', UNIX_TIMESTAMP());");
+        } catch (Throwable $e) {
+            //表可能在同进程内被删（如备份恢复），重建一次再重试；仍失败则按原样抛出
+            self::createLogTable();
+            $m->query("INSERT INTO `" . DB_PREFIX . self::LOG_TABLE . "`
+                (`pid`, `action`, `status`, `message`, `duration_ms`, `created_at`)
+                VALUES ('" . intval($pid) . "', '" . $m->real_escape_string($action) . "',
+                 '" . $m->real_escape_string($status) . "', '" . $msg . "',
+                 '" . intval($duration_ms) . "', UNIX_TIMESTAMP());");
+        }
     }
 
     /**
@@ -603,7 +615,8 @@ class SignManager
         self::ensureHistoryTable();
         $filters = is_array($filters) ? $filters : array();
         $page = max(1, (int) $page);
-        $pageSize = max(5, min(200, (int) $pageSize));
+        //上限 5000：满足 CSV 导出（api.php / control.php 传 5000），分页浏览不受影响
+        $pageSize = max(5, min(5000, (int) $pageSize));
 
         $where = array('1=1');
         $params = array();
@@ -617,8 +630,9 @@ class SignManager
             $params[] = (int) $filters['pid'];
         }
         if (!empty($filters['tieba'])) {
+            //先转义 LIKE 通配符再交给参数绑定，用户输入的 % _ 按字面匹配
             $where[] = '`tieba` LIKE ?';
-            $params[] = '%' . $m->real_escape_string($filters['tieba']) . '%';
+            $params[] = '%' . $m->real_escape_string(addcslashes((string) $filters['tieba'], '%_')) . '%';
         }
         if (!empty($filters['status']) && in_array($filters['status'], array('success', 'error', 'skipped'), true)) {
             $where[] = '`status` = ?';

@@ -91,7 +91,7 @@ if (!empty($i['user']['bduss'])) {
     if (option::get('enable_addtieba') == 1) {
         echo ' | <a href="javascript:;" data-toggle="modal" data-target="#AddTieba" style="cursor:pointer">手动添加贴吧</a>';
     }
-    echo ' | <a href="setting.php?mod=showtb&reset" style="cursor:pointer">重签出错吧</a>';
+    echo ' | <a href="setting.php?mod=showtb&reset" onclick="return confirm(\'要把所有出错的贴吧重置为待签到状态吗？今天已签到成功的不会受影响。\');" style="cursor:pointer">重签出错吧</a>';
     echo ' | <a href="javascript:;" onclick="go(\'submit_button\');" style="cursor:pointer">前往底部</a></div></div>';
     if (!empty($f)) {
         echo '<div class="cs-tabs"><ul class="cs-tablist" role="tablist">';

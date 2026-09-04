@@ -240,3 +240,40 @@ if (!function_exists('safe_announcement_hooks')) {
         return array_values(array_unique(array_intersect($allowed, array_map('strval', $hooks))));
     }
 }
+
+if (!function_exists('api_token_storable')) {
+    /**
+     * 将管理员输入的全局 API Token 转为可落库的形态：仅存 SHA-256 哈希，不再明文保存。
+     * 已经是 64 位十六进制（历史哈希或用户恰好输入 64 hex）原样保留，避免无法回推比对。
+     */
+    function api_token_storable($token)
+    {
+        $token = trim((string) $token);
+        if ($token === '') {
+            return '';
+        }
+        if (strlen($token) === 64 && ctype_xdigit($token)) {
+            return $token;
+        }
+        return hash('sha256', $token);
+    }
+}
+
+if (!function_exists('api_token_matches')) {
+    /**
+     * 校验请求携带的 Token 是否匹配库中存储值。
+     * 兼容两种历史形态：明文存储（升级前的旧站）与哈希存储。
+     */
+    function api_token_matches($stored, $provided)
+    {
+        $stored = (string) $stored;
+        $provided = (string) $provided;
+        if ($stored === '' || $provided === '') {
+            return false;
+        }
+        if (hash_equals($stored, $provided)) {
+            return true;
+        }
+        return hash_equals($stored, hash('sha256', $provided));
+    }
+}

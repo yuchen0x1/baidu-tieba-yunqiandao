@@ -16,7 +16,7 @@ $rawRows = SignManager::ranking($rawLimit);
 $rankRows = array();
 foreach ($rawRows as $row) {
     if ($row['uid'] <= 0) continue;
-    $hidden = option::uget($row['uid'], 'hide_from_ranking') == 1;
+    $hidden = option::uget('hide_from_ranking', $row['uid']) == 1;
     $rankRows[] = array(
         'uid'           => $row['uid'],
         'name'          => $hidden ? ('用户#' . $row['uid']) : $row['name'],

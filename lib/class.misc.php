@@ -420,7 +420,7 @@ class misc
         $today = date('d');
         if (empty($fid)) {
             $fid = misc::getFid($kw);
-            $m->query("UPDATE  `" . DB_PREFIX . $table . "` SET  `fid` =  '{$fid}' WHERE  `" . DB_PREFIX . $table . "`.`id` = '{$id}';", true);
+            $m->pquery("UPDATE `" . DB_PREFIX . $table . "` SET `fid` = ? WHERE `" . DB_PREFIX . $table . "`.`id` = ?", array((string) $fid, (int) $id));
         }
 
         //dump(json_decode(self::DoSign_Client($uid,$kw,$id,$pid,$fid,$ck),true),true);die;
@@ -460,12 +460,13 @@ class misc
         }
 
         if ($status_succ === true) {
-            $m->query("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` SET  `latest` =  '" . $today . "',`status` =  '0',`last_error` = NULL WHERE `" . DB_PREFIX . $table . "`.`id` = '{$id}'", true);
+            $m->pquery("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` SET `latest` = ?, `status` = 0, `last_error` = NULL WHERE `" . DB_PREFIX . $table . "`.`id` = ?", array($today, (int) $id));
             if (class_exists('SignManager')) {
                 SignManager::logTiebaResult($pid, $uid, $kw, 'success');
             }
         } elseif (!empty($error_code)) {
-            $m->query("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` SET  `latest` =  '" . $today . "',`status` =  '" . $error_code . "',`last_error` = '" . $error_msg . "' WHERE `" . DB_PREFIX . $table . "`.`id` = '{$id}'", true);
+            //error_msg 来自百度接口返回，可能含引号等字符，必须参数化否则落库失败且无法复签
+            $m->pquery("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` SET `latest` = ?, `status` = ?, `last_error` = ? WHERE `" . DB_PREFIX . $table . "`.`id` = ?", array($today, (string) $error_code, (string) $error_msg, (int) $id));
             if (class_exists('SignManager')) {
                 SignManager::logTiebaResult($pid, $uid, $kw, 'error', (int) $error_code, $error_msg);
             }
