@@ -28,6 +28,7 @@ if (isset($_POST['ver4_monitor_submit'])) {
     ver4_monitor_uopt_set($uid, 'ver4_monitor_enable', $_POST['ver4_monitor_enable'] == '1' ? '1' : '0');
     ver4_monitor_uopt_set($uid, 'ver4_monitor_kws', trim((string) $_POST['ver4_monitor_kws']));
     ver4_monitor_uopt_set($uid, 'ver4_monitor_words', trim((string) $_POST['ver4_monitor_words']));
+    ver4_monitor_uopt_set($uid, 'ver4_monitor_exclude', trim((string) $_POST['ver4_monitor_exclude']));
     ver4_monitor_uopt_set($uid, 'ver4_monitor_notify', $_POST['ver4_monitor_notify'] == '1' ? '1' : '0');
     redirect('index.php?plugin=ver4_monitor&success=' . urlencode('帖子监控设置已保存'));
 }
@@ -39,6 +40,7 @@ $g = function ($key, $default = '') use ($uid) {
 $monEnable = $g('ver4_monitor_enable', '0');
 $monKws = htmlspecialchars($g('ver4_monitor_kws'), ENT_QUOTES, 'UTF-8');
 $monWords = htmlspecialchars($g('ver4_monitor_words'), ENT_QUOTES, 'UTF-8');
+$monExclude = htmlspecialchars($g('ver4_monitor_exclude'), ENT_QUOTES, 'UTF-8');
 $monNotify = $g('ver4_monitor_notify', '1');
 $notifyEnabled = option::get('notify_enable') == '1';
 
@@ -73,6 +75,10 @@ while ($r = $m->fetch_array($logRs)) {
         <tr>
             <td><b>监控关键词</b><br/><br/>每行一个，标题包含任一关键词即命中<br/>留空表示监控全部新帖</td>
             <td><textarea class="form-control" name="ver4_monitor_words" style="height:110px" placeholder="例如：&#10;求助&#10;抽奖&#10;福利"><?php echo $monWords; ?></textarea></td>
+        </tr>
+        <tr>
+            <td><b>排除关键词</b><br/><br/>每行一个，标题包含任一排除词则忽略<br/>即使命中了监控关键词也会被过滤</td>
+            <td><textarea class="form-control" name="ver4_monitor_exclude" style="height:90px" placeholder="例如：&#10;广告&#10;招聘"><?php echo $monExclude; ?></textarea></td>
         </tr>
         <tr>
             <td><b>通知推送</b><br/>命中后通过站点通知渠道推送（Server酱/TG/邮件等，由站长在设置中心配置）<?php echo $notifyEnabled ? '' : '<br/><span class="text-danger">当前站点通知未启用，命中只记录在本页</span>'; ?></td>

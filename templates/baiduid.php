@@ -87,6 +87,12 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
   </tbody>
 </table>
 </div>
+<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 16px">
+    <b>聚合操作</b>
+    <button type="button" class="cs-btn cs-btn-warning cs-btn-sm" id="sign-run-all">⚡ 立即签到（我的全部账号）</button>
+    <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm" id="sign-run-one">立即签到（选中账号）</button>
+    <span class="text-muted" style="font-size:12px" id="sign-summary">单次立即签到最多处理 15 个贴吧，其余由计划任务继续完成</span>
+</div>
 <div style="margin-top:18px">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
         <b>我的贴吧 · 关注与等级</b>
@@ -140,6 +146,43 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
         }
         $('#mo-view').on('click', function () { moLoad(false); });
         $('#mo-refresh').on('click', function () { moLoad(true); });
+
+        function signRun(pid) {
+            var $btn = pid > 0 ? $('#sign-run-one') : $('#sign-run-all');
+            if ($btn.prop('disabled')) { return; }
+            $btn.prop('disabled', true);
+            $('#sign-summary').text('正在签到，请稍候…');
+            $.ajax({
+                url: 'ajax.php?mod=sign:run',
+                dataType: 'json',
+                type: 'POST',
+                data: { 'pid': pid, 'csrf_token': $('input[name="csrf_token"]').val() },
+                success: function (x) {
+                    $btn.prop('disabled', false);
+                    if (x.error !== 0) {
+                        $('#sign-summary').text(x.msg || '签到失败');
+                        if (window.CS && CS.toast) { CS.toast('签到未执行', { type: 'warning', body: x.msg || '' }); }
+                        return;
+                    }
+                    var msg = '今日已签 ' + x.signed + ' · 失败 ' + x.failed + ' · 等待 ' + x.waiting + (pid > 0 && x.done > 0 ? '（本次该账号处理 ' + x.done + ' 个吧）' : '');
+                    $('#sign-summary').text(msg);
+                    if (window.CS && CS.toast) { CS.toast('签到完成', { type: 'success', body: msg }); }
+                },
+                error: function () {
+                    $btn.prop('disabled', false);
+                    $('#sign-summary').text('签到请求失败，请稍后重试');
+                }
+            });
+        }
+        $('#sign-run-all').on('click', function () {
+            if (!window.confirm('立即为我的全部账号执行签到？未到时段或超过单次上限的部分由计划任务继续完成。')) { return; }
+            signRun(0);
+        });
+        $('#sign-run-one').on('click', function () {
+            var pid = $('#mo-pid').val();
+            if (!pid) { return; }
+            signRun(parseInt(pid, 10));
+        });
     })();
 </script>
     <?php

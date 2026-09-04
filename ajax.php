@@ -138,6 +138,64 @@ switch (SYSTEM_PAGE) {
     //     }
     //     break;
 
+    case 'sign:run':
+        //聚合操作：立即签到我的账号（pid=0 全部账号；pid>0 指定账号，单次最多处理 15 个贴吧）
+        if (!defined('UID')) {
+            msg('请先登录');
+        }
+        @set_time_limit(100);
+        global $i;
+        require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
+        require_once SYSTEM_ROOT . '/lib/security.php';
+        $windowBlocked = misc::signWindowBlocked();
+        if ($windowBlocked !== false) {
+            echo json_encode(array('error' => 2, 'msg' => '当前不在签到时段内：' . $windowBlocked), JSON_UNESCAPED_UNICODE);
+            die;
+        }
+        $signPid = isset($_POST['pid']) ? (int) $_POST['pid'] : 0;
+        $done = 0;
+        if ($signPid > 0) {
+            $ownSign = $m->pquery("SELECT `id` FROM `" . DB_PREFIX . "baiduid` WHERE `id` = ? AND `uid` = ?", array($signPid, UID));
+            $ownSignRow = $ownSign !== false ? $ownSign->fetch_array() : false;
+            if (empty($ownSignRow)) {
+                echo json_encode(array('error' => 1, 'msg' => '账号不存在或无权访问'), JSON_UNESCAPED_UNICODE);
+                die;
+            }
+            $signMode = safe_sign_modes(option::get('sign_mode'));
+            $todayD = date('d');
+            $remaining = 15;
+            foreach ($i['table'] as $sgTable) {
+                if ($remaining <= 0) {
+                    break;
+                }
+                $sgQs = $m->pquery("SELECT * FROM `" . DB_PREFIX . $sgTable . "` WHERE `pid` = ? AND `no` = 0 AND `latest` != ? LIMIT " . $remaining, array($signPid, $todayD));
+                if ($sgQs === false) {
+                    continue;
+                }
+                while ($sgRow = $sgQs->fetch_array()) {
+                    misc::DoSign_All((int) $sgRow['uid'], $sgRow['tieba'], (int) $sgRow['id'], $sgTable, $signMode, (int) $sgRow['pid'], (int) $sgRow['fid']);
+                    $done++;
+                    $remaining--;
+                    if ($remaining <= 0) {
+                        break;
+                    }
+                }
+            }
+        } else {
+            foreach ($i['table'] as $sgTable) {
+                misc::DoSign($sgTable, UID);
+            }
+        }
+        $signStat = SignManager::signSummary();
+        echo json_encode(array(
+            'error' => 0,
+            'done' => $done,
+            'signed' => (int) $signStat['signed'],
+            'failed' => (int) $signStat['error'],
+            'waiting' => (int) $signStat['waiting'],
+        ), JSON_UNESCAPED_UNICODE);
+        die;
+
     case 'baiduid:moindex':
         //我的贴吧：关注列表 + 每吧等级 + 今日签到状态（mo/q/newmoindex），结果缓存 30 分钟
         global $m;

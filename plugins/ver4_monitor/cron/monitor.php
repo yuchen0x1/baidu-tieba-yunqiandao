@@ -150,6 +150,16 @@ function cron_ver4_monitor_do()
                     break;
                 }
                 $title = $t['title'];
+                $excluded = false;
+                foreach ($excludeWords as $ew) {
+                    if ($ew !== '' && mb_stripos($title, $ew) !== false) {
+                        $excluded = true;
+                        break;
+                    }
+                }
+                if ($excluded) {
+                    continue;
+                }
                 $hitWord = '';
                 if (empty($words)) {
                     $hitWord = '';

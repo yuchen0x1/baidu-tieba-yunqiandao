@@ -505,6 +505,53 @@ class misc
             && isset($signAgain['num'])
             && $signAgain['num'] <= $retryMax;
     }
+
+    /**
+     * 智能重试退避判定：第 1、2 轮立即重试，之后按 2 的幂轮次重试（4、8、16…），
+     * 避免复签任务每分钟轰炸百度接口。$num 为当天已执行的复签轮数（从 0 计）。
+     * @param mixed $signAgain unserialize 后的 cron_sign_again 选项
+     * @param string $today    Y-m-d 格式的当天日期
+     * @return bool
+     */
+    public static function shouldRetrySmart($signAgain, $today)
+    {
+        if (!is_array($signAgain) || !isset($signAgain['lastdo']) || $signAgain['lastdo'] != $today) {
+            return false;
+        }
+        $num = isset($signAgain['num']) ? (int) $signAgain['num'] : 0;
+        if ($num >= 63) {
+            return false; //一天最多退避到约 64 分钟间隔
+        }
+        $round = $num + 1; //本轮序号（1 起）
+        return ($round & ($round - 1)) === 0; //轮序号为 2 的幂时允许重试
+    }
+
+    /**
+     * 签到时段判定：配置了签到时段结束时仅在该时段内签到（支持跨零点），
+     * 未配置时保持旧行为（sign_hour 点（含）之前忽略；sign_hour 为 -1/空表示不限制）
+     * @return false|string false=允许签到，字符串=被阻止的原因
+     */
+    public static function signWindowBlocked()
+    {
+        $startOpt = option::get('sign_hour');
+        $startH = ($startOpt === '' || $startOpt === null) ? -1 : (int) $startOpt;
+        $nowH = (int) date('H');
+        $endOpt = option::get('sign_window_end');
+        if ($endOpt === '' || $endOpt === null) {
+            return ($startH >= 0 && $nowH <= $startH) ? $startH . '点时忽略签到' : false;
+        }
+        $endH = (int) $endOpt;
+        if ($startH === $endH) {
+            return false;
+        }
+        if ($startH < $endH) {
+            $in = ($nowH > $startH && $nowH <= $endH);
+        } else {
+            $in = ($nowH > $startH || $nowH <= $endH); //跨零点时段
+        }
+        return $in ? false : '不在签到时段内';
+    }
+
     /**
      * 执行一个表的签到任务
      * @param string $table 表
@@ -516,8 +563,9 @@ class misc
         $sign_mode = safe_sign_modes(option::get('sign_mode'));
         $today = date('d');
         $uidWhere = (int) $onlyUid > 0 ? ' AND `uid` = ' . (int) $onlyUid : '';
-        if (date('H') <= option::get('sign_hour')) {
-            return option::get('sign_hour') . '点时忽略签到';
+        $windowBlocked = self::signWindowBlocked();
+        if ($windowBlocked !== false) {
+            return $windowBlocked;
         }
 
         $limit = option::get('cron_limit');
@@ -560,8 +608,9 @@ class misc
         $uidWhere = (int) $onlyUid > 0 ? ' AND `uid` = ' . (int) $onlyUid : '';
         $today = date('Y-m-d');
         $todayDay = date('d');
-        if (date('H') <= option::get('sign_hour')) {
-            return option::get('sign_hour') . '点时忽略签到';
+        $windowBlocked = self::signWindowBlocked();
+        if ($windowBlocked !== false) {
+            return $windowBlocked;
         }
 
         $x = $m->fetch_array($m->query("SELECT count(id) AS `c` FROM `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` WHERE `no` = 0 AND `latest` != '{$todayDay}'{$uidWhere} "));
@@ -571,11 +620,32 @@ class misc
             $sign_mode = safe_sign_modes(option::get('sign_mode'));
             $sign_again = safe_retry_state(option::get('cron_sign_again'));
             $retry_max  = option::get('retry_max');
+            $smartRetry = option::get('retry_smart') != '0';
             $q = array();
             $x = array();
         //重新尝试签到出错的贴吧
             if ($limit == 0) {
-                if (self::shouldRetry($retry_max, $sign_again, $today)) {
+                if ($smartRetry) {
+                    if (self::shouldRetrySmart($sign_again, $today)) {
+                        $qs = $m->query("SELECT * FROM  `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` WHERE `no` = 0 AND `status` IN (340011,2280007,110001,1989004,255){$uidWhere}");
+                        while ($qss = $m->fetch_array($qs)) {
+                            $q[] = array(
+                                'id'     => $qss['id'],
+                                'uid'    => $qss['uid'],
+                                'pid'    => $qss['pid'],
+                                'fid'    => $qss['fid'],
+                                'tieba'  => $qss['tieba'],
+                                'no'     => $qss['no'],
+                                'status' => $qss['status'],
+                                'latest' => $qss['latest'],
+                                'last_error'    => $qss['last_error']
+                            );
+                        }
+                        if (option::get('sign_shuffle') != '0') {
+                            shuffle($q);
+                        }
+                    }
+                } elseif (self::shouldRetry($retry_max, $sign_again, $today)) {
                     $qs = $m->query("SELECT * FROM  `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` WHERE `no` = 0 AND `status` IN (340011,2280007,110001,1989004,255){$uidWhere}");
                     while ($qss = $m->fetch_array($qs)) {
                         $q[] = array(
@@ -595,7 +665,11 @@ class misc
                     }
                 }
             } else {
-                if (self::shouldRetry($retry_max, $sign_again, $today)) {
+                if ($smartRetry) {
+                    if (self::shouldRetrySmart($sign_again, $today)) {
+                        $q = rand_row(DB_PREFIX . $table, 'id', $limit, "`no` = 0 AND `status` IN (340011,2280007,110001,1989004,255) AND `latest` = '{$todayDay}'{$uidWhere}", true);
+                    }
+                } elseif (self::shouldRetry($retry_max, $sign_again, $today)) {
                     $q = rand_row(DB_PREFIX . $table, 'id', $limit, "`no` = 0 AND `status` IN (340011,2280007,110001,1989004,255) AND `latest` = '{$todayDay}'{$uidWhere}", true);
                 }
             }

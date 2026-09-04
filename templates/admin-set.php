@@ -50,6 +50,10 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
     $content2['same_pid'] = array('html' => $bsphtml,'type' => 'else');
     $content2['retry_max'] = array('td1' => '<b>签到失败重试次数</b><br/>0为无限，-1为不重试','type' => 'number','text' => '','extra' => 'min="-1" step="1"');
     $content2['sign_hour'] = array('td1' => '<b>签到开始时间</b><br/>24小时制。例如设为-1，则从0点开始签到','type' => 'number','text' => '','extra' => 'min="-1" step="1" max="24"');
+    $signWindowEnd = option::get('sign_window_end');
+    $content2['sign_window_end'] = array('td1' => '<b>签到时段结束</b><br/>24小时制。留空表示开始后全天可签（默认）；例如开始 7 结束 10，则仅在 7 点至 10 点间签到，配合每轮限量与乱序可均匀铺满时段，支持跨零点','type' => 'number','text' => '','extra' => 'min="-1" step="1" max="24"');
+    $retrySmart = option::get('retry_smart') != '0' ? ' checked' : '';
+    $content2['retry_smart'] = array('td1' => '<b>智能重试退避</b><br/>复签不再每分钟轰炸，改为第 1、2 轮立即重试，之后按 2 的幂间隔（4、8、16…分钟）自动退避','type' => 'html','html' => '<input type="hidden" name="retry_smart" value="0"><input type="checkbox" name="retry_smart" value="1"' . $retrySmart . '> 开启智能退避','extra' => '');
     $content2['sign_sleep'] = array('td1' => '<b>签到间隔时间</b><br/>单位为毫秒，0为不暂停','type' => 'number','text' => '适量的间隔时间可以防止签到过快而失败的问题，但会导致签到效率降低','extra' => 'min="0" step="1"');
     $content2['sign_jitter'] = array('td1' => '<b>签到随机抖动</b><br/>单位为毫秒，每次签到在间隔基础上随机追加 0~该值 的等待时间，0为关闭','type' => 'number','text' => '随机化请求节奏可以降低被百度风控识别的概率','extra' => 'min="0" step="1"');
     $content2['client_version'] = array('td1' => '<b>模拟客户端版本号</b><br/>客户端签到与贴吧扫描使用的版本号','type' => 'text','text' => '百度更新客户端后旧版本号可能触发风控，可在此手动更新；留空使用内置默认值','extra' => '');

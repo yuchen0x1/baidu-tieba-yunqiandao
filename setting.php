@@ -112,6 +112,8 @@ switch (SYSTEM_PAGE) {
             @option::set('enable_addtieba', $sou['enable_addtieba']);
             @option::set('retry_max', $sou['retry_max']);
             @option::set('sign_hour', $sou['sign_hour']);
+            @option::set('sign_window_end', isset($sou['sign_window_end']) ? trim((string) $sou['sign_window_end']) : '');
+            @option::set('retry_smart', isset($sou['retry_smart']) && $sou['retry_smart'] == '1' ? '1' : '0');
             @option::set('fb', $sou['fb']);
             @option::set('sign_sleep', $sou['sign_sleep']);
             @option::set('sign_scan', $sou['sign_scan']);
