@@ -81,6 +81,10 @@ try {
     if ([string]::IsNullOrWhiteSpace($releaseId)) {
         throw "Gitee Release 响应缺少 id。"
     }
+    # Windows PowerShell 5.1 默认未加载 System.Net.Http 程序集
+    if (-not ('System.Net.Http.HttpClient' -as [type])) {
+        Add-Type -AssemblyName System.Net.Http
+    }
     $client = [System.Net.Http.HttpClient]::new()
     try {
         $client.DefaultRequestHeaders.Authorization = [System.Net.Http.Headers.AuthenticationHeaderValue]::new("Bearer", $token)
