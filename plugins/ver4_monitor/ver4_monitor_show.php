@@ -30,6 +30,8 @@ if (isset($_POST['ver4_monitor_submit'])) {
     ver4_monitor_uopt_set($uid, 'ver4_monitor_words', trim((string) $_POST['ver4_monitor_words']));
     ver4_monitor_uopt_set($uid, 'ver4_monitor_exclude', trim((string) $_POST['ver4_monitor_exclude']));
     ver4_monitor_uopt_set($uid, 'ver4_monitor_notify', $_POST['ver4_monitor_notify'] == '1' ? '1' : '0');
+    ver4_monitor_uopt_set($uid, 'ver4_monitor_mode', $_POST['ver4_monitor_mode'] === 'digest' ? 'digest' : 'realtime');
+    ver4_monitor_uopt_set($uid, 'ver4_monitor_digest_hour', (string) min(23, max(0, (int) $_POST['ver4_monitor_digest_hour'])));
     //个人通知渠道
     ver4_monitor_uopt_set($uid, 'ver4_notify_channel', trim((string) $_POST['ver4_notify_channel']));
     foreach (array('ver4_notify_serverchan_key', 'ver4_notify_telegram_token', 'ver4_notify_telegram_chatid', 'ver4_notify_bark_url', 'ver4_notify_pushplus_token', 'ver4_notify_webhook_url', 'ver4_notify_ntfy_server', 'ver4_notify_ntfy_topic') as $nfField) {
@@ -55,6 +57,8 @@ $monKws = htmlspecialchars($g('ver4_monitor_kws'), ENT_QUOTES, 'UTF-8');
 $monWords = htmlspecialchars($g('ver4_monitor_words'), ENT_QUOTES, 'UTF-8');
 $monExclude = htmlspecialchars($g('ver4_monitor_exclude'), ENT_QUOTES, 'UTF-8');
 $monNotify = $g('ver4_monitor_notify', '1');
+$monMode = $g('ver4_monitor_mode', 'realtime');
+$monDigestHour = $g('ver4_monitor_digest_hour', '21');
 $nfChannel = $g('ver4_notify_channel', 'follow_site');
 $nfKey = htmlspecialchars($g('ver4_notify_serverchan_key'), ENT_QUOTES, 'UTF-8');
 $nfTgToken = htmlspecialchars($g('ver4_notify_telegram_token'), ENT_QUOTES, 'UTF-8');
@@ -108,6 +112,16 @@ while ($r = $m->fetch_array($logRs)) {
                     <option value="1" <?php echo $monNotify == '1' ? 'selected' : ''; ?>>推送</option>
                     <option value="0" <?php echo $monNotify != '1' ? 'selected' : ''; ?>>仅记录</option>
                 </select>
+            </td>
+        </tr>
+        <tr>
+            <td><b>推送时机</b><br/>实时：命中立即推送；每日汇总：当天命中合并成一条，到设定小时点统一推送，防止刷屏</td>
+            <td>
+                <select name="ver4_monitor_mode" class="form-control" style="width:140px">
+                    <option value="realtime" <?php echo $monMode != 'digest' ? 'selected' : ''; ?>>实时推送</option>
+                    <option value="digest" <?php echo $monMode == 'digest' ? 'selected' : ''; ?>>每日汇总</option>
+                </select>
+                汇总时间点(0-23时)：<input type="number" min="0" max="23" class="form-control" name="ver4_monitor_digest_hour" value="<?php echo $monDigestHour; ?>" style="width:90px;display:inline-block;">
             </td>
         </tr>
         <tr>

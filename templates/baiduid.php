@@ -69,7 +69,17 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
         if ($name == '[E]') {
             $name = '<span class="cs-badge cs-badge-danger">已失效</span>';
         }
-        echo '<td>' . $name . '</td>';
+        //已缓存的我的贴吧概要徽章（点击下方「查看关注与等级」后生成）
+        $moBadge = '';
+        $moCacheRaw = option::get('baiduid_moindex_' . $key);
+        if ($moCacheRaw !== '' && $moCacheRaw !== null) {
+            $moCache = json_decode((string) $moCacheRaw, true);
+            if (is_array($moCache) && isset($moCache['error'], $moCache['total'], $moCache['signed']) && $moCache['error'] === 0) {
+                $allSigned = (int) $moCache['signed'] >= (int) $moCache['total'];
+                $moBadge = '<br/><span class="cs-badge" style="font-size:11px;margin-top:4px;display:inline-block;' . ($allSigned ? 'background:rgba(60,180,90,.15);color:#3cb45a' : 'background:rgba(255,160,0,.15);color:#ff9800') . '">关注 ' . (int) $moCache['total'] . ' 吧 · 已签 ' . (int) $moCache['signed'] . '</span>';
+            }
+        }
+        echo '<td>' . $name . $moBadge . '</td>';
         echo '<td><input type="text" class="form-control" readonly value="' . htmlspecialchars($i['user']['baidu_portrait'][$key], ENT_QUOTES, 'UTF-8') . '"></td>';
         echo '<td><input type="text" class="form-control" readonly value="' . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . '"></td>';
         echo '<td><input type="text" class="form-control" readonly value="' . htmlspecialchars($i['user']['stoken'][$key], ENT_QUOTES, 'UTF-8') . '"></td>';
@@ -112,6 +122,7 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
         </select>
         <button type="button" class="cs-btn cs-btn-primary cs-btn-sm" id="mo-view">查看关注与等级</button>
         <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm" id="mo-refresh">强制刷新</button>
+        <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm" id="mo-export" style="display:none">导出 CSV</button>
         <span class="text-muted" style="font-size:12px">数据缓存 30 分钟，来自手机端贴吧接口</span>
     </div>
     <div id="mo-summary" class="text-muted" style="margin-bottom:8px"></div>
@@ -120,6 +131,7 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
 <script type="text/javascript">
     (function () {
         var moLoading = false;
+        var moLastData = null;
         function moLoad(force) {
             if (moLoading) { return; }
             var pid = $('#mo-pid').val();
@@ -134,6 +146,7 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
                 success: function (x) {
                     moLoading = false;
                     if (x.error !== 0) { $('#mo-summary').text(x.msg || '加载失败'); return; }
+                    moLastData = x;
                     var box = $('#mo-forums');
                     box.empty();
                     $.each(x.forums, function (i, f) {
@@ -143,6 +156,7 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
                         box.append(badge);
                     });
                     $('#mo-summary').text('共关注 ' + x.total + ' 个吧，今日已签 ' + x.signed + ' / ' + x.total + '（更新于 ' + new Date(x.fetched_at * 1000).toLocaleTimeString() + '）');
+                    $('#mo-export').css('display', '');
                 },
                 error: function () {
                     moLoading = false;
@@ -152,6 +166,23 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
         }
         $('#mo-view').on('click', function () { moLoad(false); });
         $('#mo-refresh').on('click', function () { moLoad(true); });
+        $('#mo-export').on('click', function () {
+            if (!moLastData || !moLastData.forums) { alert('请先加载我的贴吧数据'); return; }
+            var rows = [['序号', '贴吧名', '我的等级', '经验', '今日签到']];
+            $.each(moLastData.forums, function (i, f) {
+                rows.push([i + 1, f.name, 'Lv.' + f.level, f.exp, f.signed ? '已签' : '未签']);
+            });
+            var csv = '\uFEFF' + rows.map(function (r) {
+                return r.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(',');
+            }).join('\r\n');
+            var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = '我的贴吧_' + new Date().toISOString().slice(0, 10) + '.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
 
         function signRun(pid) {
             var $btn = pid > 0 ? $('#sign-run-one') : $('#sign-run-all');
