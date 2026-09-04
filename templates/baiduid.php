@@ -55,7 +55,7 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
     <tr>
       <th>PID</th>
       <th style="width:20%">百度名称</th>
-      <th>健康度</th>
+      <th style="width:90px">健康度</th>
       <th style="width:20%">Portrait</th>
       <th style="width:30%">BDUSS</th>
       <th style="width:20%">STOKEN</th>
@@ -150,7 +150,7 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
         } else { $hScore += 5; $hParts[] = '今日无任务 5'; }
         $hScore = min(100, $hScore);
         $hColor = $hScore >= 80 ? '#3cb45a' : ($hScore >= 60 ? '#ff9800' : '#e53935');
-        echo '<td><span class="cs-badge" style="font-size:12px;background:' . $hColor . '22;color:' . $hColor . '" title="' . htmlspecialchars(implode('，', $hParts), ENT_QUOTES, 'UTF-8') . '">健康度 ' . $hScore . '</span></td>';
+        echo '<td style="white-space:nowrap"><span class="cs-badge" style="font-size:12px;white-space:nowrap;background:' . $hColor . '22;color:' . $hColor . '" title="' . htmlspecialchars(implode('，', $hParts), ENT_QUOTES, 'UTF-8') . '">健康度 ' . $hScore . '</span></td>';
         echo '<td><input type="text" class="form-control" readonly value="' . htmlspecialchars($i['user']['baidu_portrait'][$key], ENT_QUOTES, 'UTF-8') . '"></td>';
         echo '<td><input type="text" class="form-control" readonly value="' . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . '"></td>';
         echo '<td><input type="text" class="form-control" readonly value="' . htmlspecialchars($i['user']['stoken'][$key], ENT_QUOTES, 'UTF-8') . '"></td>';
