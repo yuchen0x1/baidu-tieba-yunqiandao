@@ -31,24 +31,43 @@ switch ($i['mode'][0]) {
 
         break;
     case 'analysis':
-        //会话级 CSV 导出：每日聚合报表（成功/失败/总计/成功率）
+        //会话级 CSV 导出：type=daily 每日聚合报表（成功/失败/总计/成功率）；type=forum 吧维度明细
         if (isset($_GET['export']) && $_GET['export'] === 'csv') {
             if (ROLE === 'visitor' || ROLE === 'banned') {
                 msg('请先登录');
             }
             require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
             $expDays = isset($_GET['days']) && in_array((int) $_GET['days'], array(7, 30, 90, 365), true) ? (int) $_GET['days'] : 30;
-            $expUid = (int) UID;
-            $expRows = SignManager::trend($expDays, $expUid);
+            //与 analysis 页面一致的视角：管理员控制模式查看指定用户时导出该用户数据
+            $expUid = (ISADMIN && defined('CON_UID') && CON_UID > 0) ? (int) CON_UID : (int) UID;
+            $expType = isset($_GET['type']) && $_GET['type'] === 'forum' ? 'forum' : 'daily';
             $stamp = date('Ymd_His');
             header('Content-Type: text/csv; charset=UTF-8');
-            header('Content-Disposition: attachment; filename="sign-analysis-' . $expDays . 'd-' . $stamp . '.csv"');
+            header('Content-Disposition: attachment; filename="sign-analysis-' . $expType . '-' . $expDays . 'd-' . $stamp . '.csv"');
             header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
             echo "\xEF\xBB\xBF";
-            echo csv_line(array('日期', '成功', '失败', '总计', '成功率'));
-            foreach ($expRows as $r) {
-                $rate = (int) $r['total'] > 0 ? round((int) $r['success'] / (int) $r['total'] * 100, 2) . '%' : '';
-                echo csv_line(array($r['date'], (int) $r['success'], (int) $r['error'], (int) $r['total'], $rate));
+            if ($expType === 'forum') {
+                $expRows = SignManager::tiebaHealth($expUid, $expDays);
+                echo csv_line(array('贴吧', '成功', '失败', '总计', '成功率', '最近状态', '最近签到时间', '最近消息'));
+                foreach ($expRows as $r) {
+                    echo csv_line(array(
+                        $r['tieba'],
+                        (int) $r['success'],
+                        (int) $r['error'],
+                        (int) $r['total'],
+                        $r['rate'] . '%',
+                        $r['last_status'] === 'success' ? '成功' : ($r['last_status'] === 'error' ? '失败' : ($r['last_status'] === 'skipped' ? '跳过' : '未知')),
+                        $r['last_time'] > 0 ? date('Y-m-d H:i:s', (int) $r['last_time']) : '',
+                        (string) $r['last_msg'],
+                    ));
+                }
+            } else {
+                $expRows = SignManager::trend($expDays, $expUid);
+                echo csv_line(array('日期', '成功', '失败', '总计', '成功率'));
+                foreach ($expRows as $r) {
+                    $rate = (int) $r['total'] > 0 ? round((int) $r['success'] / (int) $r['total'] * 100, 2) . '%' : '';
+                    echo csv_line(array($r['date'], (int) $r['success'], (int) $r['error'], (int) $r['total'], $rate));
+                }
             }
             exit;
         }

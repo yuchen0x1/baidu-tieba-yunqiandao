@@ -11,6 +11,7 @@ class SignManager
     const LOG_TABLE = 'cron_log_batch';
     const HEALTH_TABLE = 'baiduid_health';
     const HISTORY_TABLE = 'sign_history';
+    const HEALTH_SNAPSHOT_TABLE = 'baiduid_health_snapshot';
 
     /**
      * 为升级脚本和首次运行创建所有管理数据表。
@@ -98,6 +99,7 @@ class SignManager
                 VALUES ('" . intval($pid) . "', 'ok', '$now', 0, '$now')
                 ON DUPLICATE KEY UPDATE
                 `status` = 'ok', `last_ok` = '$now', `fail_count` = 0, `updated_at` = '$now', `error_msg` = NULL;");
+            self::snapshotBaiduidHealth($pid, true, 0);
             return true;
         } else {
             $row = $m->once_fetch_array("SELECT `name` FROM `" . DB_PREFIX . "baiduid` WHERE `id` = '" . intval($pid) . "';");
@@ -109,6 +111,8 @@ class SignManager
                 `status` = 'invalid', `last_fail` = '$now',
                 `fail_count` = `fail_count` + 1,
                 `error_msg` = 'BDUSS 已失效', `updated_at` = '$now';");
+            $failRow = $m->once_fetch_array("SELECT `fail_count` FROM `" . DB_PREFIX . self::HEALTH_TABLE . "` WHERE `pid` = " . intval($pid) . ";");
+            self::snapshotBaiduidHealth($pid, false, is_array($failRow) ? (int) $failRow['fail_count'] : 0);
             self::maybeAutoDisable($pid, $name);
             return false;
         }
@@ -599,6 +603,152 @@ class SignManager
             );
         }
         return $rows;
+    }
+
+    /**
+     * 确保 BDUSS 健康度每日快照表存在（每账号每天一条，取当天最后一次检查结果）
+     */
+    public static function ensureHealthSnapshotTable()
+    {
+        static $ready = false;
+        if ($ready) {
+            return;
+        }
+        global $m;
+        $m->query("CREATE TABLE IF NOT EXISTS `" . DB_PREFIX . self::HEALTH_SNAPSHOT_TABLE . "` (
+            `pid` INT UNSIGNED NOT NULL DEFAULT 0,
+            `day` CHAR(8) NOT NULL DEFAULT '',
+            `ok` TINYINT NOT NULL DEFAULT 0,
+            `fail_count` INT UNSIGNED NOT NULL DEFAULT 0,
+            `checked_at` INT UNSIGNED NOT NULL,
+            PRIMARY KEY (`pid`, `day`),
+            KEY `day_checked` (`day`, `checked_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+        $ready = true;
+    }
+
+    /**
+     * 记录某账号当天的健康快照（健康检查每跑一次覆盖当天记录）
+     */
+    public static function snapshotBaiduidHealth($pid, $ok, $failCount = 0)
+    {
+        global $m;
+        self::ensureHealthSnapshotTable();
+        $m->pquery(
+            "REPLACE INTO `" . DB_PREFIX . self::HEALTH_SNAPSHOT_TABLE . "` (`pid`, `day`, `ok`, `fail_count`, `checked_at`) VALUES (?, ?, ?, ?, ?)",
+            array((int) $pid, date('Ymd'), $ok ? 1 : 0, max(0, (int) $failCount), time())
+        );
+    }
+
+    /**
+     * 账号健康度每日趋势（正常账号数 / 参与检查账号数）
+     * @return array [{date, ok, total, rate}]（空白天已填充，保证趋势线连续）
+     */
+    public static function healthTrend($uid, $days = 30)
+    {
+        global $m;
+        self::ensureHealthSnapshotTable();
+        $uid = (int) $uid;
+        $days = max(1, min(365, (int) $days));
+        if ($uid <= 0) { return array(); }
+        $since = strtotime('-' . ($days - 1) . ' days midnight');
+        $result = $m->pquery(
+            "SELECT s.`day`,
+                SUM(s.`ok` = 1) AS `ok_cnt`,
+                COUNT(*) AS `total`
+            FROM `" . DB_PREFIX . self::HEALTH_SNAPSHOT_TABLE . "` s
+            INNER JOIN `" . DB_PREFIX . "baiduid` b ON s.`pid` = b.`id`
+            WHERE b.`uid` = ? AND s.`day` >= ? AND s.`day` <= ?
+            GROUP BY s.`day` ORDER BY s.`day` ASC",
+            array($uid, date('Ymd', $since), date('Ymd'))
+        );
+        $map = array();
+        while ($row = $m->fetch_array($result)) {
+            $map[(string) $row['day']] = $row;
+        }
+        $rows = array();
+        $stamp = $since;
+        $end = strtotime('today midnight');
+        while ($stamp <= $end) {
+            $day = date('Ymd', $stamp);
+            if (isset($map[$day])) {
+                $ok = (int) $map[$day]['ok_cnt'];
+                $total = (int) $map[$day]['total'];
+            } else {
+                $ok = 0;
+                $total = 0;
+            }
+            $rows[] = array(
+                'date'  => date('Y-m-d', $stamp),
+                'ok'    => $ok,
+                'total' => $total,
+                'rate'  => $total > 0 ? round($ok / $total * 100, 1) : 0,
+            );
+            $stamp += 86400;
+        }
+        return $rows;
+    }
+
+    /**
+     * 帖子监控命中统计（每吧命中数 Top 与每日命中趋势）。
+     * 监控表由 ver4_monitor 插件维护；插件未安装/表不存在时 available=false。
+     * @return array ['available'=>bool, 'total'=>int, 'top'=>[{forum,hits,replied}], 'trend'=>[{date,hits}]]
+     */
+    public static function monitorHitStats($uid, $days = 30)
+    {
+        global $m;
+        $uid = (int) $uid;
+        $days = max(1, min(365, (int) $days));
+        $empty = array('available' => false, 'total' => 0, 'top' => array(), 'trend' => array());
+        if ($uid <= 0) {
+            return $empty;
+        }
+        $t = $m->once_fetch_array(
+            "SELECT COUNT(*) AS c FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '" . $m->real_escape_string(DB_PREFIX . 'ver4_monitor_hit') . "'"
+        );
+        if (empty($t['c'])) {
+            return $empty;
+        }
+        $since = strtotime('-' . ($days - 1) . ' days midnight');
+        $totalRow = $m->once_fetch_array(
+            "SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "ver4_monitor_hit` WHERE `uid` = " . $uid . " AND `created_at` >= " . (int) $since
+        );
+        $total = !empty($totalRow['c']) ? (int) $totalRow['c'] : 0;
+        $topResult = $m->pquery(
+            "SELECT `forum`, COUNT(*) AS `hits`, SUM(`replied` = 1) AS `replied`
+            FROM `" . DB_PREFIX . "ver4_monitor_hit`
+            WHERE `uid` = ? AND `created_at` >= ?
+            GROUP BY `forum` ORDER BY `hits` DESC, `forum` ASC LIMIT 10",
+            array($uid, $since)
+        );
+        $top = array();
+        while ($row = $m->fetch_array($topResult)) {
+            $top[] = array(
+                'forum'   => (string) $row['forum'],
+                'hits'    => (int) $row['hits'],
+                'replied' => (int) $row['replied'],
+            );
+        }
+        $trendResult = $m->pquery(
+            "SELECT DATE(FROM_UNIXTIME(`created_at`)) AS `day`, COUNT(*) AS `hits`
+            FROM `" . DB_PREFIX . "ver4_monitor_hit`
+            WHERE `uid` = ? AND `created_at` >= ?
+            GROUP BY `day` ORDER BY `day` ASC",
+            array($uid, $since)
+        );
+        $trendMap = array();
+        while ($row = $m->fetch_array($trendResult)) {
+            $trendMap[(string) $row['day']] = (int) $row['hits'];
+        }
+        $trend = array();
+        $stamp = $since;
+        $end = strtotime('today midnight');
+        while ($stamp <= $end) {
+            $date = date('Y-m-d', $stamp);
+            $trend[] = array('date' => $date, 'hits' => isset($trendMap[$date]) ? $trendMap[$date] : 0);
+            $stamp += 86400;
+        }
+        return array('available' => true, 'total' => $total, 'top' => $top, 'trend' => $trend);
     }
 
     /**

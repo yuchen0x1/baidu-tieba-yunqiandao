@@ -24,6 +24,12 @@ $hourRows = SignManager::hourDistribution($viewUid, $days);
 $accountRows = SignManager::accountCompare($viewUid, $days);
 $healthMap = SignManager::accountHealth($viewUid);
 $streak = SignManager::streak($viewUid);
+$monitorStats = SignManager::monitorHitStats($viewUid, $days);
+$healthTrendRows = SignManager::healthTrend($viewUid, $days);
+$hasHealthTrend = false;
+foreach ($healthTrendRows as $htr) {
+    if ($htr['total'] > 0) { $hasHealthTrend = true; break; }
+}
 
 // 状态徽章
 $signStatusMap = array(
@@ -57,7 +63,8 @@ $fmtTime = function ($ts) {
     <?php foreach (array(7, 30, 90, 365) as $d) { ?>
     <a class="cs-btn cs-btn-ghost cs-btn-sm <?php echo $d === $days ? 'is-active' : ''; ?>" href="index.php?mod=analysis&days=<?php echo $d; ?>"><?php echo $d === 365 ? '近一年' : ('近 ' . $d . ' 天'); ?></a>
     <?php } ?>
-    <a class="cs-btn cs-btn-secondary cs-btn-sm" href="index.php?mod=analysis&days=<?php echo $days; ?>&export=csv" style="margin-left:auto">导出报表 CSV</a>
+    <a class="cs-btn cs-btn-secondary cs-btn-sm" href="index.php?mod=analysis&days=<?php echo $days; ?>&export=csv&type=forum" style="margin-left:auto">导出吧明细 CSV</a>
+    <a class="cs-btn cs-btn-secondary cs-btn-sm" href="index.php?mod=analysis&days=<?php echo $days; ?>&export=csv">导出报表 CSV</a>
 </div>
 
 <?php if ($overview['total'] === 0) { ?>
@@ -156,6 +163,34 @@ $fmtTime = function ($ts) {
     <div class="cs-chart-card-header"><h3 class="cs-chart-card-title">签到时段分布</h3><span class="cs-chart-card-subtitle">近 <?php echo $days; ?> 天按小时聚合（站点时区）</span></div>
     <div class="cs-chart-container" id="analysis-hour-chart" style="min-height:280px"></div>
 </div>
+
+<?php if ($monitorStats['available'] && $monitorStats['total'] > 0) { ?>
+<div class="cs-chart-card" style="margin:0 1% 24px">
+    <div class="cs-chart-card-header"><h3 class="cs-chart-card-title">监控命中趋势</h3><span class="cs-chart-card-subtitle">帖子监控近 <?php echo $days; ?> 天每日命中数，累计 <?php echo (int) $monitorStats['total']; ?> 条</span></div>
+    <div class="cs-chart-container" id="analysis-monitor-chart" style="min-height:260px"></div>
+    <div class="panel-body">
+        <div class="cs-table-wrap"><div class="cs-table-scroll"><table class="cs-table">
+            <thead><tr><th>目标贴吧</th><th>命中数</th><th>已联动回帖</th></tr></thead>
+            <tbody>
+            <?php foreach ($monitorStats['top'] as $mt) { ?>
+                <tr>
+                    <td><?php echo htmlspecialchars($mt['forum'], ENT_QUOTES, 'UTF-8'); ?>吧</td>
+                    <td><?php echo (int) $mt['hits']; ?></td>
+                    <td><?php echo (int) $mt['replied']; ?></td>
+                </tr>
+            <?php } ?>
+            </tbody>
+        </table></div></div>
+    </div>
+</div>
+<?php } ?>
+
+<?php if ($hasHealthTrend) { ?>
+<div class="cs-chart-card" style="margin:0 1% 24px">
+    <div class="cs-chart-card-header"><h3 class="cs-chart-card-title">账号健康度趋势</h3><span class="cs-chart-card-subtitle">来自每日健康检查快照（一天取最后一次结果）</span></div>
+    <div class="cs-chart-container" id="analysis-health-chart" style="min-height:260px"></div>
+</div>
+<?php } ?>
 
 <section class="panel panel-primary" style="margin:0 1% 24px">
     <div class="panel-heading"><span class="panel-title">账号对比与健康状态</span></div>
@@ -272,6 +307,41 @@ function initAnalysisCharts(){
             series: [
                 { name: '成功', type: 'bar', stack: 'hour', data: hourRows.map(function(r){ return r.success; }), itemStyle: { color: successColor } },
                 { name: '失败', type: 'bar', stack: 'hour', data: hourRows.map(function(r){ return r.error; }), itemStyle: { color: errorColor } }
+            ]
+        });
+    }
+
+    // 监控命中趋势：每日命中数面积折线
+    var monitorEl = document.getElementById('analysis-monitor-chart');
+    var monitorData = <?php echo json_encode($monitorStats['trend'], JSON_UNESCAPED_UNICODE); ?>;
+    if (monitorEl && monitorData.length) {
+        CS.chart.create(monitorEl, {
+            tooltip: { trigger: 'axis' },
+            grid: { left: '3%', right: '4%', bottom: '8%', containLabel: true },
+            xAxis: { type: 'category', data: monitorData.map(function(r){ return r.date.substring(5); }) },
+            yAxis: { type: 'value', minInterval: 1 },
+            series: [
+                { name: '命中数', type: 'line', smooth: true, areaStyle: { opacity: 0.15 }, data: monitorData.map(function(r){ return r.hits; }), itemStyle: { color: rateColor } }
+            ]
+        });
+    }
+
+    // 账号健康度趋势：正常账号数柱状 + 正常率折线（右轴）
+    var healthEl = document.getElementById('analysis-health-chart');
+    var healthData = <?php echo json_encode($healthTrendRows, JSON_UNESCAPED_UNICODE); ?>;
+    if (healthEl && healthData.length) {
+        CS.chart.create(healthEl, {
+            tooltip: { trigger: 'axis' },
+            legend: { data: ['正常账号', '正常率'], top: 0 },
+            grid: { left: '3%', right: '4%', bottom: '8%', containLabel: true },
+            xAxis: { type: 'category', data: healthData.map(function(r){ return r.date.substring(5); }) },
+            yAxis: [
+                { type: 'value', minInterval: 1 },
+                { type: 'value', min: 0, max: 100, axisLabel: { formatter: '{value}%' }, splitLine: { show: false } }
+            ],
+            series: [
+                { name: '正常账号', type: 'bar', stack: 'health', data: healthData.map(function(r){ return r.ok; }), itemStyle: { color: successColor } },
+                { name: '正常率', type: 'line', yAxisIndex: 1, smooth: true, symbol: 'none', data: healthData.map(function(r){ return r.rate; }), itemStyle: { color: rateColor } }
             ]
         });
     }
