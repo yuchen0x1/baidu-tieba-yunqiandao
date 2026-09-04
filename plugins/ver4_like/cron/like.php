@@ -5,7 +5,8 @@ if (!defined('SYSTEM_ROOT')) {
 }
 
 /**
- * 云点赞计划任务
+ * 云点赞计划任务（按用户配置执行）
+ * 每个百度账号归属站点用户（baiduid.uid），仅执行该用户在个人面板配置的目标贴吧。
  * 参考 aiotieba 等开源实现的贴吧客户端接口：
  *  - 帖子列表：c/f/frs/page（kw/pn/rn，tiebaclient 签名）
  *  - 帖子点赞：c/c/post/like（kz/z/tbs，tiebaclient 签名）
@@ -85,50 +86,57 @@ function ver4_like_one($bduss, $tbs, $tid, $zid, $pid = 0)
 function cron_ver4_like_do()
 {
     global $m;
-    $kwsRaw = (string) option::get('ver4_like_kws');
-    if (trim($kwsRaw) === '') {
-        ver4_like_log('未配置目标贴吧，跳过执行');
-        return;
-    }
-    $kws = array_values(array_filter(array_map('trim', explode("\n", $kwsRaw)), 'strlen'));
-    $perKw = max(1, (int) option::get('ver4_like_num'));
-    $sleep = max(0, (int) option::get('ver4_like_sleep'));
-    $okCount = 0;
-    $skipCount = 0;
-    $failCount = 0;
-    $rs = $m->query("SELECT `id`, `bduss` FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` ORDER BY `id` ASC");
+    //按归属用户分组，逐用户读取个人配置执行
+    $rs = $m->query("SELECT `id`, `uid`, `bduss` FROM `" . DB_PREFIX . "baiduid` ORDER BY `id` ASC");
+    $byUid = array();
     while ($acc = $m->fetch_array($rs)) {
-        $bduss = P::decrypt($acc['bduss']);
-        if (empty($bduss)) {
-            continue;
+        $byUid[(int) $acc['uid']][] = $acc;
+    }
+    foreach ($byUid as $uid => $accounts) {
+        $kwsRaw = (string) option::uget('ver4_like_kws', $uid);
+        if (trim($kwsRaw) === '') {
+            continue; //该用户未配置目标贴吧
         }
-        foreach ($kws as $kw) {
-            $threads = ver4_like_get_threads($bduss, $kw, (int) $acc['id']);
-            if (empty($threads)) {
+        $kws = array_values(array_filter(array_map('trim', explode("\n", $kwsRaw)), 'strlen'));
+        $perKw = max(1, (int) ((option::uget('ver4_like_num', $uid) !== null && option::uget('ver4_like_num', $uid) !== '') ? option::uget('ver4_like_num', $uid) : 5));
+        $sleep = max(0, (int) ((option::uget('ver4_like_sleep', $uid) !== null && option::uget('ver4_like_sleep', $uid) !== '') ? option::uget('ver4_like_sleep', $uid) : 1500));
+        $okCount = 0;
+        $skipCount = 0;
+        $failCount = 0;
+        foreach ($accounts as $acc) {
+            $bduss = P::decrypt($acc['bduss']);
+            if (empty($bduss)) {
                 continue;
             }
-            $tbs = misc::getTbs(0, $bduss, $acc['id']);
-            $done = 0;
-            foreach ($threads as $t) {
-                if ($done >= $perKw) {
-                    break;
+            $pid = (int) $acc['id'];
+            foreach ($kws as $kw) {
+                $threads = ver4_like_get_threads($bduss, $kw, $pid);
+                if (empty($threads)) {
+                    continue;
                 }
-                $r = ver4_like_one($bduss, $tbs, $t['tid'], $t['zid'], (int) $acc['id']);
-                if ($r === 0) {
-                    $okCount++;
-                    $done++;
-                } elseif ($r === 1) {
-                    $skipCount++;
-                    $done++;
-                } else {
-                    $failCount++;
-                    $done++;
-                }
-                if ($sleep > 0) {
-                    usleep($sleep * 1000);
+                $tbs = misc::getTbs(0, $bduss, $pid);
+                $done = 0;
+                foreach ($threads as $t) {
+                    if ($done >= $perKw) {
+                        break;
+                    }
+                    $r = ver4_like_one($bduss, $tbs, $t['tid'], $t['zid'], $pid);
+                    if ($r === 0) {
+                        $okCount++;
+                        $done++;
+                    } elseif ($r === 1) {
+                        $skipCount++;
+                        $done++;
+                    } else {
+                        $failCount++;
+                        $done++;
+                    }
+                    if ($sleep > 0) {
+                        usleep($sleep * 1000);
+                    }
                 }
             }
         }
+        ver4_like_log("云点赞完成（用户 {$uid} 的 " . count($accounts) . " 个账号）：成功 {$okCount}，已赞过 {$skipCount}，失败 {$failCount}");
     }
-    ver4_like_log("云点赞完成：成功 {$okCount}，已赞过 {$skipCount}，失败 {$failCount}");
 }

@@ -5,7 +5,8 @@ if (!defined('SYSTEM_ROOT')) {
 }
 
 /**
- * 云端自动回帖/发主题帖计划任务
+ * 云端自动回帖/发主题帖计划任务（按用户配置执行）
+ * 每个百度账号归属站点用户（baiduid.uid），仅执行该用户在个人面板配置的目标贴吧与内容库。
  * 回帖接口 c/c/post/add（楼中楼通过 quote_id 指定楼层，参数集参考 96dl/Tieba-Cloud-Sign-Plugins 的 ver4_post 与 FirefoxBar Tieba_Client），
  * 发主题帖接口 c/c/thread/add（参数集参考 FirefoxBar Tieba_Client 的 threadPost），
  * 帖子列表接口 c/f/frs/page、楼层列表接口 c/f/pb/page 参考 aiotieba 等开源实现，均走 tiebaclient 签名。
@@ -41,6 +42,13 @@ function ver4_reply_ensure_table()
     //旧版本表结构补齐 type 列
     $m->addColumn('ver4_reply_log', 'type', 'tinyint', 'NOT NULL DEFAULT 0');
     $ready = true;
+}
+
+/** 读取某用户的一项回帖配置（带默认值） */
+function ver4_reply_uopt($uid, $key, $default)
+{
+    $v = option::uget($key, $uid);
+    return ($v === null || $v === '') ? $default : $v;
 }
 
 /**
@@ -228,49 +236,80 @@ function cron_ver4_reply_do()
 {
     global $m;
     ver4_reply_ensure_table();
-
     $day = date('Ymd');
-    $okCount = 0;
-    $failCount = 0;
-    $skipCount = 0;
-    $threadOk = 0;
-    $threadFail = 0;
 
-    $rs = $m->query("SELECT `id`, `bduss` FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` ORDER BY `id` ASC");
+    //按归属用户分组，逐用户读取个人配置执行
+    $rs = $m->query("SELECT `id`, `uid`, `bduss` FROM `" . DB_PREFIX . "baiduid` ORDER BY `id` ASC");
+    $byUid = array();
     while ($acc = $m->fetch_array($rs)) {
-        $pid = (int) $acc['id'];
-        $bduss = P::decrypt($acc['bduss']);
-        if (empty($bduss)) {
-            continue;
-        }
-        $tbs = misc::getTbs(0, $bduss, $pid);
-        if (empty($tbs)) {
-            $m->query("INSERT IGNORE INTO `" . DB_PREFIX . "ver4_reply_log` (`pid`, `tid`, `kw`, `type`, `status`, `msg`, `day`, `created_at`) VALUES ({$pid}, 0, '', 0, 2, 'TBS 获取失败（账号可能已失效）', '{$day}', UNIX_TIMESTAMP())");
-            continue;
-        }
-        ver4_reply_do_replies($bduss, $tbs, $pid, $day, $okCount, $failCount, $skipCount);
-        ver4_reply_do_threads($bduss, $tbs, $pid, $day, $threadOk, $threadFail);
+        $byUid[(int) $acc['uid']][] = $acc;
     }
-    ver4_reply_log("自动回帖完成：成功 {$okCount}，失败 {$failCount}，跳过 {$skipCount}；发主题帖完成：成功 {$threadOk}，失败 {$threadFail}");
+    foreach ($byUid as $uid => $accounts) {
+        //解析该用户的配置
+        $cfg = array(
+            'kws' => ver4_reply_lines(option::uget('ver4_reply_kws', $uid)),
+            'contents' => ver4_reply_lines(option::uget('ver4_reply_contents', $uid)),
+            'num' => max(1, (int) ver4_reply_uopt($uid, 'ver4_reply_num', '3')),
+            'daily' => max(1, (int) ver4_reply_uopt($uid, 'ver4_reply_daily', '10')),
+            'sleep' => max(0, (int) ver4_reply_uopt($uid, 'ver4_reply_sleep', '3000')),
+            'floor_rate' => min(100, max(0, (int) ver4_reply_uopt($uid, 'ver4_reply_floor_rate', '0'))),
+            't_kws' => ver4_reply_lines(option::uget('ver4_reply_thread_kws', $uid)),
+            't_titles' => ver4_reply_lines(option::uget('ver4_reply_thread_titles', $uid)),
+            't_contents' => ver4_reply_lines(option::uget('ver4_reply_thread_contents', $uid)),
+            't_num' => max(1, (int) ver4_reply_uopt($uid, 'ver4_reply_thread_num', '1')),
+            't_daily' => max(1, (int) ver4_reply_uopt($uid, 'ver4_reply_thread_daily', '3')),
+        );
+        if (empty($cfg['kws']) && empty($cfg['t_kws'])) {
+            continue; //该用户未配置任何目标贴吧
+        }
+        $okCount = 0;
+        $failCount = 0;
+        $skipCount = 0;
+        $threadOk = 0;
+        $threadFail = 0;
+        foreach ($accounts as $acc) {
+            $pid = (int) $acc['id'];
+            $bduss = P::decrypt($acc['bduss']);
+            if (empty($bduss)) {
+                continue;
+            }
+            $tbs = misc::getTbs(0, $bduss, $pid);
+            if (empty($tbs)) {
+                $m->pquery("INSERT IGNORE INTO `" . DB_PREFIX . "ver4_reply_log` (`pid`, `tid`, `kw`, `type`, `status`, `msg`, `day`, `created_at`) VALUES (?, 0, '', 0, 2, 'TBS 获取失败（账号可能已失效）', ?, ?)", array($pid, $day, time()));
+                continue;
+            }
+            if (!empty($cfg['kws']) && !empty($cfg['contents'])) {
+                ver4_reply_do_replies($cfg, $bduss, $tbs, $pid, $day, $okCount, $failCount, $skipCount);
+            }
+            if (!empty($cfg['t_kws']) && !empty($cfg['t_titles']) && !empty($cfg['t_contents'])) {
+                ver4_reply_do_threads($cfg, $bduss, $tbs, $pid, $day, $threadOk, $threadFail);
+            }
+        }
+        ver4_reply_log("自动回帖完成（用户 {$uid} 的 " . count($accounts) . " 个账号）：成功 {$okCount}，失败 {$failCount}，跳过 {$skipCount}；发主题帖完成：成功 {$threadOk}，失败 {$threadFail}");
+    }
+}
+
+/** 按行拆分配置文本 */
+function ver4_reply_lines($raw)
+{
+    return array_values(array_filter(array_map('trim', explode("\n", (string) $raw)), 'strlen'));
 }
 
 /**
  * 回帖阶段：对目标贴吧的最新主题帖回复，按比例随机走楼中楼
  */
-function ver4_reply_do_replies($bduss, $tbs, $pid, $day, &$okCount, &$failCount, &$skipCount)
+function ver4_reply_do_replies($cfg, $bduss, $tbs, $pid, $day, &$okCount, &$failCount, &$skipCount)
 {
     global $m;
-    $kws = array_values(array_filter(array_map('trim', explode("\n", (string) option::get('ver4_reply_kws'))), 'strlen'));
-    $contents = array_values(array_filter(array_map('trim', explode("\n", (string) option::get('ver4_reply_contents'))), 'strlen'));
-    if (empty($kws) || empty($contents)) {
-        return;
-    }
-    $perKw = max(1, (int) option::get('ver4_reply_num'));
-    $daily = max(1, (int) option::get('ver4_reply_daily'));
-    $sleep = max(0, (int) option::get('ver4_reply_sleep'));
-    $floorRate = min(100, max(0, (int) option::get('ver4_reply_floor_rate')));
-    $used = $m->once_fetch_array("SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "ver4_reply_log` WHERE `pid` = {$pid} AND `type` = 0 AND `day` = '{$day}'");
-    $todayCount = (int) $used['c'];
+    $kws = $cfg['kws'];
+    $contents = $cfg['contents'];
+    $perKw = $cfg['num'];
+    $daily = $cfg['daily'];
+    $sleep = $cfg['sleep'];
+    $floorRate = $cfg['floor_rate'];
+    $used = $m->pquery("SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "ver4_reply_log` WHERE `pid` = ? AND `type` = 0 AND `day` = ?", array($pid, $day));
+    $usedRow = $used !== false ? $used->fetch_array() : array('c' => 0);
+    $todayCount = (int) (isset($usedRow['c']) ? $usedRow['c'] : 0);
     if ($todayCount >= $daily) {
         $skipCount++;
         return;
@@ -280,7 +319,6 @@ function ver4_reply_do_replies($bduss, $tbs, $pid, $day, &$okCount, &$failCount,
         if ($todayCount >= $daily) {
             break;
         }
-        $kwSafe = $m->real_escape_string($kw);
         $data = ver4_reply_get_threads($bduss, $kw, $pid);
         if ($data === false || empty($data['threads'])) {
             continue;
@@ -298,8 +336,9 @@ function ver4_reply_do_replies($bduss, $tbs, $pid, $day, &$okCount, &$failCount,
                 break;
             }
             $tid = (int) $t['tid'];
-            $dup = $m->once_fetch_array("SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "ver4_reply_log` WHERE `pid` = {$pid} AND `tid` = {$tid} AND `type` = 0 AND `day` = '{$day}'");
-            if (!empty($dup['c'])) {
+            $dup = $m->pquery("SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "ver4_reply_log` WHERE `pid` = ? AND `tid` = ? AND `type` = 0 AND `day` = ?", array($pid, $tid, $day));
+            $dupRow = $dup !== false ? $dup->fetch_array() : array('c' => 0);
+            if (!empty($dupRow['c'])) {
                 $skipCount++;
                 continue;
             }
@@ -320,8 +359,7 @@ function ver4_reply_do_replies($bduss, $tbs, $pid, $day, &$okCount, &$failCount,
             $content = $contents[mt_rand(0, count($contents) - 1)];
             list($rCode, $rMsg) = ver4_reply_post($bduss, $tbs, $kw, $fid, $tid, $content, $pid, $quoteId);
             $status = $rCode === 0 ? 1 : ($rCode === -2 ? 3 : 2);
-            $msgSafe = $m->real_escape_string(($quoteId > 0 ? '[楼中楼] ' : '') . $rMsg . ' @' . $t['title']);
-            $m->query("INSERT IGNORE INTO `" . DB_PREFIX . "ver4_reply_log` (`pid`, `tid`, `kw`, `type`, `status`, `msg`, `day`, `created_at`) VALUES ({$pid}, {$tid}, '{$kwSafe}', 0, {$status}, '{$msgSafe}', '{$day}', UNIX_TIMESTAMP())");
+            $m->pquery("INSERT IGNORE INTO `" . DB_PREFIX . "ver4_reply_log` (`pid`, `tid`, `kw`, `type`, `status`, `msg`, `day`, `created_at`) VALUES (?, ?, ?, 0, ?, ?, ?, ?)", array($pid, $tid, $kw, $status, ($quoteId > 0 ? '[楼中楼] ' : '') . $rMsg . ' @' . $t['title'], $day, time()));
             if ($rCode === 0) {
                 $okCount++;
             } elseif ($rCode === -2) {
@@ -344,20 +382,18 @@ function ver4_reply_do_replies($bduss, $tbs, $pid, $day, &$okCount, &$failCount,
 /**
  * 发主题帖阶段：向目标贴吧发布新主题
  */
-function ver4_reply_do_threads($bduss, $tbs, $pid, $day, &$threadOk, &$threadFail)
+function ver4_reply_do_threads($cfg, $bduss, $tbs, $pid, $day, &$threadOk, &$threadFail)
 {
     global $m;
-    $tKws = array_values(array_filter(array_map('trim', explode("\n", (string) option::get('ver4_reply_thread_kws'))), 'strlen'));
-    $tTitles = array_values(array_filter(array_map('trim', explode("\n", (string) option::get('ver4_reply_thread_titles'))), 'strlen'));
-    $tContents = array_values(array_filter(array_map('trim', explode("\n", (string) option::get('ver4_reply_thread_contents'))), 'strlen'));
-    if (empty($tKws) || empty($tTitles) || empty($tContents)) {
-        return;
-    }
-    $tNum = max(1, (int) option::get('ver4_reply_thread_num'));
-    $tDaily = max(1, (int) option::get('ver4_reply_thread_daily'));
-    $sleep = max(0, (int) option::get('ver4_reply_sleep'));
-    $used = $m->once_fetch_array("SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "ver4_reply_log` WHERE `pid` = {$pid} AND `type` = 1 AND `day` = '{$day}'");
-    $todayCount = (int) $used['c'];
+    $tKws = $cfg['t_kws'];
+    $tTitles = $cfg['t_titles'];
+    $tContents = $cfg['t_contents'];
+    $tNum = $cfg['t_num'];
+    $tDaily = $cfg['t_daily'];
+    $sleep = $cfg['sleep'];
+    $used = $m->pquery("SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "ver4_reply_log` WHERE `pid` = ? AND `type` = 1 AND `day` = ?", array($pid, $day));
+    $usedRow = $used !== false ? $used->fetch_array() : array('c' => 0);
+    $todayCount = (int) (isset($usedRow['c']) ? $usedRow['c'] : 0);
     if ($todayCount >= $tDaily) {
         return;
     }
@@ -369,15 +405,13 @@ function ver4_reply_do_threads($bduss, $tbs, $pid, $day, &$threadOk, &$threadFai
         if ($fid <= 0) {
             continue;
         }
-        $kwSafe = $m->real_escape_string($kw);
         $done = 0;
         while ($done < $tNum && $todayCount < $tDaily) {
             $title = $tTitles[mt_rand(0, count($tTitles) - 1)];
             $content = $tContents[mt_rand(0, count($tContents) - 1)];
             list($rCode, $rMsg, $newTid) = ver4_reply_post_thread($bduss, $tbs, $kw, $fid, $title, $content, $pid);
             $status = $rCode === 0 ? 1 : ($rCode === -2 ? 3 : 2);
-            $msgSafe = $m->real_escape_string($rMsg . ' @' . $title);
-            $m->query("INSERT IGNORE INTO `" . DB_PREFIX . "ver4_reply_log` (`pid`, `tid`, `kw`, `type`, `status`, `msg`, `day`, `created_at`) VALUES ({$pid}, {$newTid}, '{$kwSafe}', 1, {$status}, '{$msgSafe}', '{$day}', UNIX_TIMESTAMP())");
+            $m->pquery("INSERT IGNORE INTO `" . DB_PREFIX . "ver4_reply_log` (`pid`, `tid`, `kw`, `type`, `status`, `msg`, `day`, `created_at`) VALUES (?, ?, ?, 1, ?, ?, ?, ?)", array($pid, $newTid, $kw, $status, $rMsg . ' @' . $title, $day, time()));
             if ($rCode === 0) {
                 $threadOk++;
             } elseif ($rCode === -2) {

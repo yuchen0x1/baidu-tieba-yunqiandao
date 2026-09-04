@@ -184,6 +184,7 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
 		<textarea name="ann" class="form-control" style="height:200px">' . $ann . '</textarea>
 		</td></tr>';
     $content1['ann'] = array('html' => $annhtml,'type' => 'else');
+    $content1['ver4_ai_admin'] = array('html' => '<tr><td><b>AI 大模型站点设置</b><br/>用户 AI 发帖/回帖功能总开关、站点共享 API 配置</td><td><a class="btn btn-default btn-sm" href="index.php?mod=admin:setplug&plug=ver4_ai">前往配置</a></td></tr>','type' => 'else');
     $content1['sign_multith'] = array('td1' => '<b>计划任务线程数</b><br/>0单线程，此为模拟多线程','type' => 'number','text' => '','extra' => 'min="0" step="1"');
     if (!function_exists('fsockopen')) {
         $content1['cron_asyn'] = array('td1' => '<b>计划任务同时运行</b><br/>在高配机器上会加速任务，低配机器上可能会导致减速','type' => 'checkbox','text' => '当 do.php 被运行时，所有计划任务同时运行，有效提高计划任务效率','extra' => '');

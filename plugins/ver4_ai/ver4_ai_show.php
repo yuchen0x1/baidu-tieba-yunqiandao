@@ -75,7 +75,7 @@ if (isset($_POST['uai_test'])) {
     csrf(true, true);
     $testCfg = ver4_ai_user_cfg($uid);
     if ($testCfg === false) {
-        echo '<div class="alert alert-danger">测试失败：请先保存设置并配置 API Key' . ($sharedAllowed && $hasShared ? '（或选择使用站点共享配置并开启总开关）' : '') . '</div>';
+        echo '<div class="alert alert-danger">测试失败：请先保存设置并配置 API Key' . ($sharedAllowed && $hasShared ? '（或使用站点共享配置并开启总开关）' : '') . '</div>';
     } else {
         $testCfg['thread_topic'] = trim((string) option::uget('uai_thread_topic', $uid));
         $testKw = trim((string) $_POST['uai_test_kw']);
@@ -99,7 +99,7 @@ $g = function ($key, $default = '') use ($uid) {
     return ($v === null || $v === '') ? $default : $v;
 };
 $aiEnable = $g('uai_enable', '0');
-$aiUrl = htmlspecialchars($g('uai_api_url', ver4_ai_cfg('ver4_ai_api_url', 'https://open.bigmodel.cn/api/coding/paas/v4')), ENT_QUOTES, 'UTF-8');
+$aiUrl = htmlspecialchars($g('uai_api_url', ver4_ai_cfg('ver4_ai_api_url', 'https://open.bigmodel.cn/api/paas/v4')), ENT_QUOTES, 'UTF-8');
 $aiModel = htmlspecialchars($g('uai_model', ver4_ai_cfg('ver4_ai_model', 'glm-5.3-flash')), ENT_QUOTES, 'UTF-8');
 $aiTemp = htmlspecialchars($g('uai_temperature', ver4_ai_cfg('ver4_ai_temperature', '0.9')), ENT_QUOTES, 'UTF-8');
 $aiMaxTokens = htmlspecialchars($g('uai_max_tokens', ver4_ai_cfg('ver4_ai_max_tokens', '1500')), ENT_QUOTES, 'UTF-8');
@@ -123,7 +123,20 @@ $threadDaily = htmlspecialchars($g('uai_thread_daily', '3'), ENT_QUOTES, 'UTF-8'
 $threadTopic = htmlspecialchars($g('uai_thread_topic'), ENT_QUOTES, 'UTF-8');
 $threadPids = htmlspecialchars($g('uai_thread_pids'), ENT_QUOTES, 'UTF-8');
 
-//我的百度账号列表（供指定账号 ID 参考）
+//状态解析
+$resolved = ver4_ai_user_cfg($uid);
+if ($hasOwnKey) {
+    $sourceText = '我的 API Key';
+} elseif ($sharedAllowed && $hasShared) {
+    $sourceText = '站点共享配置';
+} else {
+    $sourceText = '未配置';
+}
+$statusBadge = $aiEnable == '1'
+    ? ($resolved !== false ? '<font color="green"><b>运行中</b></font>' : '<font color="red"><b>已启用但配置不可用</b></font>')
+    : '<font color="gray"><b>未开启</b></font>';
+
+//我的百度账号列表
 $myAccounts = array();
 $accRs = $m->query("SELECT `id`, `name` FROM `" . DB_PREFIX . "baiduid` WHERE `uid` = {$uid} ORDER BY `id` ASC");
 while ($a = $m->fetch_array($accRs)) {
@@ -141,53 +154,90 @@ while ($r = $m->fetch_array($logRs)) {
 }
 ?>
 <div class="page-heading"><div><div class="eyebrow">AI ASSISTANT</div><h1>AI 发帖/回帖</h1></div></div>
-<p class="text-muted">接入你自己的大模型（OpenAI 兼容接口，如智谱 / DeepSeek / 各类中转站），让 AI 代替你的百度账号在目标贴吧定时发主题帖、智能回帖。所有任务仅在站点开关开启时按计划自动执行。</p>
+
+<div class="cs-alert cs-alert-info" role="alert" style="margin:0 1%">
+    <svg class="cs-alert-icon" aria-hidden="true"><use href="#i-info"/></svg>
+    <div class="cs-alert-body">
+        当前状态：<?php echo $statusBadge; ?>　·　配置来源：<?php echo $sourceText; ?>　·　我的账号：<?php echo count($myAccounts); ?> 个
+        <br/>接入你自己的大模型（OpenAI 兼容），AI 将代替你的百度账号在目标贴吧定时发主题帖、智能回帖。
+    </div>
+</div>
+
 <?php if (isset($_GET['success'])): ?>
-<div class="alert alert-success"><?php echo htmlspecialchars((string) $_GET['success'], ENT_QUOTES, 'UTF-8'); ?></div>
+<div class="alert alert-success" style="margin:10px 1% 0"><?php echo htmlspecialchars((string) $_GET['success'], ENT_QUOTES, 'UTF-8'); ?></div>
 <?php endif; ?>
+
 <form method="post" action="index.php?plugin=ver4_ai">
     <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
     <table class="table table-striped">
-        <tr><th colspan="2"><h4>① 大模型接口（OpenAI 兼容）</h4></th></tr>
+        <tr><th colspan="2"><h4>① 开关与模型服务</h4></th></tr>
         <tr>
             <td style="width:35%"><b>AI 功能总开关</b></td>
             <td>
-                <select name="uai_enable" class="form-control" style="width:120px">
+                <select name="uai_enable" class="form-control" style="width:140px">
                     <option value="0" <?php echo $aiEnable != '1' ? 'selected' : ''; ?>>关闭</option>
                     <option value="1" <?php echo $aiEnable == '1' ? 'selected' : ''; ?>>开启</option>
                 </select>
             </td>
         </tr>
         <tr>
+            <td><b>服务商预设</b><br/>点击自动填入接口地址与常用模型</td>
+            <td>
+                <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm ai-preset" data-url="https://open.bigmodel.cn/api/paas/v4" data-models="glm-5.3-flash,glm-4.6,glm-4.5-flash,glm-4-flash-250414">智谱 GLM</button>
+                <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm ai-preset" data-url="https://open.bigmodel.cn/api/coding/paas/v4" data-models="glm-5.3-flash">智谱编码套餐</button>
+                <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm ai-preset" data-url="https://api.deepseek.com/v1" data-models="deepseek-chat,deepseek-reasoner">DeepSeek</button>
+                <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm ai-preset" data-url="https://dashscope.aliyuncs.com/compatible-mode/v1" data-models="qwen-plus,qwen-turbo,qwen-max">通义千问</button>
+                <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm ai-preset" data-url="https://api.moonshot.cn/v1" data-models="moonshot-v1-8k,kimi-k2-0711-preview">月之暗面</button>
+                <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm ai-preset" data-url="https://api.openai.com/v1" data-models="gpt-4o-mini,gpt-4o">OpenAI</button>
+            </td>
+        </tr>
+        <tr>
             <td><b>API 地址</b><br/>填到版本号为止</td>
-            <td><input type="text" class="form-control" name="uai_api_url" value="<?php echo $aiUrl; ?>" placeholder="https://open.bigmodel.cn/api/coding/paas/v4"></td>
+            <td><input type="text" class="form-control" name="uai_api_url" id="uai_api_url" value="<?php echo $aiUrl; ?>" placeholder="https://open.bigmodel.cn/api/paas/v4"></td>
         </tr>
         <tr>
             <td><b>API Key</b><br/>仅自己可见，加密存储；留空表示保持不变<?php echo $hasOwnKey ? '（已配置）' : '（未配置）'; ?>
-                <?php if ($sharedAllowed && $hasShared): ?><br/><span class="text-muted">站长已开放站点共享配置：不填 Key 将自动使用共享配置。</span><?php endif; ?>
+                <?php if ($sharedAllowed && $hasShared): ?><br/><span class="text-muted">站长已开放共享配置：不填 Key 将自动使用站点共享配置。</span><?php endif; ?>
             </td>
             <td><input type="password" class="form-control" name="uai_api_key" value="" placeholder="<?php echo $hasOwnKey ? '已配置，输入新值可覆盖' : 'sk-...'; ?>" autocomplete="new-password"></td>
         </tr>
         <tr>
-            <td><b>模型名称</b></td>
-            <td><input type="text" class="form-control" name="uai_model" value="<?php echo $aiModel; ?>" placeholder="glm-5.3-flash"></td>
+            <td><b>模型名称</b><br/>点击输入框可从常用模型中选择</td>
+            <td><input type="text" class="form-control" name="uai_model" id="uai_model" list="uai-model-list" value="<?php echo $aiModel; ?>" placeholder="glm-5.3-flash">
+                <datalist id="uai-model-list">
+                    <option value="glm-5.3-flash"><option value="glm-4.6"><option value="glm-4.5-flash"><option value="glm-4-flash-250414">
+                    <option value="deepseek-chat"><option value="deepseek-reasoner">
+                    <option value="qwen-plus"><option value="qwen-turbo"><option value="qwen-max">
+                    <option value="moonshot-v1-8k"><option value="gpt-4o-mini"><option value="gpt-4o">
+                </datalist>
+            </td>
         </tr>
         <tr>
-            <td><b>温度 / 最大 Token</b><br/>温度 0-2；Token 上限建议 ≥1000（推理模型思考也占用）</td>
+            <td><b>温度 / 最大 Token</b><br/>温度越高内容越发散；Token 上限建议 ≥1000（推理模型思考也占用）</td>
             <td>
                 <input type="number" min="0" max="2" step="0.1" class="form-control" name="uai_temperature" value="<?php echo $aiTemp; ?>" style="width:120px;display:inline-block;">
                 <input type="number" min="256" max="8000" step="64" class="form-control" name="uai_max_tokens" value="<?php echo $aiMaxTokens; ?>" style="width:140px;display:inline-block;">
             </td>
         </tr>
         <tr>
-            <td><b>我的 AI 人设（System Prompt）</b><br/>留空时使用站点共享人设</td>
-            <td><textarea class="form-control" name="uai_persona" style="height:80px" placeholder="例如：你是一个热爱分享生活的贴吧老哥，说话自然、口语化…"><?php echo $aiPersona; ?></textarea></td>
+            <td><b>我的 AI 人设</b><br/>决定发帖回帖的说话风格，留空使用站点共享人设</td>
+            <td>
+                <select class="form-control" id="uai-persona-preset" style="width:220px;margin-bottom:6px">
+                    <option value="">— 选择人设模板快速填充 —</option>
+                    <option value="tpl-default">贴吧老哥（日常水贴）</option>
+                    <option value="tpl-helper">热心互助（认真解答）</option>
+                    <option value="tpl-humor">段子手（幽默玩梗）</option>
+                    <option value="tpl-warm">治愈系（温暖正能量）</option>
+                    <option value="tpl-baowu">吧务播报（正式通知）</option>
+                </select>
+                <textarea class="form-control" name="uai_persona" id="uai_persona" style="height:90px" placeholder="例如：你是一个热爱分享生活的贴吧老哥，说话自然、口语化…"><?php echo $aiPersona; ?></textarea>
+            </td>
         </tr>
         <tr><th colspan="2"><h4>② AI 智能回帖</h4></th></tr>
         <tr>
             <td><b>功能开关</b></td>
             <td>
-                <select name="uai_reply_enable" class="form-control" style="width:120px">
+                <select name="uai_reply_enable" class="form-control" style="width:140px">
                     <option value="0" <?php echo $replyEnable != '1' ? 'selected' : ''; ?>>关闭</option>
                     <option value="1" <?php echo $replyEnable == '1' ? 'selected' : ''; ?>>开启</option>
                 </select>
@@ -215,7 +265,7 @@ while ($r = $m->fetch_array($logRs)) {
         <tr>
             <td><b>读取帖子内容作为上下文</b><br/>回复更贴合主题，但每帖多一次接口请求</td>
             <td>
-                <select name="uai_reply_context" class="form-control" style="width:120px">
+                <select name="uai_reply_context" class="form-control" style="width:140px">
                     <option value="1" <?php echo $replyContext == '1' ? 'selected' : ''; ?>>开启</option>
                     <option value="0" <?php echo $replyContext != '1' ? 'selected' : ''; ?>>关闭</option>
                 </select>
@@ -233,7 +283,7 @@ while ($r = $m->fetch_array($logRs)) {
         <tr>
             <td><b>功能开关</b></td>
             <td>
-                <select name="uai_thread_enable" class="form-control" style="width:120px">
+                <select name="uai_thread_enable" class="form-control" style="width:140px">
                     <option value="0" <?php echo $threadEnable != '1' ? 'selected' : ''; ?>>关闭</option>
                     <option value="1" <?php echo $threadEnable == '1' ? 'selected' : ''; ?>>开启</option>
                 </select>
@@ -301,4 +351,47 @@ while ($r = $m->fetch_array($logRs)) {
     <b>温馨提示：</b>任务由系统计划任务每 5 分钟检查执行；请遵守目标贴吧的吧规，<span class="text-danger">请勿发布违法违规内容，后果由使用者自负</span>。
     若帖子发布成功但很快消失，多为百度风控（数据中心 IP 秒删），可尝试为账号配置住宅代理。
 </div>
+<script>
+(function () {
+    //服务商预设：一键填入接口地址与模型候选
+    var urlInput = document.getElementById('uai_api_url');
+    var modelInput = document.getElementById('uai_model');
+    var datalist = document.getElementById('uai-model-list');
+    Array.prototype.forEach.call(document.querySelectorAll('.ai-preset'), function (btn) {
+        if (btn.dataset.csInit === '1') { return; }
+        btn.dataset.csInit = '1';
+        btn.addEventListener('click', function () {
+            if (urlInput) { urlInput.value = btn.getAttribute('data-url') || ''; }
+            var models = (btn.getAttribute('data-models') || '').split(',');
+            if (datalist) {
+                datalist.innerHTML = '';
+                models.forEach(function (m) {
+                    if (!m) { return; }
+                    var opt = document.createElement('option');
+                    opt.value = m.trim();
+                    datalist.appendChild(opt);
+                });
+            }
+            if (modelInput && models.length > 0) { modelInput.value = models[0].trim(); }
+        });
+    });
+    //人设模板
+    var templates = {
+        'tpl-default': '你是一个百度贴吧的普通用户，说话自然、口语化、友善，像一个真实的贴吧老哥，熟悉贴吧文化。输出必须是纯中文文本，不要使用 markdown、不要加引号、不要提及你是AI或模型、不要用括号做解释。',
+        'tpl-helper': '你是一个热心肠的贴吧用户，擅长解答各类问题，回复认真有条理，语气诚恳友善。输出必须是纯中文文本，不要使用 markdown、不要提及你是AI或模型。',
+        'tpl-humor': '你是一个贴吧段子手，说话幽默风趣，偶尔玩梗接梗，但不过分夸张，像一个逗比又可爱的贴吧老哥。输出必须是纯中文文本，不要提及你是AI或模型。',
+        'tpl-warm': '你是一个温暖治愈系的贴吧用户，说话温柔正能量，善于鼓励别人，偶尔分享生活中的小美好。输出必须是纯中文文本，不要提及你是AI或模型。',
+        'tpl-baowu': '你是一个贴吧的吧务播报员，说话正式简洁、条理清晰，发布吧内通知与活动信息时用词规范。输出必须是纯中文文本，不要提及你是AI或模型。'
+    };
+    var personaSelect = document.getElementById('uai-persona-preset');
+    var personaInput = document.getElementById('uai_persona');
+    if (personaSelect && personaInput) {
+        personaSelect.addEventListener('change', function () {
+            if (personaSelect.value && templates[personaSelect.value]) {
+                personaInput.value = templates[personaSelect.value];
+            }
+        });
+    }
+})();
+</script>
 <?php loadfoot(); ?>

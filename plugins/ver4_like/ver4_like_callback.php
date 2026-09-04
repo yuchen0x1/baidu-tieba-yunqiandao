@@ -11,24 +11,18 @@ function callback_install()
 }
 
 /**
- * 激活插件时会被调用
+ * 激活插件时会被调用：注册计划任务（用户配置存于 users_options，由用户在个人面板管理）
  */
 function callback_init()
 {
-    option::set('ver4_like_kws', '');
-    option::set('ver4_like_num', '5');
-    option::set('ver4_like_sleep', '1500');
-    cron::set('ver4_like_do', 'plugins/ver4_like/cron/like.php', 2, '自动为指定贴吧的最新帖子点赞', 0);
+    cron::set('ver4_like_do', 'plugins/ver4_like/cron/like.php', 2, '按用户配置为绑定的百度账号自动点赞', 0);
 }
 
 /**
- * 禁用插件时会被调用
+ * 禁用插件时会被调用：停用计划任务（用户配置保留，重新激活即恢复）
  */
 function callback_inactive()
 {
-    option::del('ver4_like_kws');
-    option::del('ver4_like_num');
-    option::del('ver4_like_sleep');
     cron::del('ver4_like_do');
 }
 
