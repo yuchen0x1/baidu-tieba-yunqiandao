@@ -82,6 +82,73 @@ function ver4_monitor_insert_hit($uid, $pid, $forum, $kw, $tid, $title, $notifie
     );
 }
 
+/** 记录命中的自动回帖状态 */
+function ver4_monitor_set_replied($uid, $tid, $replied)
+{
+    global $m;
+    $m->pquery("UPDATE `" . DB_PREFIX . "ver4_monitor_hit` SET `replied` = ? WHERE `uid` = ? AND `tid` = ?", array((int) $replied, (int) $uid, (int) $tid));
+}
+
+/**
+ * 命中联动 AI 自动回帖（复用 ver4_ai 的用户配置、生成、发布与安全预检：
+ * 站长敏感词、近 7 天内容去重、同账号同帖同日唯一）
+ * @return int 1=成功 2=失败 3=跳过（达上限/敏感词/重复） -2=触发频率限制
+ */
+function ver4_monitor_auto_reply($cfg, $bduss, $pid, $forum, $tid, $title, $dailyCap)
+{
+    global $m;
+    $day = date('Ymd');
+    //与常规 AI 回帖共用同帖同日去重，防止两个功能对同一帖重复回复
+    if (ver4_ai_replied_today($pid, $tid, $day)) {
+        return 3;
+    }
+    //今日监控自动回帖上限（按执行记录中带 [监控] 前缀的成功条数统计）
+    $result = $m->pquery(
+        "SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "ver4_ai_log` WHERE `pid` = ? AND `type` = 0 AND `day` = ? AND `status` = 1 AND `msg` LIKE '[监控]%'",
+        array((int) $pid, $day)
+    );
+    $today = ($result !== false && ($row = $result->fetch_array())) ? (int) $row['c'] : 0;
+    if ($today >= $dailyCap) {
+        return 3;
+    }
+    $tbs = misc::getTbs(0, $bduss, $pid);
+    if (empty($tbs)) {
+        ver4_ai_insert_log($pid, $tid, $forum, 0, 2, '[监控] TBS 获取失败（账号可能已失效）', $day);
+        return 2;
+    }
+    $fid = (int) misc::getFid($forum);
+    if ($fid <= 0) {
+        ver4_ai_insert_log($pid, $tid, $forum, 0, 2, '[监控] 获取吧 ID 失败', $day);
+        return 2;
+    }
+    //首楼内容作为生成上下文，让回复贴合主题
+    $context = ver4_ai_get_first_post($bduss, $forum, $tid, $pid);
+    $aiErr = null;
+    $content = ver4_ai_gen_reply($cfg, $forum, $title, $context, $aiErr);
+    if ($content === false) {
+        ver4_ai_insert_log($pid, $tid, $forum, 0, 4, '[监控] AI 生成失败 @' . $title . '：' . $aiErr, $day, md5(''));
+        return 2;
+    }
+    //敏感词/内容去重预检：重新生成最多 2 次，仍命中则跳过
+    $checks = 0;
+    while ((ver4_ai_content_banned($content) || ver4_ai_content_duplicated($pid, $content)) && $checks < 2) {
+        $checks++;
+        $content = ver4_ai_gen_reply($cfg, $forum, $title, $context, $aiErr);
+        if ($content === false) {
+            break;
+        }
+    }
+    if ($content === false || ver4_ai_content_banned($content) || ver4_ai_content_duplicated($pid, $content)) {
+        ver4_ai_insert_log($pid, $tid, $forum, 0, 5, '[监控] 内容命中敏感词或重复，已跳过 @' . $title, $day, md5((string) $content));
+        return 3;
+    }
+    list($rCode, $rMsg) = ver4_ai_post($bduss, $tbs, $forum, $fid, $tid, $content, $pid);
+    $status = $rCode === 0 ? 1 : ($rCode === -2 ? 3 : 2);
+    ver4_ai_insert_log($pid, $tid, $forum, 0, $status, '[监控] ' . $rMsg . ' @' . $title, $day, md5($content));
+    usleep((2000 + mt_rand(0, 1500)) * 1000);
+    return $rCode === 0 ? 1 : ($rCode === -2 ? -2 : 2);
+}
+
 function cron_ver4_monitor_do()
 {
     if (function_exists('set_time_limit')) {
@@ -107,9 +174,18 @@ function cron_ver4_monitor_do()
         }
         $wordsRaw = (string) option::uget('ver4_monitor_words', $uid);
         $words = array_values(array_filter(array_map('trim', explode("\n", $wordsRaw)), 'strlen'));
+        $excludeRaw = (string) option::uget('ver4_monitor_exclude', $uid);
+        $excludeWords = array_values(array_filter(array_map('trim', explode("\n", $excludeRaw)), 'strlen'));
         $doNotify = option::uget('ver4_monitor_notify', $uid) !== '0';
         $pushMode = option::uget('ver4_monitor_mode', $uid) === 'digest' ? 'digest' : 'realtime';
         $digestHour = min(23, max(0, (int) ((option::uget('ver4_monitor_digest_hour', $uid) !== null && option::uget('ver4_monitor_digest_hour', $uid) !== '') ? option::uget('ver4_monitor_digest_hour', $uid) : 21)));
+        //命中联动 AI 自动回帖：需 ver4_ai 插件在位且用户 AI 配置可用
+        $autoDaily = min(20, max(1, (int) ((option::uget('ver4_monitor_autoreply_daily', $uid) !== null && option::uget('ver4_monitor_autoreply_daily', $uid) !== '') ? option::uget('ver4_monitor_autoreply_daily', $uid) : 5)));
+        $autoCfg = false;
+        if (option::uget('ver4_monitor_autoreply', $uid) === '1' && file_exists(SYSTEM_ROOT . '/plugins/ver4_ai/ver4_ai.php')) {
+            require_once SYSTEM_ROOT . '/plugins/ver4_ai/cron/ai.php';
+            $autoCfg = ver4_ai_user_cfg($uid);
+        }
 
         //每日汇总模式：到汇总小时点，把当天未推送的命中合并成一条摘要推送（附各吧命中统计）
         if ($pushMode === 'digest' && $doNotify && (int) date('G') === $digestHour) {
@@ -189,6 +265,19 @@ function cron_ver4_monitor_do()
                 //实时模式立即推送（notified=1）；汇总模式先记录（notified=0），到汇总点合并推送
                 ver4_monitor_insert_hit($uid, $pid, $forum, $hitWord, $tid, $title, $pushMode === 'realtime' ? 1 : 0);
                 $totalHits++;
+                //命中联动 AI 自动回帖
+                if (is_array($autoCfg)) {
+                    $replied = ver4_monitor_auto_reply($autoCfg, $bduss, $pid, $forum, $tid, $title, $autoDaily);
+                    ver4_monitor_set_replied($uid, $tid, $replied === -2 ? 2 : $replied);
+                    if ($replied === 1) {
+                        ver4_monitor_log("用户 {$uid} 监控命中自动回帖成功：{$forum}吧 {$title}");
+                    }
+                    if ($replied === -2) {
+                        //触发频率限制：本轮剩余命中只记录不再回帖
+                        $autoCfg = false;
+                        ver4_monitor_log("用户 {$uid} 监控自动回帖触发频率限制，本轮停止回帖");
+                    }
+                }
                 if ($pushMode === 'realtime') {
                     $lines[] = '【' . $forum . '吧】' . $title . "\nhttps://tieba.baidu.com/p/" . $tid . ($hitWord !== '' ? "\n命中关键词：{$hitWord}" : '');
                 }

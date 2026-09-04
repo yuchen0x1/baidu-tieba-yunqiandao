@@ -13,6 +13,8 @@ if (!defined('UID')) {
 }
 global $m;
 $uid = UID;
+//命中表结构补齐（老表自动加 notified/replied 列），必须在任何查询前执行
+ver4_monitor_ensure_table();
 
 //AJAX：预览命中帖子的首楼内容（在任何 HTML 输出前处理）
 if (isset($_GET['preview'])) {
@@ -72,6 +74,9 @@ if (isset($_POST['ver4_monitor_submit'])) {
     ver4_monitor_uopt_set($uid, 'ver4_monitor_notify', $_POST['ver4_monitor_notify'] == '1' ? '1' : '0');
     ver4_monitor_uopt_set($uid, 'ver4_monitor_mode', $_POST['ver4_monitor_mode'] === 'digest' ? 'digest' : 'realtime');
     ver4_monitor_uopt_set($uid, 'ver4_monitor_digest_hour', (string) min(23, max(0, (int) $_POST['ver4_monitor_digest_hour'])));
+    //命中联动 AI 自动回帖
+    ver4_monitor_uopt_set($uid, 'ver4_monitor_autoreply', $_POST['ver4_monitor_autoreply'] == '1' ? '1' : '0');
+    ver4_monitor_uopt_set($uid, 'ver4_monitor_autoreply_daily', (string) min(20, max(1, (int) $_POST['ver4_monitor_autoreply_daily'])));
     //个人通知渠道
     ver4_monitor_uopt_set($uid, 'ver4_notify_channel', trim((string) $_POST['ver4_notify_channel']));
     foreach (array('ver4_notify_serverchan_key', 'ver4_notify_telegram_token', 'ver4_notify_telegram_chatid', 'ver4_notify_bark_url', 'ver4_notify_pushplus_token', 'ver4_notify_webhook_url', 'ver4_notify_ntfy_server', 'ver4_notify_ntfy_topic') as $nfField) {
@@ -99,6 +104,14 @@ $monExclude = htmlspecialchars($g('ver4_monitor_exclude'), ENT_QUOTES, 'UTF-8');
 $monNotify = $g('ver4_monitor_notify', '1');
 $monMode = $g('ver4_monitor_mode', 'realtime');
 $monDigestHour = $g('ver4_monitor_digest_hour', '21');
+$monAutoReply = $g('ver4_monitor_autoreply', '0');
+$monAutoDaily = $g('ver4_monitor_autoreply_daily', '5');
+//AI 配置可用性（命中自动回帖依赖 ver4_ai 插件与用户 AI 配置）
+$aiAvailable = false;
+if (file_exists(SYSTEM_ROOT . '/plugins/ver4_ai/ver4_ai_client.php')) {
+    require_once SYSTEM_ROOT . '/plugins/ver4_ai/ver4_ai_client.php';
+    $aiAvailable = ver4_ai_user_cfg($uid) !== false;
+}
 $nfChannel = $g('ver4_notify_channel', 'follow_site');
 $nfKey = htmlspecialchars($g('ver4_notify_serverchan_key'), ENT_QUOTES, 'UTF-8');
 $nfTgToken = htmlspecialchars($g('ver4_notify_telegram_token'), ENT_QUOTES, 'UTF-8');
@@ -111,7 +124,7 @@ $nfNtfyTopic = htmlspecialchars($g('ver4_notify_ntfy_topic'), ENT_QUOTES, 'UTF-8
 
 //最近命中记录
 $recentRows = array();
-$logRs = $m->query("SELECT `forum`, `kw`, `tid`, `title`, `created_at` FROM `" . DB_PREFIX . "ver4_monitor_hit` WHERE `uid` = {$uid} ORDER BY `id` DESC LIMIT 12");
+$logRs = $m->query("SELECT `forum`, `kw`, `tid`, `title`, `replied`, `created_at` FROM `" . DB_PREFIX . "ver4_monitor_hit` WHERE `uid` = {$uid} ORDER BY `id` DESC LIMIT 12");
 while ($r = $m->fetch_array($logRs)) {
     $recentRows[] = $r;
 }
@@ -174,6 +187,19 @@ while ($r = $m->fetch_array($logRs)) {
             </td>
         </tr>
         <tr>
+            <td><b>命中自动回帖</b><br/>命中后由 AI 生成回复并自动发布到该帖<br/>需 AI 面板已启用且配置可用（个人 Key 或站点共享配置）；与 AI 回帖共用敏感词/内容去重防护，执行记录见 AI 面板</td>
+            <td>
+                <select name="ver4_monitor_autoreply" class="form-control" style="width:140px">
+                    <option value="0" <?php echo $monAutoReply != '1' ? 'selected' : ''; ?>>关闭</option>
+                    <option value="1" <?php echo $monAutoReply == '1' ? 'selected' : ''; ?>>开启</option>
+                </select>
+                每日上限(1-20)：<input type="number" min="1" max="20" class="form-control" name="ver4_monitor_autoreply_daily" value="<?php echo htmlspecialchars((string) $monAutoDaily, ENT_QUOTES, 'UTF-8'); ?>" style="width:90px;display:inline-block;">
+                <?php if ($monAutoReply == '1' && !$aiAvailable): ?>
+                <div class="text-danger" style="margin-top:4px">AI 配置不可用：请先到 <a href="index.php?plugin=ver4_ai">AI 智能面板</a> 启用并配置（或联系站长开放共享配置），否则命中后不会自动回帖。</div>
+                <?php endif; ?>
+            </td>
+        </tr>
+        <tr>
             <td><b>我的通知渠道</b><br/>默认跟随站点（由站长配置）；填写自己的渠道后，命中提醒直接推送给你个人</td>
             <td>
                 <select name="ver4_notify_channel" class="form-control" style="width:180px">
@@ -228,13 +254,27 @@ while ($r = $m->fetch_array($logRs)) {
 <div class="text-muted">暂无命中记录。开启监控后，命中的新帖会展示在这里。</div>
 <?php else: ?>
 <table class="table table-striped">
-    <tr><th>时间</th><th>贴吧</th><th>关键词</th><th>帖子标题</th><th>操作</th></tr>
+    <tr><th>时间</th><th>贴吧</th><th>关键词</th><th>帖子标题</th><th>自动回帖</th><th>操作</th></tr>
     <?php foreach ($recentRows as $r): ?>
     <tr>
         <td><?php echo htmlspecialchars(date('m-d H:i', (int) $r['created_at']), ENT_QUOTES, 'UTF-8'); ?></td>
         <td><?php echo htmlspecialchars($r['forum'], ENT_QUOTES, 'UTF-8'); ?>吧</td>
         <td><?php echo htmlspecialchars($r['kw'] !== '' ? $r['kw'] : '（全部新帖）', ENT_QUOTES, 'UTF-8'); ?></td>
         <td><?php echo htmlspecialchars(mb_substr((string) $r['title'], 0, 40), ENT_QUOTES, 'UTF-8'); ?></td>
+        <td>
+            <?php
+            $repliedVal = (int) ($r['replied'] ?? 0);
+            if ($repliedVal === 1) {
+                echo '<span class="label label-success">已回帖</span>';
+            } elseif ($repliedVal === 2) {
+                echo '<span class="label label-danger">回帖失败</span>';
+            } elseif ($repliedVal === 3) {
+                echo '<span class="label label-default">已跳过</span>';
+            } else {
+                echo '<span class="text-muted">—</span>';
+            }
+            ?>
+        </td>
         <td style="white-space:nowrap">
             <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm monitor-preview" data-tid="<?php echo (int) $r['tid']; ?>">预览</button>
             <a class="cs-btn cs-btn-secondary cs-btn-sm" href="https://tieba.baidu.com/p/<?php echo (int) $r['tid']; ?>" target="_blank" rel="noopener">打开</a>

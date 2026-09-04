@@ -40,6 +40,7 @@ function ver4_monitor_ensure_table()
     }
     global $m;
     //notified：实时推送已发送或无需推送记 1；每日汇总模式下待推送记 0
+    //replied：命中联动 AI 自动回帖状态 0=未回帖 1=已回帖 2=回帖失败 3=跳过（达上限/敏感词/重复）
     $m->query("CREATE TABLE IF NOT EXISTS `" . DB_PREFIX . "ver4_monitor_hit` (
         `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         `uid` INT UNSIGNED NOT NULL DEFAULT 0,
@@ -49,13 +50,15 @@ function ver4_monitor_ensure_table()
         `tid` BIGINT UNSIGNED NOT NULL DEFAULT 0,
         `title` VARCHAR(255) NOT NULL DEFAULT '',
         `notified` TINYINT NOT NULL DEFAULT 1,
+        `replied` TINYINT NOT NULL DEFAULT 0,
         `created_at` INT UNSIGNED NOT NULL,
         PRIMARY KEY (`id`),
         UNIQUE KEY `uid_tid` (`uid`, `tid`),
         KEY `uid_created` (`uid`, `created_at`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
-    //旧版本表结构补齐 notified 列
+    //旧版本表结构补齐 notified/replied 列
     $m->addColumn('ver4_monitor_hit', 'notified', 'tinyint', 'NOT NULL DEFAULT 1');
+    $m->addColumn('ver4_monitor_hit', 'replied', 'tinyint', 'NOT NULL DEFAULT 0');
     $ready = true;
 }
 

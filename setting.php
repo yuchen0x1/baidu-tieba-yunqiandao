@@ -307,6 +307,31 @@ switch (SYSTEM_PAGE) {
                 Redirect('index.php?mod=admin:tools&ok');
 
                 break;
+            case 'cleanup_save':
+                option::set('cleanup_enable', isset($_POST['cleanup_enable']) && $_POST['cleanup_enable'] == '1' ? '1' : '0');
+                option::set('cleanup_sign_history_days', min(3650, max(0, (int) request_scalar_value($_POST, 'cleanup_sign_history_days', 180))));
+                option::set('cleanup_task_runs_days', min(3650, max(0, (int) request_scalar_value($_POST, 'cleanup_task_runs_days', 90))));
+                option::set('cleanup_cron_log_days', min(3650, max(0, (int) request_scalar_value($_POST, 'cleanup_cron_log_days', 30))));
+                option::set('cleanup_plugin_log_days', min(3650, max(0, (int) request_scalar_value($_POST, 'cleanup_plugin_log_days', 90))));
+                option::set('cleanup_api_rate_days', min(365, max(0, (int) request_scalar_value($_POST, 'cleanup_api_rate_days', 7))));
+                Redirect('index.php?mod=admin:tools&ok');
+
+                break;
+            case 'cleanup_run':
+                require_once SYSTEM_ROOT . '/lib/cron_system_cleanup.php';
+                msg(cron_system_cleanup(), 'index.php?mod=admin:tools');
+
+                break;
+            case 'cleanup_init':
+                $m->query("INSERT IGNORE INTO `" . DB_PREFIX . "cron` (`name`, `orde`, `file`, `no`, `desc`, `freq`, `lastdo`, `log`) VALUES ('system_cleanup', '10', 'lib/cron_system_cleanup.php', '0', '每日按保留天数清理签到历史/任务运行历史/插件日志等过期数据', '86400', '0', '')");
+                Redirect('index.php?mod=admin:tools&ok');
+
+                break;
+            case 'weekreport_init':
+                $m->query("INSERT IGNORE INTO `" . DB_PREFIX . "cron` (`name`, `orde`, `file`, `no`, `desc`, `freq`, `lastdo`, `log`) VALUES ('system_weekreport', '11', 'lib/cron_system_weekreport.php', '0', '每周按用户配置推送签到周报（用户个人通知渠道）', '86400', '0', '')");
+                Redirect('index.php?mod=admin:tools&ok');
+
+                break;
             case 'remtab':
                 global $m;
                 $tabs = isset($_POST['tab']) ? (array) $_POST['tab'] : array();
@@ -1047,6 +1072,8 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
             'remind_sign_fail',
             'remind_sign_fail_threshold',
             'remind_daily_summary',
+            'weekly_report_enable',
+            'weekly_report_day',
             'sign_retry_max',
             'sign_delay_minutes',
             'sign_shuffle'
@@ -1064,6 +1091,16 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
             $_POST['remind_daily_summary'] = '0';
             $i['post']['remind_daily_summary'] = '0';
         }
+        if (!isset($_POST['weekly_report_enable'])) {
+            $_POST['weekly_report_enable'] = '0';
+            $i['post']['weekly_report_enable'] = '0';
+        }
+        // 签到周报：推送日 0(周日)-6(周六)
+        $weekDay = (int) (isset($_POST['weekly_report_day']) ? $_POST['weekly_report_day'] : 1);
+        if ($weekDay < 0) { $weekDay = 0; }
+        if ($weekDay > 6) { $weekDay = 6; }
+        $_POST['weekly_report_day'] = (string) $weekDay;
+        $i['post']['weekly_report_day'] = (string) $weekDay;
         if (!isset($_POST['sign_shuffle'])) {
             $_POST['sign_shuffle'] = '0';
             $i['post']['sign_shuffle'] = '0';

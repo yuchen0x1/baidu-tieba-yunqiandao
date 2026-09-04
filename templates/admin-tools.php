@@ -102,6 +102,75 @@ $bkCount = is_array($bkFiles) ? count($bkFiles) : 0;
 &nbsp;&nbsp;&nbsp;&nbsp;当前已有 <b><?php echo $bkCount; ?></b> 份备份存于 data/backups 目录（Apache 已由 .htaccess 拦截直接下载，Nginx 等环境请自行屏蔽该目录）
 
 <br/><br/>
+<!--Part 2 数据保留与自动清理-->
+<h4>数据保留与自动清理</h4>
+<?php
+$clEnabled = option::get('cleanup_enable') == '1';
+$clCron = $m->once_fetch_array("SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "cron` WHERE `name` = 'system_cleanup'");
+$clGet = function ($key, $default) {
+    $v = option::get($key);
+    return ($v === null || $v === '') ? $default : (int) $v;
+};
+?>
+<form action="<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=cleanup_save" method="post">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
+<div class="table-responsive">
+<table class="cs-table">
+    <tbody>
+        <tr>
+            <td style="width:20%">启用自动清理</td>
+            <td><label class="checkbox"><input type="checkbox" name="cleanup_enable" value="1" <?php if ($clEnabled) {
+                echo 'checked="checked"';
+                     } ?>> 启用后计划任务 system_cleanup 每日按下方保留天数删除过期数据（0 = 永久保留）</label></td>
+        </tr>
+        <tr>
+            <td>签到历史 sign_history<br/><span class="text-muted">签到日历/数据分析/周报的数据源，清理后旧图表不可回看</span></td>
+            <td><input type="number" name="cleanup_sign_history_days" min="0" max="3650" class="form-control" style="width:120px" value="<?php echo $clGet('cleanup_sign_history_days', 180); ?>"> 天</td>
+        </tr>
+        <tr>
+            <td>任务运行历史 task_runs<br/><span class="text-muted">任务中心的状态/耗时记录</span></td>
+            <td><input type="number" name="cleanup_task_runs_days" min="0" max="3650" class="form-control" style="width:120px" value="<?php echo $clGet('cleanup_task_runs_days', 90); ?>"> 天</td>
+        </tr>
+        <tr>
+            <td>批量签到日志 cron_log_batch</td>
+            <td><input type="number" name="cleanup_cron_log_days" min="0" max="3650" class="form-control" style="width:120px" value="<?php echo $clGet('cleanup_cron_log_days', 30); ?>"> 天</td>
+        </tr>
+        <tr>
+            <td>插件执行记录<br/><span class="text-muted">AI 执行记录 / 帖子监控命中 / 自动回帖记录</span></td>
+            <td><input type="number" name="cleanup_plugin_log_days" min="0" max="3650" class="form-control" style="width:120px" value="<?php echo $clGet('cleanup_plugin_log_days', 90); ?>"> 天</td>
+        </tr>
+        <tr>
+            <td>API 限流记录 api_rate_limits</td>
+            <td><input type="number" name="cleanup_api_rate_days" min="0" max="365" class="form-control" style="width:120px" value="<?php echo $clGet('cleanup_api_rate_days', 7); ?>"> 天</td>
+        </tr>
+    </tbody>
+</table>
+</div>
+<input type="submit" class="cs-btn cs-btn-primary" value="保存清理设置">
+</form>
+<form style="display:inline" action="<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=cleanup_init" method="post">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
+<button type="submit" class="cs-btn cs-btn-secondary" onclick="return confirm('确定注册自动清理计划任务吗？已注册时无副作用。');">注册自动清理任务<?php echo (int) $clCron['c'] > 0 ? '（已注册）' : '（未注册）'; ?></button>
+</form>
+&nbsp;&nbsp;
+<form style="display:inline" action="<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=cleanup_run" method="post">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
+<button type="submit" class="cs-btn cs-btn-secondary" onclick="return confirm('立即按当前保留天数执行一次清理吗？删除不可恢复。');">立即清理一次</button>
+</form>
+
+<br/><br/>
+<!--Part 2 签到周报-->
+<h4>签到周报</h4>
+<?php
+$wrCron = $m->once_fetch_array("SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "cron` WHERE `name` = 'system_weekreport'");
+?>
+<form style="display:inline" action="<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=weekreport_init" method="post">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
+<button type="submit" class="cs-btn cs-btn-secondary" onclick="return confirm('确定注册签到周报计划任务吗？已注册时无副作用。');">注册签到周报任务<?php echo (int) $wrCron['c'] > 0 ? '（已注册）' : '（未注册）'; ?></button>
+</form>
+&nbsp;&nbsp;&nbsp;&nbsp;注册后，用户可在「个人设置」开启周报并选择星期几，到点通过其个人通知渠道（未配置时走站点渠道）推送近 7 天签到汇总与失败原因
+
+<br/><br/>
 <!--Part 2 Warning-->
 <br/><br/><input type="button" data-toggle="modal" data-target="#TruncateTableLabel" class="cs-btn cs-btn-warning" value="清空指定数据表" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;请慎用此功能，一般用于清空无用的分表
 

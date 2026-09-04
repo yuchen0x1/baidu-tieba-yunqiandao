@@ -97,6 +97,25 @@ function addset($name, $type, $x, $other = '', $text = '')
                 </label>
             </td>
         </tr>
+        <tr>
+            <td>每周签到报告<br/>每周到点通过你的个人通知渠道（帖子监控页配置，未配置走站点渠道）推送近 7 天签到汇总、成功率与失败原因 Top</td>
+            <td>
+                <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
+                    <input type="checkbox" name="weekly_report_enable" value="1" <?php if (option::uget('weekly_report_enable') == 1) echo 'checked'; ?>>
+                    <span>启用每周签到报告</span>
+                </label>
+                <div style="margin-top:6px;display:flex;align-items:center;gap:6px">
+                    <label for="weekly_report_day" style="margin:0">推送日</label>
+                    <select id="weekly_report_day" name="weekly_report_day" class="cs-form-control" style="width:auto">
+                        <?php $wrDay = option::uget('weekly_report_day');
+                        $wrDay = ($wrDay === null || $wrDay === '') ? 1 : (int) $wrDay;
+                        foreach (array(1 => '周一', 2 => '周二', 3 => '周三', 4 => '周四', 5 => '周五', 6 => '周六', 0 => '周日') as $wdVal => $wdLabel) { ?>
+                        <option value="<?php echo $wdVal; ?>" <?php if ($wrDay === $wdVal) echo 'selected'; ?>><?php echo $wdLabel; ?></option>
+                        <?php } ?>
+                    </select>
+                </div>
+            </td>
+        </tr>
         <?php
         // 阶段 R：签到策略配置（用户级 + 全局只读信息）
         $globalSignHour = (int) option::get('sign_hour');
