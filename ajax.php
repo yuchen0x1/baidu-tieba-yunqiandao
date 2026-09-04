@@ -120,6 +120,33 @@ switch (SYSTEM_PAGE) {
                 $tip .= '<hr/><small>Windows 包校验值：' . htmlspecialchars($release['asset_digest'], ENT_QUOTES, 'UTF-8') . '</small>';
             }
             echo '<div class="panel panel-default" style="background-color: #F9F9F9;"><div class="panel-body">' . $tip . '</div></div>';
+            // 历史更新日志：拉取失败时静默跳过，不影响主检查结果
+            try {
+                $history = ProjectUpdater::fetchReleaseHistory($release['tag_name']);
+                $hist = '<div class="panel panel-default" style="background-color: #F9F9F9;"><div class="panel-body"><b>历史更新日志</b>';
+                $shown = 0;
+                foreach ($history as $h) {
+                    if ($h['tag_name'] === $release['tag_name']) {
+                        continue; // 最新版本的说明已在上方展示
+                    }
+                    $pubDate = $h['published_at'] !== '' ? substr($h['published_at'], 0, 10) : '';
+                    $hist .= '<details class="cs-collapse"' . ($shown === 0 ? ' open' : '') . '>'
+                        . '<summary>V' . htmlspecialchars($h['version'], ENT_QUOTES, 'UTF-8')
+                        . ($h['is_prerelease'] ? '　<span class="cs-badge cs-badge-neutral">预发布</span>' : '')
+                        . ($pubDate !== '' ? '　<span class="text-muted">' . htmlspecialchars($pubDate, ENT_QUOTES, 'UTF-8') . '</span>' : '')
+                        . '</summary>'
+                        . '<div class="cs-collapse-body">'
+                        . ($h['body'] !== '' ? nl2br(htmlspecialchars($h['body'], ENT_QUOTES, 'UTF-8')) : '（本版本无发布说明）')
+                        . ($h['release_url'] !== '' ? '<br/><a href="' . htmlspecialchars($h['release_url'], ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener">查看该版本 Release 页</a>' : '')
+                        . '</div></details>';
+                    $shown++;
+                }
+                $hist .= $shown === 0 ? '暂无更多历史版本。' : '';
+                $hist .= '</div></div>';
+                echo $hist;
+            } catch (Throwable $e) {
+                error_log('获取历史更新日志失败：' . $e->getMessage());
+            }
         } catch (Throwable $e) {
             error_log('在线更新检查失败：' . $e->getMessage());
             echo '<div class="alert alert-danger"><b>检查更新失败：</b>暂时无法连接更新服务器，请稍后重试或打开项目 Release 页面手动更新。</div>';

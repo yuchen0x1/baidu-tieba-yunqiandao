@@ -8,6 +8,9 @@ class ProjectUpdater
 {
     const DEFAULT_TIMEOUT_MS = 8000;
     const GITEE_RELEASES_API_URL = 'https://gitee.com/api/v5/repos/yuchen0x1/baidu-tieba-yunqiandao/releases/latest';
+    const GITEE_RELEASES_HISTORY_API_URL = 'https://gitee.com/api/v5/repos/yuchen0x1/baidu-tieba-yunqiandao/releases?per_page=10&page=1';
+    const HISTORY_CACHE_OPTION = 'update_release_history_cache';
+    const HISTORY_CACHE_TTL = 1800;
 
     public static function normalizeVersion($value)
     {
@@ -81,6 +84,94 @@ class ProjectUpdater
     public static function primaryChannel()
     {
         return 'gitee';
+    }
+
+    /**
+     * 获取历史 Release 列表（用于更新页“历史更新日志”）。
+     * 结果缓存到 options 表以减少对 Gitee API 的请求；检测到更新的 latest tag 时自动失效。
+     * @param string|null $latestTag 当前 latest Release 的 tag（用于缓存失效判断）
+     * @return array 简化后的 Release 列表，按发布时间倒序
+     * @throws RuntimeException 网络或数据不可用时抛出，调用方可静默降级
+     */
+    public static function fetchReleaseHistory($latestTag = null)
+    {
+        $cached = option::get(self::HISTORY_CACHE_OPTION);
+        if ($cached !== null && $cached !== '') {
+            $decoded = json_decode((string) $cached, true);
+            if (is_array($decoded) && isset($decoded['items']) && is_array($decoded['items']) && !empty($decoded['items'])) {
+                $fresh = (int) $decoded['time'] > 0 && (time() - (int) $decoded['time']) < self::HISTORY_CACHE_TTL;
+                $tagMatched = $latestTag === null || !isset($decoded['latest_tag']) || $decoded['latest_tag'] === (string) $latestTag;
+                if ($fresh && $tagMatched) {
+                    return $decoded['items'];
+                }
+            }
+        }
+        $items = self::requestReleaseList(self::GITEE_RELEASES_HISTORY_API_URL);
+        option::set(self::HISTORY_CACHE_OPTION, json_encode(array(
+            'time' => time(),
+            'latest_tag' => (string) $latestTag,
+            'items' => $items
+        ), JSON_UNESCAPED_UNICODE));
+        return $items;
+    }
+
+    private static function requestReleaseList($apiUrl)
+    {
+        if (!self::isAllowedUrl($apiUrl)) {
+            throw new RuntimeException('更新服务器地址不受信任');
+        }
+        $curl = self::createReleaseCurl($apiUrl, true);
+        if ($curl === false) {
+            throw new RuntimeException('无法初始化更新连接');
+        }
+        $body = curl_exec($curl);
+        $error = curl_error($curl);
+        $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+        //与 requestRelease 相同的降级策略：凭据被拒时匿名重试
+        if (in_array($status, array(401, 403, 404), true) && self::hasCredentialForUrl($apiUrl)) {
+            $curl = self::createReleaseCurl($apiUrl, false);
+            if ($curl !== false) {
+                $body = curl_exec($curl);
+                $error = curl_error($curl);
+                $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+                curl_close($curl);
+            }
+        }
+        if ($body === false || $error !== '' || $status < 200 || $status >= 300) {
+            throw new RuntimeException('无法获取历史 Release 列表（HTTP ' . $status . '）' . ($error !== '' ? '：' . $error : ''));
+        }
+        $payload = json_decode($body, true);
+        if (!is_array($payload)) {
+            throw new RuntimeException('历史 Release 列表数据无效');
+        }
+        $items = array();
+        foreach ($payload as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            //单条数据异常时跳过该条，不影响其余历史展示
+            try {
+                $release = self::parseRelease(self::normalizeGiteePayload($entry, $apiUrl));
+            } catch (Throwable $e) {
+                continue;
+            }
+            $items[] = array(
+                'tag_name' => $release['tag_name'],
+                'version' => $release['version'],
+                'name' => $release['name'],
+                //缓存与展示用截断正文，完整说明以 Release 页为准
+                'body' => function_exists('mb_substr') ? mb_substr($release['body'], 0, 4000, 'UTF-8') : substr($release['body'], 0, 4000),
+                'release_url' => $release['release_url'],
+                'published_at' => $release['published_at'],
+                'is_prerelease' => $release['is_prerelease']
+            );
+        }
+        if (empty($items)) {
+            throw new RuntimeException('历史 Release 列表为空');
+        }
+        //Gitee 列表端点按最旧在前返回，统一反转为最新在前
+        return array_reverse($items);
     }
 
     public static function foreignFallbackEnabled()
