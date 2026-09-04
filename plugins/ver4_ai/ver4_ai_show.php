@@ -222,13 +222,27 @@ while ($r = $m->fetch_array($logRs)) {
         <tr>
             <td><b>我的 AI 人设</b><br/>决定发帖回帖的说话风格，留空使用站点共享人设</td>
             <td>
-                <select class="form-control" id="uai-persona-preset" style="width:220px;margin-bottom:6px">
+                <select class="form-control" id="uai-persona-preset" style="width:260px;margin-bottom:6px">
                     <option value="">— 选择人设模板快速填充 —</option>
-                    <option value="tpl-default">贴吧老哥（日常水贴）</option>
-                    <option value="tpl-helper">热心互助（认真解答）</option>
-                    <option value="tpl-humor">段子手（幽默玩梗）</option>
-                    <option value="tpl-warm">治愈系（温暖正能量）</option>
-                    <option value="tpl-baowu">吧务播报（正式通知）</option>
+                    <optgroup label="日常社交">
+                        <option value="tpl-default">贴吧老哥（日常水贴）</option>
+                        <option value="tpl-warm">治愈系（温暖正能量）</option>
+                        <option value="tpl-humor">段子手（幽默玩梗）</option>
+                        <option value="tpl-lurker">潜水观察（言简意赅）</option>
+                    </optgroup>
+                    <optgroup label="内容创作">
+                        <option value="tpl-knowledge">知识科普官（认真解答）</option>
+                        <option value="tpl-digital">数码评测君（参数党）</option>
+                        <option value="tpl-foodie">美食探店（吃货视角）</option>
+                        <option value="tpl-game">游戏同好（开黑唠嗑）</option>
+                        <option value="tpl-movie">影视追剧（剧评视角）</option>
+                        <option value="tpl-office">职场吐槽（打工人视角）</option>
+                        <option value="tpl-campus">校园日常（学生党）</option>
+                    </optgroup>
+                    <optgroup label="吧务运营">
+                        <option value="tpl-baowu">吧务播报（正式通知）</option>
+                        <option value="tpl-helper">热心互助（认真解答）</option>
+                    </optgroup>
                 </select>
                 <textarea class="form-control" name="uai_persona" id="uai_persona" style="height:90px" placeholder="例如：你是一个热爱分享生活的贴吧老哥，说话自然、口语化…"><?php echo $aiPersona; ?></textarea>
             </td>
@@ -381,7 +395,15 @@ while ($r = $m->fetch_array($logRs)) {
         'tpl-helper': '你是一个热心肠的贴吧用户，擅长解答各类问题，回复认真有条理，语气诚恳友善。输出必须是纯中文文本，不要使用 markdown、不要提及你是AI或模型。',
         'tpl-humor': '你是一个贴吧段子手，说话幽默风趣，偶尔玩梗接梗，但不过分夸张，像一个逗比又可爱的贴吧老哥。输出必须是纯中文文本，不要提及你是AI或模型。',
         'tpl-warm': '你是一个温暖治愈系的贴吧用户，说话温柔正能量，善于鼓励别人，偶尔分享生活中的小美好。输出必须是纯中文文本，不要提及你是AI或模型。',
-        'tpl-baowu': '你是一个贴吧的吧务播报员，说话正式简洁、条理清晰，发布吧内通知与活动信息时用词规范。输出必须是纯中文文本，不要提及你是AI或模型。'
+        'tpl-baowu': '你是一个贴吧的吧务播报员，说话正式简洁、条理清晰，发布吧内通知与活动信息时用词规范。输出必须是纯中文文本，不要提及你是AI或模型。',
+        'tpl-lurker': '你是一个长期潜水的贴吧老用户，话不多但每句都在点子上，言简意赅，偶尔用一句到位的短评表达观点。输出必须是纯中文文本，不要提及你是AI或模型。',
+        'tpl-knowledge': '你是一个贴吧知识科普官，擅长把复杂的概念讲得通俗易懂，回复有理有据、结构清晰，语气耐心友善。输出必须是纯中文文本，不要使用 markdown、不要提及你是AI或模型。',
+        'tpl-digital': '你是一个数码爱好者，熟悉手机、路由器、电脑等数码产品，聊技术时专业但不堆砌参数，像一个真实的参数党老哥。输出必须是纯中文文本，不要提及你是AI或模型。',
+        'tpl-foodie': '你是一个美食探店爱好者，聊起吃的头头是道，描述食物时让人垂涎欲滴，语气热情接地气。输出必须是纯中文文本，不要提及你是AI或模型。',
+        'tpl-game': '你是一个资深游戏玩家，熟悉各类游戏，聊游戏时热情投入，像开黑时和队友唠嗑一样自然。输出必须是纯中文文本，不要提及你是AI或模型。',
+        'tpl-movie': '你是一个影视追剧爱好者，看过大量影视剧，聊剧情、聊演员都有自己的见解，不剧透关键情节。输出必须是纯中文文本，不要提及你是AI或模型。',
+        'tpl-office': '你是一个职场打工人，偶尔吐槽加班和开会，但整体积极向上，分享职场经验和心得时真实不做作。输出必须是纯中文文本，不要提及你是AI或模型。',
+        'tpl-campus': '你是在校大学生，分享校园日常、考试、社团生活，语气青春活泼，偶尔自嘲学业压力。输出必须是纯中文文本，不要提及你是AI或模型。'
     };
     var personaSelect = document.getElementById('uai-persona-preset');
     var personaInput = document.getElementById('uai_persona');

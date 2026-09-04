@@ -55,6 +55,7 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
     <tr>
       <th>PID</th>
       <th style="width:20%">百度名称</th>
+      <th>健康度</th>
       <th style="width:20%">Portrait</th>
       <th style="width:30%">BDUSS</th>
       <th style="width:20%">STOKEN</th>
@@ -82,6 +83,16 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
             }
         }
     }
+    //账号健康度评分：BDUSS 健康状态 50 + 近 7 天签到成功率 30 + 代理 10 + 今日完成度 10
+    require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
+    $healthMap = SignManager::accountHealth((int) UID);
+    $rateMap = array();
+    $rateQs = $m->pquery("SELECT `pid`, SUM(`status` = 'success') AS s, COUNT(*) AS t FROM `" . DB_PREFIX . SignManager::HISTORY_TABLE . "` WHERE `uid` = ? AND `created_at` >= ? GROUP BY `pid`", array((int) UID, strtotime('-7 days midnight')));
+    if ($rateQs !== false) {
+        while ($rRow = $rateQs->fetch_array()) {
+            $rateMap[(int) $rRow['pid']] = array('s' => (int) $rRow['s'], 't' => (int) $rRow['t']);
+        }
+    }
     foreach ($i['user']['bduss'] as $key => $value) {
         echo '<tr><td>' . $key . '</td>';
         $name = empty($i['user']['baidu'][$key]) ? '未记录百度ID' : htmlspecialchars($i['user']['baidu'][$key], ENT_QUOTES, 'UTF-8');
@@ -104,12 +115,42 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
         $moCacheRaw = option::get('baiduid_moindex_' . $key);
         if ($moCacheRaw !== '' && $moCacheRaw !== null) {
             $moCache = json_decode((string) $moCacheRaw, true);
-            if (is_array($moCache) && isset($moCache['error'], $moCache['total'], $moCache['signed']) && $moCache['error'] === 0) {
+            if (is_array($moCache) && isset($moCache['error'], $moCache['total'], $moCache['signed'], $moCache['forums']) && $moCache['error'] === 0) {
                 $allSigned = (int) $moCache['signed'] >= (int) $moCache['total'];
                 $moBadge = '<br/><span class="cs-badge" style="font-size:11px;margin-top:4px;display:inline-block;' . ($allSigned ? 'background:rgba(60,180,90,.15);color:#3cb45a' : 'background:rgba(255,160,0,.15);color:#ff9800') . '">关注 ' . (int) $moCache['total'] . ' 吧 · 已签 ' . (int) $moCache['signed'] . '</span>';
+                $topForums = array_slice($moCache['forums'], 0, 3);
+                if (!empty($topForums)) {
+                    $topText = array();
+                    foreach ($topForums as $tf) {
+                        $topText[] = htmlspecialchars($tf['name'], ENT_QUOTES, 'UTF-8') . ' Lv.' . (int) $tf['level'];
+                    }
+                    $moBadge .= '<br/><span style="font-size:11px;color:#888">最高：' . implode(' · ', $topText) . '</span>';
+                }
             }
         }
         echo '<td>' . $name . $progressHtml . $moBadge . '</td>';
+        //健康度评分
+        $hScore = 0;
+        $hParts = array();
+        $hStatus = isset($healthMap[(int) $key]['status']) ? $healthMap[(int) $key]['status'] : 'unknown';
+        if ($hStatus === 'normal') { $hScore += 50; $hParts[] = '凭证正常 50'; }
+        elseif ($hStatus === 'invalid') { $hParts[] = '凭证失效 0'; }
+        else { $hScore += 25; $hParts[] = '凭证未检测 25'; }
+        $hRate = isset($rateMap[(int) $key]) && $rateMap[(int) $key]['t'] > 0 ? $rateMap[(int) $key]['s'] / $rateMap[(int) $key]['t'] : null;
+        if ($hRate !== null) { $hScore += (int) round($hRate * 30); $hParts[] = '近7天成功率 ' . (int) round($hRate * 30); }
+        else { $hScore += 15; $hParts[] = '暂无签到数据 15'; }
+        $hProxy = isset($i['user']['bduss_proxy'][$key]) ? trim((string) $i['user']['bduss_proxy'][$key]) : '';
+        if ($hProxy !== '' && strcasecmp($hProxy, 'off') !== 0) { $hScore += 10; $hParts[] = '已配代理 10'; }
+        elseif (strcasecmp($hProxy, 'off') === 0) { $hScore += 5; $hParts[] = '代理禁用 5'; }
+        else { $hScore += 0; $hParts[] = '跟随全局 0'; }
+        if (isset($signProgress[(int) $key]) && $signProgress[(int) $key]['total'] > 0) {
+            $sp = $signProgress[(int) $key];
+            $hScore += (int) round($sp['signed'] / $sp['total'] * 10);
+            $hParts[] = '今日完成 ' . (int) round($sp['signed'] / $sp['total'] * 10);
+        } else { $hScore += 5; $hParts[] = '今日无任务 5'; }
+        $hScore = min(100, $hScore);
+        $hColor = $hScore >= 80 ? '#3cb45a' : ($hScore >= 60 ? '#ff9800' : '#e53935');
+        echo '<td><span class="cs-badge" style="font-size:12px;background:' . $hColor . '22;color:' . $hColor . '" title="' . htmlspecialchars(implode('，', $hParts), ENT_QUOTES, 'UTF-8') . '">健康度 ' . $hScore . '</span></td>';
         echo '<td><input type="text" class="form-control" readonly value="' . htmlspecialchars($i['user']['baidu_portrait'][$key], ENT_QUOTES, 'UTF-8') . '"></td>';
         echo '<td><input type="text" class="form-control" readonly value="' . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . '"></td>';
         echo '<td><input type="text" class="form-control" readonly value="' . htmlspecialchars($i['user']['stoken'][$key], ENT_QUOTES, 'UTF-8') . '"></td>';
@@ -137,6 +178,7 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
     <b>聚合操作</b>
     <button type="button" class="cs-btn cs-btn-warning cs-btn-sm" id="sign-run-all">⚡ 立即签到（我的全部账号）</button>
     <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm" id="sign-run-one">立即签到（选中账号）</button>
+    <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm" id="bulk-refresh-tieba">刷新贴吧列表（全部账号）</button>
     <span class="text-muted" style="font-size:12px" id="sign-summary">单次立即签到最多处理 15 个贴吧，其余由计划任务继续完成</span>
 </div>
 <div style="margin-top:18px">
@@ -249,6 +291,25 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
             var pid = $('#mo-pid').val();
             if (!pid) { return; }
             signRun(parseInt(pid, 10));
+        });
+
+        $('#bulk-refresh-tieba').on('click', function () {
+            if (!window.confirm('刷新全部账号的关注贴吧列表？扫描需要一些时间，期间请勿关闭页面。')) { return; }
+            $('#bulk-refresh-tieba').prop('disabled', true);
+            $('#sign-summary').text('正在刷新贴吧列表，可能需要较长时间…');
+            $.ajax({
+                url: 'setting.php?mod=showtb&refreshTiebaList',
+                type: 'GET',
+                success: function () {
+                    $('#bulk-refresh-tieba').prop('disabled', false);
+                    $('#sign-summary').text('贴吧列表已刷新');
+                    if (window.CS && CS.toast) { CS.toast('刷新完成', { type: 'success', body: '全部账号的关注贴吧列表已同步' }); }
+                },
+                error: function () {
+                    $('#bulk-refresh-tieba').prop('disabled', false);
+                    $('#sign-summary').text('刷新失败，请稍后重试');
+                }
+            });
         });
 
         $('#proxy-apply').on('click', function () {

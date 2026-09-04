@@ -22,6 +22,7 @@ if (isset($_POST['ver4_ai_save'])) {
     option::set('ver4_ai_temperature', min(2, max(0, (float) $_POST['ver4_ai_temperature'])));
     option::set('ver4_ai_max_tokens', min(8000, max(256, (int) $_POST['ver4_ai_max_tokens'])));
     option::set('ver4_ai_persona', trim((string) $_POST['ver4_ai_persona']));
+    option::set('ver4_ai_banned_words', trim((string) $_POST['ver4_ai_banned_words']));
     echo '<div class="alert alert-success">AI 设置已保存</div>';
 } elseif (isset($_POST['ver4_ai_test'])) {
     csrf(true, true);
@@ -101,6 +102,10 @@ $cronOn = !empty($cronRow['enable']);
                 <input type="number" min="0" max="2" step="0.1" class="form-control" name="ver4_ai_temperature" value="<?php echo $aiTemp; ?>" style="width:120px;display:inline-block;">
                 <input type="number" min="256" max="8000" step="64" class="form-control" name="ver4_ai_max_tokens" value="<?php echo $aiMaxTokens; ?>" style="width:140px;display:inline-block;">
             </td>
+        </tr>
+        <tr>
+            <td><b>敏感词库（全站生效）</b><br/>每行一个。AI 生成内容发送前预检，命中则自动重新生成（最多 2 次），仍命中则跳过并记录</td>
+            <td><textarea class="form-control" name="ver4_ai_banned_words" style="height:90px" placeholder="每行一个敏感词"><?php echo htmlspecialchars(ver4_ai_cfg('ver4_ai_banned_words'), ENT_QUOTES, 'UTF-8'); ?></textarea></td>
         </tr>
         <tr>
             <td><b>共享人设（System Prompt）</b><br/>用户未填写自己的人设时生效</td>

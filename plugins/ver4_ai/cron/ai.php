@@ -36,21 +36,59 @@ function ver4_ai_ensure_table()
         `status` TINYINT NOT NULL DEFAULT 0,
         `msg` VARCHAR(255) NOT NULL DEFAULT '',
         `day` CHAR(8) NOT NULL DEFAULT '',
+        `content_md5` CHAR(32) NOT NULL DEFAULT '',
         `created_at` INT UNSIGNED NOT NULL,
         PRIMARY KEY (`id`),
         UNIQUE KEY `pid_tid_day` (`pid`, `tid`, `day`),
         KEY `pid_day_type` (`pid`, `day`, `type`),
-        KEY `kw_created` (`kw`, `type`, `created_at`)
+        KEY `kw_created` (`kw`, `type`, `created_at`),
+        KEY `pid_md5_created` (`pid`, `content_md5`, `created_at`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+    //旧版本表结构补齐 content_md5 列（内容去重用）
+    $m->addColumn('ver4_ai_log', 'content_md5', 'char(32)', "NOT NULL DEFAULT ''");
     $ready = true;
 }
 
-function ver4_ai_insert_log($pid, $tid, $kw, $type, $status, $msg, $day)
+/** 站长配置的敏感词列表（全站生效） */
+function ver4_ai_banned_words()
+{
+    return array_values(array_filter(array_map('trim', explode("\n", (string) option::get('ver4_ai_banned_words'))), 'strlen'));
+}
+
+/** 内容是否命中敏感词 */
+function ver4_ai_content_banned($text)
+{
+    foreach (ver4_ai_banned_words() as $word) {
+        if ($word !== '' && mb_stripos((string) $text, $word) !== false) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/** 近 7 天该账号是否已发送过相同内容（内容去重） */
+function ver4_ai_content_duplicated($pid, $content)
+{
+    global $m;
+    $md5 = md5((string) $content);
+    $since = time() - 7 * 86400;
+    $result = $m->pquery(
+        "SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "ver4_ai_log` WHERE `pid` = ? AND `content_md5` = ? AND `status` = 1 AND `created_at` > ?",
+        array((int) $pid, $md5, $since)
+    );
+    if ($result === false) {
+        return false;
+    }
+    $row = $result->fetch_array();
+    return !empty($row['c']);
+}
+
+function ver4_ai_insert_log($pid, $tid, $kw, $type, $status, $msg, $day, $contentMd5 = '')
 {
     global $m;
     $m->pquery(
-        "INSERT IGNORE INTO `" . DB_PREFIX . "ver4_ai_log` (`pid`, `tid`, `kw`, `type`, `status`, `msg`, `day`, `created_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        array((int) $pid, (int) $tid, (string) $kw, (int) $type, (int) $status, mb_substr((string) $msg, 0, 200), (string) $day, time())
+        "INSERT IGNORE INTO `" . DB_PREFIX . "ver4_ai_log` (`pid`, `tid`, `kw`, `type`, `status`, `msg`, `day`, `content_md5`, `created_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        array((int) $pid, (int) $tid, (string) $kw, (int) $type, (int) $status, mb_substr((string) $msg, 0, 200), (string) $day, (string) $contentMd5, time())
     );
 }
 
@@ -152,12 +190,26 @@ function ver4_ai_do_replies($cfg, $acc, $day)
             $aiErr = null;
             $content = ver4_ai_gen_reply($cfg, $kw, $t['title'], $context, $aiErr);
             if ($content === false) {
-                ver4_ai_insert_log($pid, $tid, $kw, 0, 4, 'AI 生成失败 @' . $t['title'] . '：' . $aiErr, $day);
+                ver4_ai_insert_log($pid, $tid, $kw, 0, 4, 'AI 生成失败 @' . $t['title'] . '：' . $aiErr, $day, md5(''));
                 if (!empty($fallbacks)) {
                     $content = $fallbacks[mt_rand(0, count($fallbacks) - 1)];
                 } else {
                     continue;
                 }
+            }
+            //敏感词预检：命中则重新生成（最多 2 次），仍命中则跳过；内容去重：近 7 天同账号发过相同内容则跳过
+            $contentChecks = 0;
+            while ((ver4_ai_content_banned($content) || ver4_ai_content_duplicated($pid, $content)) && $contentChecks < 2) {
+                $contentChecks++;
+                $content = ver4_ai_gen_reply($cfg, $kw, $t['title'], $context, $aiErr);
+                if ($content === false) {
+                    break;
+                }
+            }
+            if ($content === false || ver4_ai_content_banned($content) || ver4_ai_content_duplicated($pid, $content)) {
+                $reason = ver4_ai_content_banned($content ?? '') ? '命中敏感词' : '内容重复';
+                ver4_ai_insert_log($pid, $tid, $kw, 0, 5, $reason . '，已跳过 @' . $t['title'], $day, md5($content ?? ''));
+                continue;
             }
             //按比例随机楼中楼
             $quoteId = 0;
@@ -173,7 +225,7 @@ function ver4_ai_do_replies($cfg, $acc, $day)
             }
             list($rCode, $rMsg) = ver4_ai_post($bduss, $tbs, $kw, $fid, $tid, $content, $pid, $quoteId);
             $status = $rCode === 0 ? 1 : ($rCode === -2 ? 3 : 2);
-            ver4_ai_insert_log($pid, $tid, $kw, 0, $status, ($quoteId > 0 ? '[楼中楼] ' : '') . $rMsg . ' @' . $t['title'], $day);
+            ver4_ai_insert_log($pid, $tid, $kw, 0, $status, ($quoteId > 0 ? '[楼中楼] ' : '') . $rMsg . ' @' . $t['title'], $day, md5($content));
             if ($rCode === 0) {
                 $todayCount++;
             } elseif ($rCode === -2) {
@@ -237,12 +289,25 @@ function ver4_ai_do_threads($cfg, $acc, $day)
         $aiErr = null;
         $thread = ver4_ai_gen_thread($cfg, $kw, $aiErr);
         if ($thread === false) {
-            ver4_ai_insert_log($pid, 0, $kw, 1, 4, 'AI 生成失败：' . $aiErr, $day);
+            ver4_ai_insert_log($pid, 0, $kw, 1, 4, 'AI 生成失败：' . $aiErr, $day, md5(''));
+            continue;
+        }
+        //敏感词预检：标题或正文命中则重新生成（最多 2 次），仍命中则跳过；近 7 天同内容去重
+        $contentChecks = 0;
+        while ((ver4_ai_content_banned($thread['title']) || ver4_ai_content_banned($thread['content']) || ver4_ai_content_duplicated($pid, $thread['title'] . $thread['content'])) && $contentChecks < 2) {
+            $contentChecks++;
+            $thread = ver4_ai_gen_thread($cfg, $kw, $aiErr);
+            if ($thread === false) {
+                break;
+            }
+        }
+        if ($thread === false || ver4_ai_content_banned($thread['title']) || ver4_ai_content_banned($thread['content']) || ver4_ai_content_duplicated($pid, $thread['title'] . $thread['content'])) {
+            ver4_ai_insert_log($pid, 0, $kw, 1, 5, '内容命中敏感词或重复，已跳过', $day, md5(''));
             continue;
         }
         list($rCode, $rMsg, $newTid) = ver4_ai_post_thread($bduss, $tbs, $kw, $fid, $thread['title'], $thread['content'], $pid);
         $status = $rCode === 0 ? 1 : ($rCode === -2 ? 3 : 2);
-        ver4_ai_insert_log($pid, $newTid, $kw, 1, $status, $rMsg . ' @' . $thread['title'], $day);
+        ver4_ai_insert_log($pid, $newTid, $kw, 1, $status, $rMsg . ' @' . $thread['title'], $day, md5($thread['title'] . $thread['content']));
         if ($rCode === 0) {
             ver4_ai_cron_log("AI 发帖成功：账号 {$pid} 在 {$kw}吧 发布《" . $thread['title'] . "》");
         } elseif ($rCode === -2) {

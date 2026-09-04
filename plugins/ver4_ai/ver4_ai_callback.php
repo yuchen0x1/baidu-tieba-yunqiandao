@@ -24,6 +24,7 @@ function callback_init()
     option::set('ver4_ai_temperature', '0.9');
     option::set('ver4_ai_max_tokens', '1500');
     option::set('ver4_ai_persona', '你是一个百度贴吧的普通用户，说话自然、口语化、友善，像一个真实的贴吧老哥，熟悉贴吧文化。输出必须是纯中文文本，不要使用 markdown、不要加引号、不要提及你是AI或模型、不要用括号做解释。');
+    option::set('ver4_ai_banned_words', '');
     cron::set('ver4_ai_do', 'plugins/ver4_ai/cron/ai.php', 2, 'AI 大模型定时发主题帖/智能回帖（按用户配置）', 0);
 }
 
@@ -35,7 +36,7 @@ function callback_inactive()
 {
     $keys = array(
         'ver4_ai_user_enable', 'ver4_ai_shared_enable', 'ver4_ai_api_url', 'ver4_ai_api_key',
-        'ver4_ai_model', 'ver4_ai_temperature', 'ver4_ai_max_tokens', 'ver4_ai_persona',
+        'ver4_ai_model', 'ver4_ai_temperature', 'ver4_ai_max_tokens', 'ver4_ai_persona', 'ver4_ai_banned_words',
     );
     foreach ($keys as $key) {
         option::del($key);
