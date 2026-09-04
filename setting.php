@@ -57,68 +57,28 @@ switch (SYSTEM_PAGE) {
         Redirect('index.php?mod=admin:plugins&ok');
 
         break;
-    // case 'admin:cloud':
-    //     doAction('plugin_update_1');
-    //     global $i;
-    //     $plug = $i['plugins']['desc'][$_GET['upd']];
-    //     if (!file_exists(UPDATE_CACHE)) {
-    //         mkdir(UPDATE_CACHE, 0777, true);
-    //     }
-    // 
-    //     $up_url = SUPPORT_URL . 'getplug.php?m=up&pname=' . $_GET['upd'] . '&user=' . option::get('bbs_us') . '&pw=' . option::get('bbs_pw');
-    //     $c = new wcurl($up_url);
-    //     $file = $c->exec();
-    //     $c->close();
-    //     if ($file == 'WRONG') {
-    //         msg('错误 - 更新失败：<br/><br/>产品中心拒绝了下载<br/>请检查全局设置中的账号是否正确以及是否购买过此插件');
-    //     }
-    // 
-    //     $zipPath = UPDATE_CACHE . 'update_plug_' . time() . '.zip';
-    //     if (file_put_contents($zipPath, $file) === false) {
-    //         DeleteFile(UPDATE_CACHE);
-    //         msg('错误 - 更新失败：<br/><br/>无法下载更新包');
-    //     }
-    // 
-    //     //解压缩
-    //     $z = new zip();
-    //     $z->open($zipPath);
-    //     $z->extract(UPDATE_CACHE);
-    //     $z->close();
-    // //检查更新文件
-    //     $floderName = UPDATE_CACHE . $_GET['upd'];
-    //     if (!is_dir($floderName)) {
-    //         DeleteFile(UPDATE_CACHE);
-    //         msg('错误 - 更新失败：<br/><br/>无法解压缩更新包');
-    //     }
-    // 
-    //     //覆盖文件
-    //     if (CopyAll($floderName, SYSTEM_ROOT . '/plugins/' . $_GET['upd']) !== true) {
-    //         DeleteFile(UPDATE_CACHE);
-    //         msg('错误 - 更新失败：<br/><br/>无法更新文件');
-    //     }
-    //     DeleteFile(UPDATE_CACHE);
-    //     doAction('plugin_update_2');
-    //     msg('（1/2）已成功下载最新版本的 ' . $plug['plugin']['name'] . ' 插件。请单击下一步，以完成更新<br/><br/><a href="setting.php?mod=admin:plugins&upd=' . $_GET['upd'] . '">>> 下一步</a>', false);
-    // 
-    //     break;
     case 'admin:set':
         global $m;
         $sou = $_POST;
+        // 缺键兜底（checkbox 未勾选等），不再依赖 @ 抑制未定义键告警
+        $souGet = static function (string $key, string $default = '') use ($sou): string {
+            return isset($sou[$key]) ? (string) $sou[$key] : $default;
+        };
         if ($_GET['type'] == 'sign') {
-            @option::set('cron_limit', $sou['cron_limit']);
-            @option::set('tb_max', $sou['tb_max']);
-            @option::set('bduss_num', $sou['bduss_num']);
-            @option::set('sign_mode', serialize($sou['sign_mode']));
-            @option::set('enable_addtieba', $sou['enable_addtieba']);
-            @option::set('retry_max', $sou['retry_max']);
-            @option::set('sign_hour', $sou['sign_hour']);
+            @option::set('cron_limit', $souGet('cron_limit'));
+            @option::set('tb_max', $souGet('tb_max'));
+            @option::set('bduss_num', $souGet('bduss_num'));
+            @option::set('sign_mode', serialize($souGet('sign_mode')));
+            @option::set('enable_addtieba', $souGet('enable_addtieba'));
+            @option::set('retry_max', $souGet('retry_max'));
+            @option::set('sign_hour', $souGet('sign_hour'));
             @option::set('sign_window_end', isset($sou['sign_window_end']) ? trim((string) $sou['sign_window_end']) : '');
             @option::set('retry_smart', isset($sou['retry_smart']) && $sou['retry_smart'] == '1' ? '1' : '0');
-            @option::set('fb', $sou['fb']);
-            @option::set('sign_sleep', $sou['sign_sleep']);
-            @option::set('sign_scan', $sou['sign_scan']);
-            @option::set('same_pid', $sou['same_pid']);
-            @option::set('sign_jitter', $sou['sign_jitter']);
+            @option::set('fb', $souGet('fb'));
+            @option::set('sign_sleep', $souGet('sign_sleep'));
+            @option::set('sign_scan', $souGet('sign_scan'));
+            @option::set('same_pid', $souGet('same_pid'));
+            @option::set('sign_jitter', $souGet('sign_jitter'));
             @option::set('client_version', isset($sou['client_version']) ? trim($sou['client_version']) : '');
             @option::set('client_rotate', isset($sou['client_rotate']) ? $sou['client_rotate'] : '1');
             @option::set('sign_shuffle', isset($sou['sign_shuffle']) ? $sou['sign_shuffle'] : '0');
@@ -131,7 +91,7 @@ switch (SYSTEM_PAGE) {
             @option::set('dama_password', isset($sou['dama_password']) ? $sou['dama_password'] : '');
             @option::set('dama_softid', isset($sou['dama_softid']) ? trim($sou['dama_softid']) : '');
             @option::set('health_auto_disable', isset($sou['health_auto_disable']) ? $sou['health_auto_disable'] : '0');
-            @option::set('health_fail_max', max(1, min(20, (int) $sou['health_fail_max'])));
+            @option::set('health_fail_max', max(1, min(20, (int) $souGet('health_fail_max', '1'))));
             if (empty($sou['fb_tables'])) {
                 @option::set('fb_tables', null);
             } else {
@@ -152,34 +112,34 @@ switch (SYSTEM_PAGE) {
                 @option::set('fb_tables', serialize($fb_tab));
             }
         } else {
-            @option::set('system_url', $sou['system_url']);
-            @option::set('system_name', $sou['system_name']);
-            @option::set('system_keywords', $sou['system_keywords']);
-            @option::set('system_description', $sou['system_description']);
-            @option::set('footer', $sou['footer']);
-            @option::set('ann', $sou['ann']);
-            @option::set('enable_reg', $sou['enable_reg']);
-            isset($sou['captcha']) and @option::set('captcha', $sou['captcha']);
-            @option::set('yr_reg', $sou['yr_reg']);
+            @option::set('system_url', $souGet('system_url'));
+            @option::set('system_name', $souGet('system_name'));
+            @option::set('system_keywords', $souGet('system_keywords'));
+            @option::set('system_description', $souGet('system_description'));
+            @option::set('footer', $souGet('footer'));
+            @option::set('ann', $souGet('ann'));
+            @option::set('enable_reg', $souGet('enable_reg'));
+            isset($sou['captcha']) and @option::set('captcha', $souGet('captcha'));
+            @option::set('yr_reg', $souGet('yr_reg'));
             @option::set('reg_mail_verify', isset($sou['reg_mail_verify']) ? $sou['reg_mail_verify'] : '0');
-            @option::set('stop_reg', $sou['stop_reg']);
-            @option::set('icp', $sou['icp']);
-            @option::set('bbs_us', $sou['bbs_us']);
-            @option::set('bbs_pw', $sou['bbs_pw']);
-            @option::set('mail_mode', $sou['mail_mode']);
-            @option::set('mail_name', $sou['mail_name']);
-            @option::set('mail_yourname', $sou['mail_yourname']);
-            @option::set('mail_host', $sou['mail_host']);
-            @option::set('mail_port', $sou['mail_port']);
-            @option::set('mail_auth', $sou['mail_auth']);
-            @option::set('mail_secure', $sou['mail_secure']);
-            @option::set('mail_smtpname', $sou['mail_smtpname']);
-            isset($sou['mail_smtppw']) and @option::set('mail_smtppw', $sou['mail_smtppw']);
-            @option::set('dev', $sou['dev']);
-            @option::set('cron_pw', $sou['cron_pw']);
-            isset($sou['cron_asyn']) and @option::set('cron_asyn', $sou['cron_asyn']);
-            @option::set('sign_multith', $sou['sign_multith']);
-            @option::set('cktime', $sou['cktime']);
+            @option::set('stop_reg', $souGet('stop_reg'));
+            @option::set('icp', $souGet('icp'));
+            @option::set('bbs_us', $souGet('bbs_us'));
+            @option::set('bbs_pw', $souGet('bbs_pw'));
+            @option::set('mail_mode', $souGet('mail_mode'));
+            @option::set('mail_name', $souGet('mail_name'));
+            @option::set('mail_yourname', $souGet('mail_yourname'));
+            @option::set('mail_host', $souGet('mail_host'));
+            @option::set('mail_port', $souGet('mail_port'));
+            @option::set('mail_auth', $souGet('mail_auth'));
+            @option::set('mail_secure', $souGet('mail_secure'));
+            @option::set('mail_smtpname', $souGet('mail_smtpname'));
+            isset($sou['mail_smtppw']) and @option::set('mail_smtppw', $souGet('mail_smtppw'));
+            @option::set('dev', $souGet('dev'));
+            @option::set('cron_pw', $souGet('cron_pw'));
+            isset($sou['cron_asyn']) and @option::set('cron_asyn', $souGet('cron_asyn'));
+            @option::set('sign_multith', $souGet('sign_multith'));
+            @option::set('cktime', $souGet('cktime'));
             @option::set('notify_enable', isset($sou['notify_enable']) && $sou['notify_enable'] == '1' ? 1 : 0);
             @option::set('notify_channel', isset($sou['notify_channel']) ? $sou['notify_channel'] : 'none');
             @option::set('notify_serverchan_key', isset($sou['notify_serverchan_key']) ? $sou['notify_serverchan_key'] : '');
@@ -218,23 +178,6 @@ switch (SYSTEM_PAGE) {
 
         break;
     case 'admin:tools':
-        /*
-         $toolpw = option::get('toolpw');
-           if(!empty($_POST['toolpw'])){
-          $cookies = md5(md5(md5($_POST['toolpw'])));
-            if(empty($toolpw)){
-                option::add('toolpw',$cookies);
-                setcookie('toolpw',$cookies);
-              Redirect('index.php?mod=admin:tools&ok');
-          } else {
-               setcookie('toolpw',$cookies);
-              Redirect('index.php?mod=admin:tools');
-         }
-          }
-          if($_COOKIE['toolpw'] != $toolpw || empty($toolpw)){
-           Redirect('index.php?mod=admin:tools');
-         }
-        */
 
         switch (strip_tags($_GET['setting'])) {
             case 'optim':
@@ -750,9 +693,10 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
 
         break;
     case 'baiduid':
-        $bdussIn = isset($_POST['bduss']) ? $_POST['bduss'] : (isset($_GET['bduss']) ? $_GET['bduss'] : '');
-        $stokenIn = isset($_POST['stoken']) ? $_POST['stoken'] : (isset($_GET['stoken']) ? $_GET['stoken'] : '');
-        $delIn = isset($_POST['del']) ? $_POST['del'] : (isset($_GET['del']) ? $_GET['del'] : '');
+        //凭据只接受 POST：GET 传输会进入访问日志/浏览器历史/Referer
+        $bdussIn = isset($_POST['bduss']) ? $_POST['bduss'] : '';
+        $stokenIn = isset($_POST['stoken']) ? $_POST['stoken'] : '';
+        $delIn = isset($_POST['del']) ? $_POST['del'] : '';
         if (isset($_POST['delete']) || isset($_GET['delete'])) {
             doAction('baiduid_set_1');
             CleanUser(UID);

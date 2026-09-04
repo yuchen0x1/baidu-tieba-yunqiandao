@@ -128,39 +128,19 @@ class cron
     {
         global $m;
 
-        $set = adds($set);
-
-        $sql = "INSERT IGNORE INTO  `" . DB_PREFIX . "cron` (`name`";
-        $a = '';
-        $b = "'{$name}'";
-
-        if (isset($set['file'])) {
-            $a .= ', `file`';
-            $b .= ", '{$set['file']}'";
+        //列白名单 + 参数化写入（历史实现为 addslashes 拼接）
+        $columns = array('file', 'no', 'desc', 'freq', 'lastdo', 'log');
+        $cols = '`name`';
+        $marks = '?';
+        $params = array((string) $name);
+        foreach ($columns as $col) {
+            if (isset($set[$col])) {
+                $cols .= ', `' . $col . '`';
+                $marks .= ', ?';
+                $params[] = (string) $set[$col];
+            }
         }
-        if (isset($set['no'])) {
-            $a .= ', `no`';
-            $b .= ", '{$set['no']}'";
-        }
-        if (isset($set['desc'])) {
-            $a .= ', `desc`';
-            $b .= ", '{$set['desc']}'";
-        }
-        if (isset($set['freq'])) {
-            $a .= ', `freq`';
-            $b .= ", '{$set['freq']}'";
-        }
-        if (isset($set['lastdo'])) {
-            $a .= ', `lastdo`';
-            $b .= ", '{$set['lastdo']}'";
-        }
-        if (isset($set['log'])) {
-            $a .= ', `log`';
-            $b .= ", '{$set['log']}'";
-        }
-
-        $sql .= $a . ' ) VALUES (' . $b . ')';
-        $m->query($sql);
+        $m->pquery("INSERT IGNORE INTO `" . DB_PREFIX . "cron` ({$cols}) VALUES ({$marks})", $params);
     }
 
     /**

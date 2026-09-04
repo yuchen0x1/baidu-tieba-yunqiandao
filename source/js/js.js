@@ -21,6 +21,15 @@ if (window.$) {
     });
 }
 
+// 带确认文案的表单（data-confirm）：confirm 文本由服务端放入 HTML 属性，避免拼进 JS 字符串
+if (window.$) {
+    $(document).on('submit', 'form[data-confirm]', function (event) {
+        if (!window.confirm($(this).attr('data-confirm'))) {
+            event.preventDefault();
+        }
+    });
+}
+
 $(function () {
     // v4: 主题切换 + 系统偏好跟随
     var themeToggle = document.querySelector('[data-theme-toggle]');

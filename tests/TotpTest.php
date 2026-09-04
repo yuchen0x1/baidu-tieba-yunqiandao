@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use TOTP;
 
@@ -45,8 +46,8 @@ class TotpTest extends TestCase
     }
 
     /**
-     * @dataProvider rfcVectorProvider
      */
+    #[DataProvider('rfcVectorProvider')]
     public function testRfc6238Vectors($timeSlice, $expected)
     {
         $this->assertSame($expected, TOTP::code(self::RFC_SECRET, $timeSlice));
