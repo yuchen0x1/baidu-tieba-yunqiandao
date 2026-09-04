@@ -19,36 +19,6 @@ function ver4_ai_cron_log($msg)
     cron::aset('ver4_ai_do', array('log' => '[' . date('Y-m-d H:i:s') . ']' . $msg));
 }
 
-function ver4_ai_ensure_table()
-{
-    static $ready = false;
-    if ($ready) {
-        return;
-    }
-    global $m;
-    //type 0=回帖 1=主题帖；status 1=成功 2=失败 3=触发频率限制 4=AI 生成失败
-    $m->query("CREATE TABLE IF NOT EXISTS `" . DB_PREFIX . "ver4_ai_log` (
-        `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-        `pid` INT UNSIGNED NOT NULL DEFAULT 0,
-        `tid` BIGINT UNSIGNED NOT NULL DEFAULT 0,
-        `kw` VARCHAR(60) NOT NULL DEFAULT '',
-        `type` TINYINT NOT NULL DEFAULT 0,
-        `status` TINYINT NOT NULL DEFAULT 0,
-        `msg` VARCHAR(255) NOT NULL DEFAULT '',
-        `day` CHAR(8) NOT NULL DEFAULT '',
-        `content_md5` CHAR(32) NOT NULL DEFAULT '',
-        `created_at` INT UNSIGNED NOT NULL,
-        PRIMARY KEY (`id`),
-        UNIQUE KEY `pid_tid_day` (`pid`, `tid`, `day`),
-        KEY `pid_day_type` (`pid`, `day`, `type`),
-        KEY `kw_created` (`kw`, `type`, `created_at`),
-        KEY `pid_md5_created` (`pid`, `content_md5`, `created_at`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
-    //旧版本表结构补齐 content_md5 列（内容去重用）
-    $m->addColumn('ver4_ai_log', 'content_md5', 'char(32)', "NOT NULL DEFAULT ''");
-    $ready = true;
-}
-
 /** 站长配置的敏感词列表（全站生效） */
 function ver4_ai_banned_words()
 {
@@ -83,15 +53,6 @@ function ver4_ai_content_duplicated($pid, $content)
     return !empty($row['c']);
 }
 
-function ver4_ai_insert_log($pid, $tid, $kw, $type, $status, $msg, $day, $contentMd5 = '')
-{
-    global $m;
-    $m->pquery(
-        "INSERT IGNORE INTO `" . DB_PREFIX . "ver4_ai_log` (`pid`, `tid`, `kw`, `type`, `status`, `msg`, `day`, `content_md5`, `created_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        array((int) $pid, (int) $tid, (string) $kw, (int) $type, (int) $status, mb_substr((string) $msg, 0, 200), (string) $day, (string) $contentMd5, time())
-    );
-}
-
 function cron_ver4_ai_do()
 {
     if (function_exists('set_time_limit')) {
@@ -99,6 +60,8 @@ function cron_ver4_ai_do()
     }
     global $m;
     ver4_ai_ensure_table();
+    ver4_ai_ensure_draft_table();
+    ver4_ai_draft_prune_stale();
     $day = date('Ymd');
 
     //按归属用户分组账号，逐用户解析配置执行
@@ -262,28 +225,79 @@ function ver4_ai_do_threads($cfg, $acc, $day)
     $hourPoint = $cfg['thread_hour'];
     $everyHours = $cfg['thread_every'] * 3600;
     $dailyMax = $cfg['thread_daily'];
+    //半自动模式：到点只生成候选草稿，由用户在个人页挑选发布
+    $semi = !empty($cfg['thread_semi']);
+    $uid = (int) (isset($acc['uid']) ? $acc['uid'] : 0);
 
     if ($mode === 'daily' && (int) date('G') < $hourPoint) {
         return; //未到当日设定小时点
     }
 
     foreach ($cfg['thread_kws'] as $kw) {
-        if (ver4_ai_day_count($pid, 1, $day) >= $dailyMax) {
-            break;
-        }
-        if ($mode === 'daily') {
-            if (ver4_ai_posted_today($pid, $kw, $day)) {
-                continue; //该吧今日已发
+        if ($semi) {
+            //半自动：按生成节奏节流（发布是手动动作，不计入全自动每日上限）
+            if ($mode === 'daily') {
+                if (ver4_ai_draft_made_today($pid, $kw, $day)) {
+                    continue; //该吧今日已生成过候选
+                }
+            } else {
+                $lastDraft = ver4_ai_draft_last_time($pid, $kw);
+                if ($lastDraft > 0 && time() - $lastDraft < $everyHours) {
+                    continue; //未到 N 小时间隔
+                }
             }
         } else {
-            $last = ver4_ai_last_post_time($pid, $kw);
-            if ($last > 0 && time() - $last < $everyHours) {
-                continue; //未到 N 小时间隔
+            if (ver4_ai_day_count($pid, 1, $day) >= $dailyMax) {
+                break;
+            }
+            if ($mode === 'daily') {
+                if (ver4_ai_posted_today($pid, $kw, $day)) {
+                    continue; //该吧今日已发
+                }
+            } else {
+                $last = ver4_ai_last_post_time($pid, $kw);
+                if ($last > 0 && time() - $last < $everyHours) {
+                    continue; //未到 N 小时间隔
+                }
             }
         }
         $fid = (int) misc::getFid($kw);
         if ($fid <= 0) {
             ver4_ai_insert_log($pid, 0, $kw, 1, 2, '获取吧 ID 失败（贴吧名可能不存在）', $day);
+            continue;
+        }
+        if ($semi) {
+            //===== 半自动：一次生成 3 条候选，逐条过敏感词/去重检查后存草稿箱 =====
+            $made = 0;
+            $seenMd5 = array();
+            for ($ci = 0; $ci < 3; $ci++) {
+                $aiErr = null;
+                $thread = ver4_ai_gen_thread($cfg, $kw, $aiErr);
+                if ($thread === false) {
+                    continue;
+                }
+                $contentChecks = 0;
+                while ((ver4_ai_content_banned($thread['title']) || ver4_ai_content_banned($thread['content']) || ver4_ai_content_duplicated($pid, $thread['title'] . $thread['content'])) && $contentChecks < 2) {
+                    $contentChecks++;
+                    $thread = ver4_ai_gen_thread($cfg, $kw, $aiErr);
+                    if ($thread === false) {
+                        break;
+                    }
+                }
+                if ($thread === false || ver4_ai_content_banned($thread['title']) || ver4_ai_content_banned($thread['content'])) {
+                    continue;
+                }
+                $md5 = md5($thread['title'] . $thread['content']);
+                if (isset($seenMd5[$md5]) || ver4_ai_content_duplicated($pid, $thread['title'] . $thread['content'])) {
+                    continue; //与已发布内容或本批候选重复
+                }
+                $seenMd5[$md5] = true;
+                ver4_ai_draft_add($uid, $pid, $kw, $thread['title'], $thread['content']);
+                $made++;
+                usleep(800 * 1000);
+            }
+            ver4_ai_insert_log($pid, 0, $kw, 1, 6, "半自动模式：已生成 {$made} 条候选，请到个人页「发帖草稿箱」挑选发布", $day, md5(''));
+            ver4_ai_cron_log("半自动发帖：账号 {$pid} 在 {$kw}吧 生成 {$made} 条候选");
             continue;
         }
         $aiErr = null;
@@ -439,107 +453,12 @@ function ver4_ai_get_floors($bduss, $kw, $tid, $pid)
 }
 
 /**
- * 回帖（$quoteId > 0 时为楼中楼）
- * @return array code: 0=成功 -1=失败 -2=频繁；msg
+ * 回帖（$quoteId > 0 时为楼中楼）：见 ver4_ai_client.php（与用户页半自动发布共用）
  */
-function ver4_ai_post($bduss, $tbs, $kw, $fid, $tid, $content, $pid, $quoteId = 0)
-{
-    $url = 'https://c.tieba.baidu.com/c/c/post/add';
-    if (!wcurl::isAllowedPublicUrl($url)) {
-        return array(-1, '接口地址校验失败');
-    }
-    $data = array(
-        'BDUSS' => $bduss,
-        '_client_id' => 'wappc_' . mt_rand(100000000, 999999999) . '_' . mt_rand(100, 999),
-        '_phone_imei' => md5(uniqid('', true)),
-        'anonymous' => '0',
-        'content' => $content,
-        'fid' => (string) $fid,
-        'kw' => $kw,
-        'net_type' => '3',
-        'new_vcode' => '1',
-        'tbs' => $tbs,
-        'tid' => (string) $tid,
-        'title' => '',
-    );
-    if ($quoteId > 0) {
-        $data['quote_id'] = (string) $quoteId;
-    }
-    misc::addTiebaSign($data);
-    $ch = new wcurl($url);
-    misc::applyProxy($ch, $pid);
-    $ch->addCookie(array('BDUSS' => $bduss));
-    $resp = json_decode($ch->post($data), true);
-    if (!is_array($resp)) {
-        return array(-1, '接口返回无法解析');
-    }
-    $code = isset($resp['error_code']) ? (int) $resp['error_code'] : -1;
-    if ($code === 0) {
-        return array(0, $quoteId > 0 ? '楼中楼回复成功' : '回帖成功');
-    }
-    $map = array(
-        4 => '发帖过于频繁，本轮停止',
-        5 => '需要验证码或未关注该吧',
-        7 => '操作过于频繁',
-        8 => '账号已被本吧封禁',
-    );
-    if (isset($map[$code])) {
-        return array($code === 4 || $code === 7 ? -2 : -1, $map[$code]);
-    }
-    $errmsg = isset($resp['error_msg']) ? (string) $resp['error_msg'] : '';
-    return array(-1, '错误码 ' . $code . ($errmsg !== '' ? '：' . $errmsg : ''));
-}
 
 /**
- * 发布新主题帖
- * @return array array(0=成功 -1=失败 -2=频繁, msg, 新主题tid)
+ * 发布新主题帖：见 ver4_ai_client.php（与用户页半自动发布共用）
  */
-function ver4_ai_post_thread($bduss, $tbs, $kw, $fid, $title, $content, $pid)
-{
-    $url = 'https://c.tieba.baidu.com/c/c/thread/add';
-    if (!wcurl::isAllowedPublicUrl($url)) {
-        return array(-1, '接口地址校验失败', 0);
-    }
-    $data = array(
-        'BDUSS' => $bduss,
-        '_client_id' => 'wappc_' . mt_rand(100000000, 999999999) . '_' . mt_rand(100, 999),
-        '_phone_imei' => md5(uniqid('', true)),
-        'anonymous' => '0',
-        'content' => $content,
-        'fid' => (string) $fid,
-        'kw' => $kw,
-        'net_type' => '3',
-        'new_vcode' => '1',
-        'tbs' => $tbs,
-        'title' => $title,
-        'vcode_tag' => '11',
-    );
-    misc::addTiebaSign($data);
-    $ch = new wcurl($url);
-    misc::applyProxy($ch, $pid);
-    $ch->addCookie(array('BDUSS' => $bduss));
-    $resp = json_decode($ch->post($data), true);
-    if (!is_array($resp)) {
-        return array(-1, '接口返回无法解析', 0);
-    }
-    $code = isset($resp['error_code']) ? (int) $resp['error_code'] : -1;
-    //tid 在响应顶层（实测），旧文档的 data.tid 作兜底
-    $newTid = isset($resp['tid']) ? (int) $resp['tid'] : (isset($resp['data']['tid']) ? (int) $resp['data']['tid'] : 0);
-    if ($code === 0) {
-        return array(0, '发主题帖成功', $newTid);
-    }
-    $map = array(
-        4 => '发帖过于频繁，本轮停止',
-        5 => '需要验证码或未关注该吧',
-        7 => '操作过于频繁',
-        8 => '账号已被本吧封禁',
-    );
-    if (isset($map[$code])) {
-        return array($code === 4 || $code === 7 ? -2 : -1, $map[$code], 0);
-    }
-    $errmsg = isset($resp['error_msg']) ? (string) $resp['error_msg'] : '';
-    return array(-1, '错误码 ' . $code . ($errmsg !== '' ? '：' . $errmsg : ''), 0);
-}
 
 /** 某账号某类型今日已成功执行条数 */
 function ver4_ai_day_count($pid, $type, $day)
