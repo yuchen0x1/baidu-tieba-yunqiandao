@@ -6,8 +6,8 @@
  */
 
 define('SYSTEM_FN', '百度贴吧云签到');
-define('SYSTEM_VER', '6.3');
-define('SYSTEM_VER_NOTE', 'V6.3：帖子监控与 AI 联动、数据保留与周报、Glass v5 玻璃拟态');
+define('SYSTEM_VER', '6.4');
+define('SYSTEM_VER_NOTE', 'V6.4：安全与正确性加固、AI 人设模板/半自动发帖/审查拦截');
 define('SYSTEM_ROOT', dirname(__FILE__));
 require_once SYSTEM_ROOT . '/lib/request.php';
 define('PLUGIN_ROOT', dirname(__FILE__) . '/plugins/');
