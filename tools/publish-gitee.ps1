@@ -58,7 +58,7 @@ try {
         if (-not (Test-Path -LiteralPath $ReleaseNotesFile)) {
             throw "ReleaseNotesFile 不存在：$ReleaseNotesFile"
         }
-        $releaseBodyText = [IO.File]::ReadAllText($ReleaseNotesFile)
+        $releaseBodyText = [IO.File]::ReadAllText($ReleaseNotesFile, [Text.Encoding]::UTF8)
     }
     $releaseBody = @{ tag_name = $Tag; name = "百度贴吧云签到 $Tag Windows 部署包"; body = $releaseBodyText; target_commitish = $SourceRef } | ConvertTo-Json
 
@@ -76,7 +76,9 @@ try {
         }
     }
 
-    $release = Invoke-RestMethod -Uri "$apiRoot/releases" -Method Post -Headers $headers -Body $releaseBody -ContentType "application/json"
+    # PS 5.1 字符串请求体按代码页编码，必须显式以 UTF-8 字节发送，否则中文说明乱码
+    $releaseBodyBytes = [Text.Encoding]::UTF8.GetBytes($releaseBody)
+    $release = Invoke-RestMethod -Uri "$apiRoot/releases" -Method Post -Headers $headers -Body $releaseBodyBytes -ContentType "application/json; charset=utf-8"
     $releaseId = [string]$release.id
     if ([string]::IsNullOrWhiteSpace($releaseId)) {
         throw "Gitee Release 响应缺少 id。"
