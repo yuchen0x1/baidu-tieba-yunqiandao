@@ -252,7 +252,7 @@ function ver4_ai_draft_owned($uid, $id)
 }
 
 /** 某账号某吧今日是否已生成过候选（半自动模式按生成节奏节流） */
-function ver4_ai_draft_made_today($pid, $kw, $day)
+function ver4_ai_draft_made_today($pid, $kw)
 {
     global $m;
     $since = strtotime(date('Y-m-d') . ' 00:00:00');
@@ -315,6 +315,15 @@ function ver4_ai_ensure_table()
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
     //旧版本表结构补齐 content_md5 列（内容去重用）
     $m->addColumn('ver4_ai_log', 'content_md5', 'char(32)', "NOT NULL DEFAULT ''");
+    //旧版本的 UNIQUE(pid,tid,day) 会让 tid=0 的状态日志（生成失败/审查拦截/半自动候选等）
+    //同账号同天只留第一条（INSERT IGNORE 静默吞掉其余记录），降级为普通索引；
+    //判重由 replied_today/posted_today 显式查询负责
+    $uniq = $m->once_fetch_array(
+        "SELECT COUNT(*) AS c FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = '" . $m->real_escape_string(DB_PREFIX . 'ver4_ai_log') . "' AND index_name = 'pid_tid_day' AND NON_UNIQUE = 0"
+    );
+    if (!empty($uniq['c'])) {
+        $m->query("ALTER TABLE `" . DB_PREFIX . "ver4_ai_log` DROP INDEX `pid_tid_day`, ADD INDEX `pid_tid_day` (`pid`, `tid`, `day`)");
+    }
     $ready = true;
 }
 
@@ -325,7 +334,7 @@ function ver4_ai_insert_log($pid, $tid, $kw, $type, $status, $msg, $day, $conten
 {
     global $m;
     $m->pquery(
-        "INSERT IGNORE INTO `" . DB_PREFIX . "ver4_ai_log` (`pid`, `tid`, `kw`, `type`, `status`, `msg`, `day`, `content_md5`, `created_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO `" . DB_PREFIX . "ver4_ai_log` (`pid`, `tid`, `kw`, `type`, `status`, `msg`, `day`, `content_md5`, `created_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         array((int) $pid, (int) $tid, (string) $kw, (int) $type, (int) $status, mb_substr((string) $msg, 0, 200), (string) $day, (string) $contentMd5, time())
     );
 }

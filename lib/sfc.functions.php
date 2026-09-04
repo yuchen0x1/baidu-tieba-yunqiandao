@@ -1358,6 +1358,10 @@ function csv_line(array $fields)
 {
     $fields = array_map('strval', $fields);
     foreach ($fields as &$v) {
+        //防公式注入：以 = + - @ 或制表符开头的单元格会被 Excel/WPS 当公式执行
+        if ($v !== '' && preg_match('/^[=+\-@\t]/', $v)) {
+            $v = "'" . $v;
+        }
         if (preg_match('/[",\r\n]/', $v)) {
             $v = '"' . str_replace('"', '""', $v) . '"';
         }

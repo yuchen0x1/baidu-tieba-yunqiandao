@@ -684,7 +684,7 @@ class SignManager
                 'total' => $total,
                 'rate'  => $total > 0 ? round($ok / $total * 100, 1) : 0,
             );
-            $stamp += 86400;
+            $stamp = strtotime('+1 day', $stamp); // 用日历日推进，避免 DST 时区重复/跳日
         }
         return $rows;
     }
@@ -746,7 +746,7 @@ class SignManager
         while ($stamp <= $end) {
             $date = date('Y-m-d', $stamp);
             $trend[] = array('date' => $date, 'hits' => isset($trendMap[$date]) ? $trendMap[$date] : 0);
-            $stamp += 86400;
+            $stamp = strtotime('+1 day', $stamp); // 用日历日推进，避免 DST 时区重复/跳日
         }
         return array('available' => true, 'total' => $total, 'top' => $top, 'trend' => $trend);
     }
@@ -894,7 +894,7 @@ class SignManager
                 'total'   => $total,
                 'rate'    => $rate,
             );
-            $stamp += 86400;
+            $stamp = strtotime('+1 day', $stamp); // 用日历日推进，避免 DST 时区重复/跳日
         }
         return $rows;
     }
@@ -913,19 +913,22 @@ class SignManager
         $days = max(1, min(365, (int) $days));
         if ($uid <= 0) { return array(); }
         $since = strtotime('-' . ($days - 1) . ' days midnight');
-        // 子查询：每个贴吧的聚合 + 最近一条记录
+        // 子查询：每个贴吧的聚合 + 最近一条记录（last_msg 用相关子查询，消息含逗号时 GROUP_CONCAT 会截断）
         $sql = "SELECT t.`tieba`,
             SUM(t.`status` = 'success') AS `success`,
             SUM(t.`status` = 'error')   AS `error`,
             COUNT(*) AS `total`,
             MAX(t.`created_at`) AS `last_time`,
             SUBSTRING_INDEX(GROUP_CONCAT(t.`status` ORDER BY t.`id` DESC), ',', 1) AS `last_status`,
-            SUBSTRING_INDEX(GROUP_CONCAT(COALESCE(t.`message`,'') ORDER BY t.`id` DESC), ',', 1) AS `last_msg`
+            (SELECT t2.`message` FROM `" . DB_PREFIX . self::HISTORY_TABLE . "` t2
+              WHERE t2.`uid` = t.`uid` AND t2.`tieba` = t.`tieba` AND t2.`created_at` >= ?
+              ORDER BY t2.`id` DESC LIMIT 1) AS `last_msg`
             FROM `" . DB_PREFIX . self::HISTORY_TABLE . "` t
             WHERE t.`uid` = ? AND t.`created_at` >= ?
             GROUP BY t.`tieba`
             ORDER BY `total` DESC";
-        $result = $m->pquery($sql, array($uid, $since));
+        $sinceTs = $since;
+        $result = $m->pquery($sql, array($sinceTs, $uid, $since));
         $rows = array();
         while ($row = $m->fetch_array($result)) {
             $success = (int) $row['success'];

@@ -97,12 +97,16 @@ if (isset($_POST['uai_draft_pub'])) {
     csrf(true, true);
     ver4_ai_ensure_table();
     ver4_ai_ensure_draft_table();
-    $draft = ver4_ai_draft_owned($uid, isset($_POST['uai_draft_id']) ? (int) $_POST['uai_draft_id'] : 0);
-    if ($draft === false || (int) $draft['status'] !== 0) {
+    $draftId = isset($_POST['uai_draft_id']) ? (int) $_POST['uai_draft_id'] : 0;
+    //先原子占位（status 0→1），并发/双击只有一次请求能拿到发布权
+    $m->pquery("UPDATE `" . DB_PREFIX . "ver4_ai_draft` SET `status` = 1, `published_at` = ? WHERE `id` = ? AND `uid` = ? AND `status` = 0", array(time(), $draftId, $uid));
+    if ((int) $m->affected_rows() !== 1) {
         redirect('index.php?plugin=ver4_ai&success=' . urlencode('草稿不存在或已处理，请刷新页面'));
     }
+    $draft = ver4_ai_draft_owned($uid, $draftId);
     $accRow = $m->once_fetch_array("SELECT `id`, `bduss` FROM `" . DB_PREFIX . "baiduid` WHERE `id` = " . (int) $draft['pid'] . " AND `uid` = {$uid}");
     if (empty($accRow['id'])) {
+        $m->pquery("UPDATE `" . DB_PREFIX . "ver4_ai_draft` SET `status` = 0, `published_at` = 0 WHERE `id` = ?", array($draftId));
         redirect('index.php?plugin=ver4_ai&success=' . urlencode('该草稿所属的百度账号已不存在'));
     }
     $pubBduss = P::decrypt($accRow['bduss']);
@@ -110,16 +114,18 @@ if (isset($_POST['uai_draft_pub'])) {
     $pubFid = (int) misc::getFid((string) $draft['kw']);
     $day = date('Ymd');
     if (empty($pubTbs) || $pubFid <= 0) {
+        $m->pquery("UPDATE `" . DB_PREFIX . "ver4_ai_draft` SET `status` = 0, `published_at` = 0 WHERE `id` = ?", array($draftId));
         ver4_ai_insert_log((int) $draft['pid'], 0, (string) $draft['kw'], 1, 2, '半自动发布失败：账号凭据失效或贴吧不存在 @' . $draft['title'], $day, md5(''));
         redirect('index.php?plugin=ver4_ai&success=' . urlencode('发布失败：账号凭据可能已失效，或目标贴吧不存在'));
     }
-    $pubErr = null;
     list($pubCode, $pubMsg, $newTid) = ver4_ai_post_thread($pubBduss, $pubTbs, (string) $draft['kw'], $pubFid, (string) $draft['title'], (string) $draft['content'], (int) $draft['pid']);
     if ($pubCode === 0) {
-        $m->pquery("UPDATE `" . DB_PREFIX . "ver4_ai_draft` SET `status` = 1, `tid` = ?, `published_at` = ? WHERE `id` = ?", array((int) $newTid, time(), (int) $draft['id']));
+        $m->pquery("UPDATE `" . DB_PREFIX . "ver4_ai_draft` SET `tid` = ? WHERE `id` = ?", array((int) $newTid, $draftId));
         ver4_ai_insert_log((int) $draft['pid'], (int) $newTid, (string) $draft['kw'], 1, 1, '半自动发布成功 @' . $draft['title'], $day, md5($draft['title'] . $draft['content']));
         redirect('index.php?plugin=ver4_ai&success=' . urlencode('发布成功：《' . $draft['title'] . '》'));
     } else {
+        //发布失败回滚为待发布，用户可重试
+        $m->pquery("UPDATE `" . DB_PREFIX . "ver4_ai_draft` SET `status` = 0, `published_at` = 0 WHERE `id` = ?", array($draftId));
         ver4_ai_insert_log((int) $draft['pid'], 0, (string) $draft['kw'], 1, 2, '半自动发布失败：' . $pubMsg . ' @' . $draft['title'], $day, md5(''));
         redirect('index.php?plugin=ver4_ai&success=' . urlencode('发布失败：' . $pubMsg . '（草稿已保留，可稍后重试）'));
     }
@@ -269,12 +275,12 @@ while ($r = $m->fetch_array($logRs)) {
         <td><b><?php echo htmlspecialchars((string) $d['title'], ENT_QUOTES, 'UTF-8'); ?></b><br/><span style="white-space:pre-wrap;color:#555;font-size:13px"><?php echo htmlspecialchars(mb_substr((string) $d['content'], 0, 160), ENT_QUOTES, 'UTF-8'); ?><?php echo mb_strlen((string) $d['content']) > 160 ? '…' : ''; ?></span></td>
         <td><?php echo htmlspecialchars(date('m-d H:i', (int) $d['created_at']), ENT_QUOTES, 'UTF-8'); ?></td>
         <td>
-            <form method="post" action="index.php?plugin=ver4_ai" style="display:inline" onsubmit="return confirm('确认把《<?php echo htmlspecialchars((string) $d['title'], ENT_QUOTES, 'UTF-8'); ?>》发布到 <?php echo htmlspecialchars((string) $d['kw'], ENT_QUOTES, 'UTF-8'); ?>吧 吗？');">
+            <form method="post" action="index.php?plugin=ver4_ai" style="display:inline" data-confirm="确认把《<?php echo htmlspecialchars((string) $d['title'], ENT_QUOTES, 'UTF-8'); ?>》发布到 <?php echo htmlspecialchars((string) $d['kw'], ENT_QUOTES, 'UTF-8'); ?>吧 吗？">
                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
                 <input type="hidden" name="uai_draft_id" value="<?php echo (int) $d['id']; ?>">
                 <input type="submit" class="btn btn-success btn-sm" name="uai_draft_pub" value="发布">
             </form>
-            <form method="post" action="index.php?plugin=ver4_ai" style="display:inline" onsubmit="return confirm('确定丢弃这条候选吗？');">
+            <form method="post" action="index.php?plugin=ver4_ai" style="display:inline" data-confirm="确定丢弃这条候选吗？">
                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
                 <input type="hidden" name="uai_draft_id" value="<?php echo (int) $d['id']; ?>">
                 <input type="submit" class="btn btn-default btn-sm" name="uai_draft_drop" value="丢弃">
@@ -668,6 +674,15 @@ while ($r = $m->fetch_array($logRs)) {
             submitHidden('uai_tpl_del', { 'uai_tpl_index': String(parseInt(v.slice(2), 10)) });
         });
     }
+
+    // 带确认文案的表单：confirm 文本从 data-confirm 属性读取，避免把动态文本拼进 JS 字符串
+    Array.prototype.forEach.call(document.querySelectorAll('form[data-confirm]'), function (form) {
+        if (form.dataset.csConfirm === '1') { return; }
+        form.dataset.csConfirm = '1';
+        form.addEventListener('submit', function (e) {
+            if (!window.confirm(form.getAttribute('data-confirm'))) { e.preventDefault(); }
+        });
+    });
 })();
 </script>
 <?php loadfoot(); ?>

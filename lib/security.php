@@ -263,6 +263,8 @@ if (!function_exists('api_token_matches')) {
     /**
      * 校验请求携带的 Token 是否匹配库中存储值。
      * 兼容两种历史形态：明文存储（升级前的旧站）与哈希存储。
+     * 注意：存储值为哈希形态时，「哈希本身」不能作为凭据通过校验，只比对
+     * SHA-256(提供的 Token)——否则拖库者无需还原原 Token 即可调用 API。
      */
     function api_token_matches($stored, $provided)
     {
@@ -271,8 +273,9 @@ if (!function_exists('api_token_matches')) {
         if ($stored === '' || $provided === '') {
             return false;
         }
-        if (hash_equals($stored, $provided)) {
-            return true;
+        $storedIsHash = strlen($stored) === 64 && ctype_xdigit($stored);
+        if (!$storedIsHash && hash_equals($stored, $provided)) {
+            return true; // 旧版明文存储形态
         }
         return hash_equals($stored, hash('sha256', $provided));
     }

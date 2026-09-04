@@ -114,6 +114,10 @@ final class SecurityHardeningTest extends TestCase
 
         $this->assertFalse(api_token_matches('', 'anything'));
         $this->assertFalse(api_token_matches($storedHash, ''));
+
+        // 哈希形态下，「哈希本身」不能作为凭据通过校验（防拖库直接调用 API）
+        $this->assertFalse(api_token_matches($storedHash, $storedHash));
+        $this->assertFalse(api_token_matches(strtoupper($storedHash), strtoupper($storedHash)));
     }
 
     public function testOptionUsetForcesUidToInt(): void

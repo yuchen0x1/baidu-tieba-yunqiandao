@@ -3,6 +3,7 @@
 use PHPUnit\Framework\TestCase;
 
 require_once dirname(__DIR__) . '/lib/class.SignManager.php';
+require_once dirname(__DIR__) . '/lib/sfc.functions.php';
 
 /**
  * 批 B（数据与报表）统计方法回归测试：
@@ -182,5 +183,20 @@ final class ReportStatsTest extends TestCase
         } finally {
             $m = $previous;
         }
+    }
+
+    public function testCsvLineNeutralizesFormulaInjection(): void
+    {
+        // 以 = + - @ 开头的单元格在 Excel/WPS 中会被当公式执行，必须前置单引号
+        $this->assertSame("'=1+1\n", csv_line(array('=1+1')));
+        $this->assertSame("'+2\n", csv_line(array('+2')));
+        $this->assertSame("'@SUM(A1)\n", csv_line(array('@SUM(A1)')));
+        $this->assertSame("'\tcmd\n", csv_line(array("\tcmd")));
+        // 普通内容与日期不受影响；含逗号/引号仍走 RFC4180 引号包裹
+        $this->assertSame("钓鱼吧\n", csv_line(array('钓鱼吧')));
+        $this->assertSame("2026-09-05 01:00:00\n", csv_line(array('2026-09-05 01:00:00')));
+        $this->assertSame("\"a,\"\"b\"\n", csv_line(array('a,"b')));
+        // 负数被保护性前置（不会执行公式），这是 CSV 公式注入防护的预期取舍
+        $this->assertSame("'-1\n", csv_line(array('-1')));
     }
 }

@@ -237,7 +237,7 @@ function ver4_ai_do_threads($cfg, $acc, $day)
         if ($semi) {
             //半自动：按生成节奏节流（发布是手动动作，不计入全自动每日上限）
             if ($mode === 'daily') {
-                if (ver4_ai_draft_made_today($pid, $kw, $day)) {
+                if (ver4_ai_draft_made_today($pid, $kw)) {
                     continue; //该吧今日已生成过候选
                 }
             } else {
