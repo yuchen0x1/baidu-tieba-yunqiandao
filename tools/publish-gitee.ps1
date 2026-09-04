@@ -34,7 +34,8 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "找不到版本 Tag：$Tag"
     }
-    $dirty = & git status --porcelain --untracked-files=all
+    # 打包内容来自 tag 指向的已提交树，未跟踪的本地文件不影响发布，只检查已跟踪文件的改动
+    $dirty = & git status --porcelain --untracked-files=no
     if (-not [string]::IsNullOrWhiteSpace(($dirty -join "`n"))) {
         throw "工作区存在未提交改动。请先提交版本，发布脚本不会打包未提交内容。"
     }
