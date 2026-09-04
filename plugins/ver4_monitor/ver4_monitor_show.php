@@ -130,21 +130,21 @@ while ($r = $m->fetch_array($logRs)) {
         </tr>
         <tr>
             <td><b>Telegram Bot Token / Chat ID</b></td>
-            <td>
+            <td class="nf-row">
                 <input type="text" class="form-control" name="ver4_notify_telegram_token" value="<?php echo $nfTgToken; ?>" placeholder="Bot Token" style="width:46%;display:inline-block;">
                 <input type="text" class="form-control" name="ver4_notify_telegram_chatid" value="<?php echo $nfTgChat; ?>" placeholder="Chat ID" style="width:30%;display:inline-block;">
             </td>
         </tr>
         <tr>
             <td><b>Bark URL / PushPlus Token</b></td>
-            <td>
+            <td class="nf-row">
                 <input type="text" class="form-control" name="ver4_notify_bark_url" value="<?php echo $nfBark; ?>" placeholder="https://api.day.app/你的Key" style="width:46%;display:inline-block;">
                 <input type="text" class="form-control" name="ver4_notify_pushplus_token" value="<?php echo $nfPushPlus; ?>" placeholder="PushPlus Token" style="width:30%;display:inline-block;">
             </td>
         </tr>
         <tr>
             <td><b>Webhook URL / ntfy Topic / 服务器</b></td>
-            <td>
+            <td class="nf-row">
                 <input type="text" class="form-control" name="ver4_notify_webhook_url" value="<?php echo $nfWebhook; ?>" placeholder="https://..." style="width:40%;display:inline-block;">
                 <input type="text" class="form-control" name="ver4_notify_ntfy_topic" value="<?php echo $nfNtfyTopic; ?>" placeholder="ntfy Topic" style="width:20%;display:inline-block;">
                 <input type="text" class="form-control" name="ver4_notify_ntfy_server" value="<?php echo $nfNtfyServer; ?>" placeholder="https://ntfy.sh（可选）" style="width:30%;display:inline-block;">
@@ -177,4 +177,9 @@ while ($r = $m->fetch_array($logRs)) {
     <?php endforeach; ?>
 </table>
 <?php endif; ?>
+<style>
+@media (max-width: 768px) {
+    .nf-row input.form-control { display: block !important; width: 100% !important; margin: 0 0 6px; }
+}
+</style>
 <?php loadfoot(); ?>
