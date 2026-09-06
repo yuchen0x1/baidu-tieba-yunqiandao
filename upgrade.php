@@ -84,7 +84,8 @@ if ($dbVersion === SYSTEM_VER) {
     if (function_exists('opcache_reset')) {
         @opcache_reset(); //文件刚被更新器覆盖时，确保加载的是新代码
     }
-    echo '<div class="alert alert-success">数据库已经是 V' . htmlspecialchars(SYSTEM_VER, ENT_QUOTES, 'UTF-8') . '，无需升级。<a href="index.php">进入首页</a></div>';
+    echo '<div class="alert alert-success">数据库已经是 V' . htmlspecialchars(SYSTEM_VER, ENT_QUOTES, 'UTF-8') . '，无需升级，即将返回首页…</div>';
+    echo '<script>setTimeout(function(){location.href="index.php";},1500);</script>';
     upgrade_page_foot();
     exit;
 }
@@ -124,9 +125,10 @@ try {
         @opcache_reset(); //迁移结束即重置字节码缓存，后续请求全部加载新代码
         echo 'opcache 已重置。' . PHP_EOL;
     }
-    echo '</pre><div class="alert alert-success"><b>升级完成</b>，已同步 core_version=V' . htmlspecialchars(SYSTEM_VER, ENT_QUOTES, 'UTF-8') . '。'
-        . '<a class="btn btn-success" href="index.php">进入 V' . htmlspecialchars(SYSTEM_VER, ENT_QUOTES, 'UTF-8') . '</a><br/>'
+    echo '</pre><div class="alert alert-success"><b>升级完成</b>，已同步 core_version=V' . htmlspecialchars(SYSTEM_VER, ENT_QUOTES, 'UTF-8') . '，3 秒后自动进入首页…'
+        . '<a class="btn btn-success" href="index.php">立即进入 V' . htmlspecialchars(SYSTEM_VER, ENT_QUOTES, 'UTF-8') . '</a><br/>'
         . '<span class="text-muted">若你的部署使用了 do.php --loop 常驻进程，请重启该进程以加载新代码；普通计划任务部署无需任何操作。</span></div>';
+    echo '<script>setTimeout(function(){location.href="index.php";},3000);</script>';
 } catch (Throwable $e) {
     echo '</pre><div class="alert alert-danger">升级失败：' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8') . '<br/>失败状态已记录到 schema_migrations，修复问题后刷新本页可继续；也可以在服务器上运行 <code>php tools/migrate.php up</code>。</div>';
 }
