@@ -925,7 +925,7 @@ class SignManager
               ORDER BY t2.`id` DESC LIMIT 1) AS `last_msg`
             FROM `" . DB_PREFIX . self::HISTORY_TABLE . "` t
             WHERE t.`uid` = ? AND t.`created_at` >= ?
-            GROUP BY t.`tieba`
+            GROUP BY t.`uid`, t.`tieba`
             ORDER BY `total` DESC";
         $sinceTs = $since;
         $result = $m->pquery($sql, array($sinceTs, $uid, $since));

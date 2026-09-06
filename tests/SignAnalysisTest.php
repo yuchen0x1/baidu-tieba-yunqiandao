@@ -24,6 +24,23 @@ final class SignAnalysisTest extends TestCase
         }
     }
 
+    public function testTiebaHealthGroupsByUidForOnlyFullGroupBy(): void
+    {
+        // 线上 MySQL 启用 only_full_group_by：相关子查询引用 t.uid 时必须将其纳入 GROUP BY，
+        // 否则贴吧与签到/数据分析页报 1055 内部错误
+        $fake = new class {
+            public $captured = array();
+            public function query($sql) { return true; }
+            public function pquery($sql, $params = array()) { $this->captured[] = $sql; return true; }
+            public function fetch_array($rs) { return false; }
+        };
+        $GLOBALS['m'] = $fake;
+        SignManager::tiebaHealth(1, 30);
+        $this->assertNotEmpty($fake->captured, 'tiebaHealth 应发出查询');
+        $sql = end($fake->captured);
+        $this->assertStringContainsString('GROUP BY t.`uid`, t.`tieba`', $sql, 'tiebaHealth 的 GROUP BY 必须包含 t.uid（only_full_group_by 兼容）');
+    }
+
     public function testAnalysisTemplateExists(): void
     {
         $this->assertFileExists(SYSTEM_ROOT . '/templates/analysis.php');
