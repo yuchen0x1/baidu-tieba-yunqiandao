@@ -319,7 +319,7 @@ class cron
                 'log'           => $log,
             ));
         } else {
-            // 达到最大重试：进入正常周期，并通知
+            // 达到最大重试：进入正常周期
             $next = ($freq == '0') ? ($now + max(300, $backoff)) : ($now + (int) $freq);
             self::aset($name, array(
                 'lastdo'        => $now,
@@ -331,11 +331,21 @@ class cron
             ));
             require_once SYSTEM_ROOT . '/lib/class.logger.php';
             Logger::error('计划任务连续失败，已达最大重试次数', array('name' => $name, 'max_retry' => $maxRetry, 'log' => substr((string) $log, 0, 500)));
-            require_once SYSTEM_ROOT . '/lib/class.webhook.php';
-            Webhook::push('task_fail', array('task' => $name, 'max_retry' => $maxRetry, 'message' => substr((string) $log, 0, 500)));
-            if (option::get('cron_notify_on_fail') == '1' && class_exists('Notify')) {
-                require_once SYSTEM_ROOT . '/lib/class.notify.php';
-                Notify::send(SYSTEM_FN . ' 计划任务执行失败', "计划任务「{$name}」已连续失败（超过最大重试 {$maxRetry} 次）。\n最近执行时间：" . date('Y-m-d H:i:s', $now) . "\n日志：" . (string) $log, 'cron_fail');
+            // 渠道告警去重（Webhook/Notify）：重试阶段的失败不告警，耗尽后也按
+            // cron_notify_interval 节流（默认 3600 秒，0 = 每次耗尽都告警），
+            // 避免持续失败的任务反复轰炸通知渠道。结构化日志不受节流影响。
+            $interval = option::get('cron_notify_interval');
+            $interval = $interval === null ? 3600 : max(0, (int) $interval);
+            $markerKey = 'cron_notify_last_' . $name;
+            $lastNotified = (int) option::get($markerKey);
+            if ($interval === 0 || $now - $lastNotified >= $interval) {
+                require_once SYSTEM_ROOT . '/lib/class.webhook.php';
+                Webhook::push('task_fail', array('task' => $name, 'max_retry' => $maxRetry, 'message' => substr((string) $log, 0, 500)));
+                if (option::get('cron_notify_on_fail') == '1' && class_exists('Notify')) {
+                    require_once SYSTEM_ROOT . '/lib/class.notify.php';
+                    Notify::send(SYSTEM_FN . ' 计划任务执行失败', "计划任务「{$name}」已连续失败（超过最大重试 {$maxRetry} 次）。\n最近执行时间：" . date('Y-m-d H:i:s', $now) . "\n日志：" . (string) $log, 'cron_fail');
+                }
+                option::set($markerKey, (string) $now);
             }
         }
     }
@@ -376,10 +386,14 @@ class cron
             Logger::error('计划任务执行异常', array('name' => $name, 'error' => $e->getMessage()));
         }
         $durationMs = intval((microtime(true) - $start) * 1000);
-        self::releaseLock($name);
-
-        self::logRun($name, $ok ? 'success' : 'error', $ok ? (string) $ret : '失败：' . (string) $ret, $durationMs);
-        self::scheduleAfterRun($row['name'], (string) $row['freq'], $ok, (string) $ret, $durationMs);
+        // 运行历史与排程写入在持锁状态下完成（finally 释放），避免并发进程在
+        // 解锁与排程之间交错读取 retry/nextrun 造成重复计数或重复领取
+        try {
+            self::logRun($name, $ok ? 'success' : 'error', $ok ? (string) $ret : '失败：' . (string) $ret, $durationMs);
+            self::scheduleAfterRun($row['name'], (string) $row['freq'], $ok, (string) $ret, $durationMs);
+        } finally {
+            self::releaseLock($name);
+        }
         return $ret;
     }
 

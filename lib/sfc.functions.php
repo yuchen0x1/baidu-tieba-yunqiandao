@@ -546,7 +546,8 @@ function dataBak($table)
         $comma = '';
         $sql .= "INSERT INTO `$table` VALUES(";
         for ($e = 0; $e < $numfields; $e++) {
-            $sql .= $comma . "'" . $m->escape_string($row[$e]) . "'";
+            //V7.0：NULL 列导出为 SQL NULL；此前导出为空字符串，恢复后 NULL→'' 静默失真
+            $sql .= $comma . ($row[$e] === null ? 'NULL' : "'" . $m->escape_string($row[$e]) . "'");
             $comma = ',';
         }
         $sql .= ");\n";

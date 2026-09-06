@@ -256,4 +256,53 @@ final class CronSchedulerTest extends TestCase
         }
         $this->assertTrue($skipped, '锁冲突应记录 skipped 运行历史');
     }
+
+    // ---------- 失败通知去重（V7.0） ----------
+
+    /** 已处于耗尽边界（retry == max_retry），本次失败触发耗尽分支 */
+    private function exhaustOnce(string $name): void
+    {
+        $this->db->cronRows[$name] = array('name' => $name, 'retry' => '2');
+        cron::scheduleAfterRun($name, '3600', false, 'fail', 0);
+    }
+
+    public function testExhaustionRecordsNotifyMarker(): void
+    {
+        $this->exhaustOnce('task');
+        $this->assertArrayHasKey('cron_notify_last_task', $GLOBALS['i']['opt'], '耗尽应写入告警时间标记');
+    }
+
+    public function testRetryPathDoesNotTouchNotifyMarker(): void
+    {
+        $this->db->cronRows['task'] = array('name' => 'task', 'retry' => '0');
+        cron::scheduleAfterRun('task', '3600', false, 'fail', 0);
+        $this->assertArrayNotHasKey('cron_notify_last_task', $GLOBALS['i']['opt'], '重试阶段不得触发渠道告警');
+    }
+
+    public function testNotifyDedupSuppressesWithinInterval(): void
+    {
+        $this->exhaustOnce('task');
+        $first = $GLOBALS['i']['opt']['cron_notify_last_task'];
+        $this->exhaustOnce('task');
+        $this->assertSame($first, $GLOBALS['i']['opt']['cron_notify_last_task'], '去重窗口内的第二次耗尽不应更新告警标记');
+    }
+
+    public function testNotifyDedupDisabledWithZeroInterval(): void
+    {
+        $GLOBALS['i']['opt']['cron_notify_interval'] = '0';
+        $this->exhaustOnce('task');
+        $first = (int) $GLOBALS['i']['opt']['cron_notify_last_task'];
+        sleep(1);
+        $this->exhaustOnce('task');
+        $this->assertGreaterThan($first, (int) $GLOBALS['i']['opt']['cron_notify_last_task'], 'interval=0 时每次耗尽都应告警');
+    }
+
+    public function testSuccessPathKeepsMarkerHistory(): void
+    {
+        $this->exhaustOnce('task');
+        cron::scheduleAfterRun('task', '3600', true, 'ok', 0);
+        $row = $this->db->cronRows['task'];
+        $this->assertSame('success', $row['last_status']);
+        $this->assertArrayHasKey('cron_notify_last_task', $GLOBALS['i']['opt'], '历史告警标记保留，供下次耗尽判断间隔');
+    }
 }

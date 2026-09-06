@@ -44,6 +44,7 @@ class ProjectUpdater
             'asset_download_url' => $asset['url'],
             'asset_size' => $asset['size'],
             'asset_digest' => $asset['digest'],
+            'asset_checksum_url' => self::selectChecksumAsset(isset($payload['assets']) && is_array($payload['assets']) ? $payload['assets'] : array()),
             'published_at' => isset($payload['published_at']) ? (string) $payload['published_at'] : '',
             'is_prerelease' => !empty($payload['prerelease'])
         );
@@ -490,7 +491,7 @@ class ProjectUpdater
             }
             $zipPath = $workDir . '/source.zip';
             $errors = array();
-            $downloaded = false;
+            $downloadedUrl = '';
             foreach ($candidates as $url) {
                 $res = self::downloadToFile($url, $zipPath);
                 if (!$res['ok']) {
@@ -502,13 +503,15 @@ class ProjectUpdater
                     $errors[] = '返回内容不是 ZIP（' . $res['content_type'] . '，开头 ' . $res['snippet'] . '）';
                     continue;
                 }
-                $downloaded = true;
+                $downloadedUrl = $url;
                 break;
             }
-            if (!$downloaded) {
+            if ($downloadedUrl === '') {
                 throw new RuntimeException('更新包下载失败，已尝试 ' . count($candidates) . ' 个地址：' . implode('；', $errors)
                     . '。部分数据中心 IP 会被 Gitee 匿名风控拦截：可在服务器环境变量配置 UPDATE_GITEE_TOKEN（站长自己的 Gitee 个人令牌，仅发送至 gitee.com）后重试，或到 Release 页手动下载更新包覆盖安装');
             }
+            // ZIP 魔数只能证明“是个压缩包”，不能证明内容可信：安装前强制校验发布摘要
+            self::verifyPackageDigest($zipPath, $release, $downloadedUrl);
             $zip = new ZipArchive();
             $opened = $zip->open($zipPath);
             if ($opened !== true) {
@@ -565,6 +568,21 @@ class ProjectUpdater
         return $selected;
     }
 
+    /**
+     * 从 Release 资产中选取 SHA-256 校验文件（publish-gitee.ps1 随包上传的 .sha256）
+     */
+    private static function selectChecksumAsset(array $assets)
+    {
+        foreach ($assets as $asset) {
+            $name = isset($asset['name']) ? (string) $asset['name'] : '';
+            $url = isset($asset['browser_download_url']) ? trim((string) $asset['browser_download_url']) : '';
+            if (strtolower(pathinfo($name, PATHINFO_EXTENSION)) === 'sha256' && self::isAllowedUrl($url)) {
+                return $url;
+            }
+        }
+        return '';
+    }
+
     private static function isAllowedUrl($url)
     {
         $parts = parse_url((string) $url);
@@ -619,6 +637,73 @@ class ProjectUpdater
         $isZip = strlen($body) >= 2 && substr($body, 0, 2) === 'PK';
         $snippet = $isZip ? '' : strtolower(substr(preg_replace('/\s+/', ' ', strip_tags((string) $body)), 0, 80));
         return array('ok' => true, 'is_zip' => $isZip, 'status' => $status, 'content_type' => $contentType, 'snippet' => $snippet);
+    }
+
+    /**
+     * 安装前校验下载包的 SHA-256：
+     * 期望值优先取 Release 的 digest 字段（"sha256:<hex>"），否则读取随包发布的 .sha256 资产；
+     * 拿不到可信摘要或哈希不一致时直接拒绝安装，保留原程序与数据。
+     * 仅当下载的正是该摘要对应的 Release 附件时才校验（源码归档回退通道无对应摘要，一律拒绝）。
+     */
+    public static function verifyPackageDigest($zipPath, array $release, $downloadedUrl)
+    {
+        $assetUrl = isset($release['asset_download_url']) ? rtrim((string) $release['asset_download_url'], '/') : '';
+        if ($assetUrl === '' || strcasecmp(rtrim((string) $downloadedUrl, '/'), $assetUrl) !== 0) {
+            throw new RuntimeException('本次下载走的是源码归档回退通道，没有对应的发布摘要，已拒绝在线覆盖安装。请配置 UPDATE_GITEE_TOKEN 后重试，或到 Release 页手动下载更新包');
+        }
+        $expected = '';
+        $digest = trim((string) (isset($release['asset_digest']) ? $release['asset_digest'] : ''));
+        if ($digest !== '' && preg_match('/^sha256:([0-9a-fA-F]{64})$/', $digest, $m)) {
+            $expected = strtolower($m[1]);
+        } else {
+            $checksumUrl = isset($release['asset_checksum_url']) ? (string) $release['asset_checksum_url'] : '';
+            if ($checksumUrl !== '') {
+                $res = self::downloadToString($checksumUrl);
+                if ($res['ok'] && preg_match('/^([0-9a-fA-F]{64})\b/', trim($res['body']), $m)) {
+                    $expected = strtolower($m[1]);
+                }
+            }
+        }
+        if ($expected === '') {
+            throw new RuntimeException('Release 未提供可信的 SHA-256 摘要（digest 字段与 .sha256 附件均缺失或不可用），已拒绝在线覆盖安装。请到 Release 页手动下载更新包');
+        }
+        $actual = hash_file('sha256', $zipPath);
+        if (!is_string($actual) || !hash_equals($expected, $actual)) {
+            throw new RuntimeException('更新包 SHA-256 校验失败（期望 ' . $expected . '，实际 ' . ($actual === false ? '无法计算' : $actual) . '），已拒绝安装，原程序未被修改');
+        }
+    }
+
+    private static function downloadToString($url)
+    {
+        $curl = curl_init($url);
+        if ($curl === false) {
+            return array('ok' => false, 'body' => '');
+        }
+        $headers = array('User-Agent: Tieba-Cloud-Sign-Updater/' . (defined('SYSTEM_VER') ? SYSTEM_VER : 'unknown'));
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+        $giteeToken = getenv('UPDATE_GITEE_TOKEN');
+        if ($giteeToken !== false && trim((string) $giteeToken) !== '' && $host === 'gitee.com') {
+            $headers[] = 'Authorization: Bearer ' . trim((string) $giteeToken);
+        }
+        curl_setopt_array($curl, array(
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_CONNECTTIMEOUT_MS => 5000,
+            CURLOPT_TIMEOUT_MS => self::DEFAULT_TIMEOUT_MS,
+            CURLOPT_HTTPHEADER => $headers
+        ));
+        $caInfo = self::findCaInfo();
+        if ($caInfo !== false) {
+            curl_setopt($curl, CURLOPT_CAINFO, $caInfo);
+        }
+        $body = curl_exec($curl);
+        $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        $error = curl_error($curl);
+        curl_close($curl);
+        $ok = $body !== false && $error === '' && $status >= 200 && $status < 300;
+        return array('ok' => $ok, 'body' => $ok ? (string) $body : '');
     }
 
     private static function findSingleRootDirectory($directory)

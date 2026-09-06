@@ -36,6 +36,130 @@ jobs:
       - name: Run project checks
         run: composer check
 
+  migration-integration:
+    name: MariaDB 11.4 migration integration
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: tcs_it_bootstrap
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl, mbstring, mysqli, zip
+          tools: composer
+
+      - name: Run migration integration test
+        env:
+          TCS_IT_DB_HOST: 127.0.0.1
+          TCS_IT_DB_PORT: '3306'
+          TCS_IT_DB_USER: root
+          TCS_IT_DB_PASS: root
+        run: php tools/migrate-integration-test.php
+
+      - name: Run scheduler integration test
+        env:
+          TCS_IT_DB_HOST: 127.0.0.1
+          TCS_IT_DB_PORT: '3306'
+          TCS_IT_DB_USER: root
+          TCS_IT_DB_PASS: root
+        run: php tools/scheduler-integration-test.php
+
+      - name: Run backup restore drill
+        env:
+          TCS_IT_DB_HOST: 127.0.0.1
+          TCS_IT_DB_PORT: '3306'
+          TCS_IT_DB_USER: root
+          TCS_IT_DB_PASS: root
+        run: php tools/backup-restore-drill.php
+
+  docker-smoke:
+    name: Docker image smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build and start stack
+        env:
+          DB_PASSWD: ci-only
+        run: docker compose -f docker/docker-compose.yml up -d --build --wait --wait-timeout 180
+
+      - name: Verify live health endpoint
+        run: |
+          set -eu
+          body=$(curl -fsS 'http://127.0.0.1:8080/healthz.php?mode=live')
+          echo "$body"
+          echo "$body" | grep -q '"ok":true'
+
+      - name: Verify PHP-FPM serves application routes
+        run: |
+          set -eu
+          # 未安装站点应正常渲染安装向导（HTTP 200），而非 5xx
+          code=$(curl -s -o /dev/null -w '%{http_code}' 'http://127.0.0.1:8080/setup/install.php')
+          echo "install.php HTTP $code"
+          [ "$code" = "200" ]
+          code=$(curl -s -o /dev/null -w '%{http_code}' 'http://127.0.0.1:8080/index.php')
+          echo "index.php HTTP $code"
+          [ "$code" = "200" ]
+
+      - name: Teardown
+        if: always()
+        run: docker compose -f docker/docker-compose.yml down -v
+
+  release-packaging:
+    name: Release packaging dry run
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create temporary release tag
+        run: git tag v0.0.0-ci
+
+      - name: Generate local package and checksum
+        shell: pwsh
+        env:
+          GITEE_ACCESS_TOKEN: ci-dry-run-not-used
+        run: |
+          tools/publish-gitee.ps1 -Tag v0.0.0-ci -OutputDirectory "$env:RUNNER_TEMP\pkg"
+
+      - name: Verify package integrity
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $pkg = Get-ChildItem "$env:RUNNER_TEMP\pkg\*.zip" | Select-Object -First 1
+          if (-not $pkg) { throw "未生成发布包" }
+          $checksum = "$($pkg.FullName).sha256"
+          if (-not (Test-Path $checksum)) { throw "未生成 SHA-256 校验文件" }
+          $expected = ((Get-Content $checksum -Raw).Trim() -split '\s+')[0].ToLowerInvariant()
+          $actual = (Get-FileHash $pkg.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($expected -ne $actual) { throw "SHA-256 校验不一致：$expected vs $actual" }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($pkg.FullName)
+          try {
+            if ($zip.Entries.Count -lt 50) { throw "发布包条目异常：$($zip.Entries.Count)" }
+            $hasEntry = $zip.Entries | Where-Object { $_.Name -in @('index.php','init.php','api.php','version.php') }
+            if (-not $hasEntry -or @($hasEntry).Count -lt 4) { throw "发布包缺少核心入口文件" }
+          } finally {
+            $zip.Dispose()
+          }
+          Write-Host "发布包校验通过：$($pkg.Name)（$($zip.Entries.Count) 条目已检查）"
+
   windows-scripts:
     name: Windows PowerShell syntax
     runs-on: windows-latest
@@ -53,6 +177,23 @@ jobs:
             [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors) | Out-Null
             if ($errors.Count -gt 0) {
               $errors | Write-Error
+              $failed = $true
+            }
+          }
+          if ($failed) { exit 1 }
+
+      - name: Parse PowerShell scripts (Windows PowerShell 5.1 compatibility)
+        shell: powershell
+        run: |
+          # 部署文档推荐 powershell.exe（5.1）执行 windows 脚本；无 BOM 的 UTF-8 中文会导致 5.1 解析失败
+          $failed = $false
+          Get-ChildItem windows,tools -Filter '*.ps1' -Recurse | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              Write-Host "5.1 解析失败：$($_.Name)"
+              $errors | ForEach-Object { Write-Host $_.Message }
               $failed = $true
             }
           }

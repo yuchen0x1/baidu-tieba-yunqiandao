@@ -22,7 +22,15 @@ switch (SYSTEM_PAGE) {
         if (isset($_GET['dis'])) {
             inactivePlugin(valid_plugin_id((string) $_GET['dis']) ? (string) $_GET['dis'] : '');
         } elseif (isset($_GET['act'])) {
-            activePlugin(valid_plugin_id((string) $_GET['act']) ? (string) $_GET['act'] : '');
+            $activatePlug = valid_plugin_id((string) $_GET['act']) ? (string) $_GET['act'] : '';
+            if ($activatePlug !== '') {
+                // V7.0：启用前给出明确的兼容性失败原因（activePlugin 内部亦有同门禁）
+                $compat = plugin_compatibility_check($activatePlug);
+                if (!$compat['ok']) {
+                    msg('插件「' . htmlspecialchars($activatePlug, ENT_QUOTES, 'UTF-8') . '」无法启用：<br/><br/>· ' . implode('<br/>· ', array_map('htmlspecialchars', $compat['errors'])) . '<br/><br/><a href="index.php?mod=admin:plugins">返回插件管理</a>');
+                }
+                activePlugin($activatePlug);
+            }
         } elseif (isset($_GET['upd'])) {
             if (!valid_plugin_id((string) $_GET['upd'])) {
                 msg('插件标识不合法');
@@ -712,48 +720,45 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
                     msg('您当前绑定的账号数已达到管理员设置的上限<br/><br/>您当前已绑定 ' . $count['c'] . ' 个账号，最多只能绑定 ' . option::get('bduss_num') . ' 个账号');
                 }
             }
-            // 去除双引号和bduss=
+            // 去除双引号和bduss=（参数化查询绑定原始值，不再做 SQL 转义）
             $bduss = str_replace('"', '', $bdussIn);
             $bduss = str_ireplace('BDUSS=', '', $bduss);
             $bduss = str_replace(' ', '', $bduss);
-            $bduss = sqladds($bduss);
             // 同上操作取得stoken
             $stoken = str_replace('"', '', $stokenIn);
             $stoken = str_ireplace('STOKEN=', '', $stoken);
             $stoken = str_replace(' ', '', $stoken);
-            $stoken = sqladds($stoken);
             //get user info
             $baiduUserInfo = getBaiduUserInfo($bduss);
             if (empty($baiduUserInfo["portrait"])) {
                 msg('您的 Cookie 信息有误，请核验后重新绑定');
             }
-            $baidu_name = sqladds($baiduUserInfo["name"]);
-            $baidu_name_portrait = sqladds($baiduUserInfo["portrait"]);
+            $baidu_name = (string) $baiduUserInfo["name"];
+            $baidu_name_portrait = (string) $baiduUserInfo["portrait"];
             doAction('baiduid_set_2');
 
             $same_pid = option::get('same_pid');
 
             if ($same_pid === '3') {
-                $checkSame = $m->once_fetch_array("SELECT id, uid FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `portrait` = '{$baidu_name_portrait}' AND `uid`='" . UID . "'");
+                $checkRs = $m->pquery("SELECT id, uid FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `portrait` = ? AND `uid` = ?", array($baidu_name_portrait, UID));
             } else {
-                $checkSame = $m->once_fetch_array("SELECT id, uid FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `portrait` = '{$baidu_name_portrait}'");
+                $checkRs = $m->pquery("SELECT id, uid FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `portrait` = ?", array($baidu_name_portrait));
             }
+            $checkSame = $checkRs ? $m->fetch_array($checkRs) : false;
 
             if ($same_pid == '3' && $checkSame['uid'] == UID && !empty($checkSame)) {
-                $encBduss = $m->real_escape_string(P::encrypt($bduss));
-            $encStoken = $m->real_escape_string(P::encrypt($stoken));
-            $m->query("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` SET `bduss`='{$encBduss}', `stoken`='{$encStoken}' WHERE `id` = '{$checkSame["id"]}';");
+                $m->pquery("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` SET `bduss` = ?, `stoken` = ? WHERE `id` = ?", array(P::encrypt($bduss), P::encrypt($stoken), (int) $checkSame['id']));
             } else {
-                $encBduss2 = $m->real_escape_string(P::encrypt($bduss));
-            $encStoken2 = $m->real_escape_string(P::encrypt($stoken));
-            $m->query("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` (`id`,`uid`,`bduss`,`stoken`,`name`,`portrait`) VALUES  (NULL,'" . UID . "', '{$encBduss2}', '{$encStoken2}', '{$baidu_name}', '{$baidu_name_portrait}')");
+                $m->pquery("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` (`id`,`uid`,`bduss`,`stoken`,`name`,`portrait`) VALUES (NULL, ?, ?, ?, ?, ?)", array(UID, P::encrypt($bduss), P::encrypt($stoken), $baidu_name, $baidu_name_portrait));
             }
         } elseif (!empty($delIn)) {
             $del = (int) $delIn;
             doAction('baiduid_set_3');
             $x = $m->once_fetch_array("SELECT * FROM  `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE  `id` = " . UID . " LIMIT 1");
             $m->query("DELETE FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `" . DB_PREFIX . "baiduid`.`uid` = " . UID . " AND `" . DB_PREFIX . "baiduid`.`id` = " . $del);
-            $m->query('DELETE FROM `' . DB_NAME . '`.`' . DB_PREFIX . $x['t'] . '` WHERE `' . DB_PREFIX . $x['t'] . '`.`uid` = ' . UID . ' AND `' . DB_PREFIX . $x['t'] . '`.`pid` = ' . $del);
+            // 分表名来自数据库（users.t），拼入标识符前必须过白名单
+            $userTable = function_exists('safe_table_name') ? safe_table_name($x['t']) : 'tieba';
+            $m->query('DELETE FROM `' . DB_NAME . '`.`' . DB_PREFIX . $userTable . '` WHERE `' . DB_PREFIX . $userTable . '`.`uid` = ' . UID . ' AND `' . DB_PREFIX . $userTable . '`.`pid` = ' . $del);
         } elseif (isset($_POST['batch_import'])) {
             //批量导入 BDUSS（可带 STOKEN），每行一个账号
             $batchRaw = (string) (isset($_POST['batch_bduss']) ? $_POST['batch_bduss'] : '');
@@ -796,29 +801,35 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
                     $failDetail[] = 'Cookie 校验失败';
                     continue;
                 }
-                $portrait = sqladds($info['portrait']);
-                $bname = sqladds($info['name']);
-                $encB = $m->real_escape_string(P::encrypt($bduss));
-                $encS = $stoken !== '' ? ', `' . 'stoken' . '` = \'' . $m->real_escape_string(P::encrypt($stoken)) . '\'' : '';
+                $portrait = (string) $info['portrait'];
+                $bname = (string) $info['name'];
+                $encB = P::encrypt($bduss);
+                $encS = $stoken !== '' ? P::encrypt($stoken) : null;
                 if ($samePid === '3') {
-                    $dup = $m->once_fetch_array("SELECT `id` FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `portrait` = '{$portrait}' AND `uid` = " . UID . " LIMIT 1");
+                    $dupRs = $m->pquery("SELECT `id` FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `portrait` = ? AND `uid` = ? LIMIT 1", array($portrait, UID));
                 } else {
-                    $dup = $m->once_fetch_array("SELECT `id`, `uid` FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `portrait` = '{$portrait}' LIMIT 1");
+                    $dupRs = $m->pquery("SELECT `id`, `uid` FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `portrait` = ? LIMIT 1", array($portrait));
                 }
+                $dup = $dupRs ? $m->fetch_array($dupRs) : false;
+                $importRow = function () use ($m, $encB, $encS, $bname, $portrait) {
+                    $m->pquery("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` (`id`, `uid`, `bduss`, `stoken`, `name`, `portrait`) VALUES (NULL, ?, ?, ?, ?, ?)", array(UID, $encB, $encS, $bname, $portrait));
+                };
                 if (!empty($dup)) {
                     if ($samePid === '3' && $dup['id'] > 0) {
-                        $m->query("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` SET `bduss` = '{$encB}'{$encS} WHERE `id` = " . (int) $dup['id']);
+                        if ($encS !== null) {
+                            $m->pquery("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` SET `bduss` = ?, `stoken` = ? WHERE `id` = ?", array($encB, $encS, (int) $dup['id']));
+                        } else {
+                            $m->pquery("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` SET `bduss` = ? WHERE `id` = ?", array($encB, (int) $dup['id']));
+                        }
                         $ok++;
                     } elseif (($samePid == '1' || $samePid == '2') && !ISADMIN) {
                         $skip++;
                     } else {
-                        $encSIns = $stoken !== '' ? ', \'' . $m->real_escape_string(P::encrypt($stoken)) . '\'' : ', NULL';
-                        $m->query("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` (`id`, `uid`, `bduss`, `stoken`, `name`, `portrait`) VALUES (NULL, " . UID . ", '{$encB}'{$encSIns}, '{$bname}', '{$portrait}')");
+                        $importRow();
                         $ok++;
                     }
                 } else {
-                    $encSIns = $stoken !== '' ? ', \'' . $m->real_escape_string(P::encrypt($stoken)) . '\'' : ', NULL';
-                    $m->query("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` (`id`, `uid`, `bduss`, `stoken`, `name`, `portrait`) VALUES (NULL, " . UID . ", '{$encB}'{$encSIns}, '{$bname}', '{$portrait}')");
+                    $importRow();
                     $ok++;
                 }
             }
@@ -866,10 +877,9 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
         $retryUid = ISADMIN && defined('CON_UID') && CON_UID > 0 ? (int) CON_UID : (int) UID;
         $retryTables = array();
         if (ISADMIN && defined('CON_UID') && CON_UID > 0) {
-            // 控制模式：用被控用户的表
+            // 控制模式：用被控用户的表（白名单校验后使用）
             $u = $m->once_fetch_array("SELECT `t` FROM `" . DB_PREFIX . "users` WHERE `id` = " . (int) CON_UID . " LIMIT 1");
-            $candidate = !empty($u['t']) ? strtolower((string) $u['t']) : 'tieba';
-            $retryTables = preg_match('/^[a-z0-9_]{1,64}$/', $candidate) ? array($candidate) : array('tieba');
+            $retryTables = array(function_exists('safe_table_name') ? safe_table_name($u['t']) : 'tieba');
         } else {
             $retryTables = array(TABLE);
         }

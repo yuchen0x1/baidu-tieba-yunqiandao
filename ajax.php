@@ -368,10 +368,9 @@ switch (SYSTEM_PAGE) {
     if ($loginResult[0] == -3) {
         echo json_encode(array('error' => '-3', 'msg' => '请输入验证码', 'vcodestr' => $loginResult[1], 'img' => $loginResult[2]), JSON_UNESCAPED_UNICODE);
     } elseif ($loginResult[0] == 0) {
-        $bdussSafe = $m->escape_string((string) $loginResult[1]);
-        $nameSafe = $m->escape_string((string) $loginResult[2]);
         if ((option::get('same_pid') == '1' || option::get('same_pid') == '2') && !ISADMIN) {
-            $checkSame = $m->once_fetch_array("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `name` = '{$nameSafe}'");
+            $checkRs = $m->pquery("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `name` = ?", array((string) $loginResult[2]));
+            $checkSame = $checkRs ? $m->fetch_array($checkRs) : false;
             if (!empty($checkSame)) {
                 if (option::get('same_pid') == '2') {
                     echo json_encode(array('error' => '-11', 'msg' => '你已经绑定了这个百度账号或者该账号已被其他人绑定，若要重新绑定，请先解绑'), JSON_UNESCAPED_UNICODE);
@@ -381,8 +380,7 @@ switch (SYSTEM_PAGE) {
                 die;
             }
         }
-        $bdussEnc = $m->escape_string(P::encrypt((string)$loginResult[1]));
-        $m->query("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` (`uid`,`bduss`,`name`) VALUES  (" . UID . ", '{$bdussEnc}', '{$nameSafe}')");
+        $m->pquery("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` (`uid`,`bduss`,`name`) VALUES (?, ?, ?)", array(UID, P::encrypt((string) $loginResult[1]), (string) $loginResult[2]));
         echo json_encode(array('error' => '0', 'msg' => '获取BDUSS成功', 'bduss' => $loginResult[1], 'name' => $loginResult[2]), JSON_UNESCAPED_UNICODE);
     } else {
         echo json_encode(array('error' => (string) $loginResult[0], 'msg' => (string) $loginResult[1]), JSON_UNESCAPED_UNICODE);
@@ -405,20 +403,20 @@ switch (SYSTEM_PAGE) {
     if ($loginResult["error"] == 0) {
         $baiduUserInfo = getBaiduUserInfo($loginResult["bduss"]);
         if (!empty($baiduUserInfo["portrait"])) {
-            $baidu_name = $baiduUserInfo["name"];
-            $baidu_name_portrait = sqladds($baiduUserInfo["portrait"]);
-            $baidu_name_esc = $m->escape_string((string) $baidu_name);
-            $bduss_esc = $m->escape_string(P::encrypt((string) $loginResult["bduss"]));
-            $stoken_esc = $m->escape_string(P::encrypt((string) $loginResult["stoken"]));
+            $baidu_name = (string) $baiduUserInfo["name"];
+            $baidu_name_portrait = (string) $baiduUserInfo["portrait"];
+            $bdussEnc = P::encrypt((string) $loginResult["bduss"]);
+            $stokenEnc = P::encrypt((string) $loginResult["stoken"]);
 
             $same_pid = option::get('same_pid');
 
             if ($same_pid === '3') {
-                $checkSame = $m->once_fetch_array("SELECT id, uid FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `portrait` = '{$baidu_name_portrait}' AND `uid`='" . UID . "'");
+                $checkRs = $m->pquery("SELECT id, uid FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `portrait` = ? AND `uid` = ?", array($baidu_name_portrait, UID));
             } else {
-                $checkSame = $m->once_fetch_array("SELECT id, uid FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `portrait` = '{$baidu_name_portrait}'");
+                $checkRs = $m->pquery("SELECT id, uid FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `portrait` = ?", array($baidu_name_portrait));
             }
-            
+            $checkSame = $checkRs ? $m->fetch_array($checkRs) : false;
+
             if ($same_pid != '3' && ($same_pid == '1' || $same_pid == '2') && !ISADMIN) {
                 if (!empty($checkSame)) {
                     if ($same_pid == '2') {
@@ -430,16 +428,16 @@ switch (SYSTEM_PAGE) {
                     }
                     $loginResult["bduss"] = "";
                 } else {
-                    $m->query("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` (`id`,`uid`,`bduss`,`stoken`,`name`,`portrait`) VALUES  (NULL,'" . UID . "', '{$bduss_esc}', '{$stoken_esc}', '{$baidu_name_esc}', '{$baidu_name_portrait}')");
+                    $m->pquery("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` (`id`,`uid`,`bduss`,`stoken`,`name`,`portrait`) VALUES (NULL, ?, ?, ?, ?, ?)", array(UID, $bdussEnc, $stokenEnc, $baidu_name, $baidu_name_portrait));
                     $loginResult["msg"] = "获取BDUSS成功";
                     $loginResult["name"] = "{$baidu_name} [{$baidu_name_portrait}]";
                 }
             } else {
                 if ($same_pid == '3' && $checkSame['uid'] == UID && !empty($checkSame)) {
-                    $m->query("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` SET `bduss`='{$bduss_esc}', `stoken`='{$stoken_esc}' WHERE `id` = '{$checkSame["id"]}';");
+                    $m->pquery("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` SET `bduss` = ?, `stoken` = ? WHERE `id` = ?", array($bdussEnc, $stokenEnc, (int) $checkSame['id']));
                     $loginResult["msg"] = "更新BDUSS成功";
                 } else {
-                    $m->query("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` (`id`,`uid`,`bduss`,`stoken`,`name`,`portrait`) VALUES  (NULL,'" . UID . "', '{$bduss_esc}', '{$stoken_esc}', '{$baidu_name_esc}', '{$baidu_name_portrait}')");
+                    $m->pquery("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` (`id`,`uid`,`bduss`,`stoken`,`name`,`portrait`) VALUES (NULL, ?, ?, ?, ?, ?)", array(UID, $bdussEnc, $stokenEnc, $baidu_name, $baidu_name_portrait));
                     $loginResult["msg"] = "获取BDUSS成功";
                 }
                 $loginResult["name"] = "{$baidu_name} [{$baidu_name_portrait}]";

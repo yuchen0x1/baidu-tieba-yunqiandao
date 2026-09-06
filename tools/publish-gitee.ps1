@@ -7,6 +7,8 @@ param(
     [string]$SourceRef = "main",
     [string]$OutputDirectory = "",
     [string]$ReleaseNotesFile = "",
+    [int]$CleanOldReleases = 0,
+    [switch]$DeleteOldTags,
     [switch]$Publish
 )
 
@@ -65,6 +67,9 @@ try {
     Write-Host "已生成：$package"
     Write-Host "校验文件：$checksum"
     if (-not $Publish) {
+        if ($CleanOldReleases -gt 0) {
+            Write-Warning "清理旧版本仅在 -Publish（真正发布）成功后执行；本地打包模式未做任何删除。"
+        }
         Write-Host "仅生成本地发布包。传入 -Publish 后才会创建 Gitee Release 并上传附件。"
         return
     }
@@ -109,6 +114,36 @@ try {
         $client.Dispose()
     }
     Write-Host "Gitee Release 发布完成：https://gitee.com/$Owner/$Repository/releases/tag/$Tag"
+
+    # 可选：清理旧版本（删除旧 Release；配合 -DeleteOldTags 连同远端标签一并删除）。
+    # 仅在发布成功后执行；刚发布的 $Tag 永远保留，保留数量按 Release 创建时间倒序由 -CleanOldReleases 指定。
+    if ($CleanOldReleases -gt 0) {
+        $releases = Invoke-RestMethod -Uri "$apiRoot/releases?per_page=100&access_token=$([Uri]::EscapeDataString($token))" -Headers @{ 'User-Agent' = 'Tieba-Cloud-Sign-Gitee-Publisher' }
+        $sorted = @($releases | Sort-Object -Property created_at -Descending)
+        $toDelete = @($sorted | Select-Object -Skip $CleanOldReleases | Where-Object { [string]$_.tag_name -ne $Tag })
+        if ($toDelete.Count -eq 0) {
+            Write-Host "旧版本清理：没有需要删除的历史 Release（共 $($sorted.Count) 个，保留最近 $CleanOldReleases 个）。"
+        }
+        foreach ($old in $toDelete) {
+            $oldId = [string]$old.id
+            $oldTag = [string]$old.tag_name
+            try {
+                Invoke-RestMethod -Method Delete -Uri "$apiRoot/releases/$oldId`?access_token=$([Uri]::EscapeDataString($token))" | Out-Null
+                Write-Host "已删除旧版本：$oldTag（Release $oldId）"
+            } catch {
+                Write-Warning "删除 Release $oldTag 失败，跳过其标签清理：$($_.Exception.Message)"
+                continue
+            }
+            if ($DeleteOldTags -and $oldTag -ne '') {
+                try {
+                    Invoke-RestMethod -Method Delete -Uri "$apiRoot/tags/$([Uri]::EscapeDataString($oldTag))?access_token=$([Uri]::EscapeDataString($token))" | Out-Null
+                    Write-Host "已删除远端标签：$oldTag"
+                } catch {
+                    Write-Warning "删除标签 $oldTag 失败（Release 已删除）：$($_.Exception.Message)"
+                }
+            }
+        }
+    }
 } finally {
     Pop-Location
 }

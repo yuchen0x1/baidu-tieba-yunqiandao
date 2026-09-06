@@ -229,6 +229,22 @@ if (!function_exists('safe_table_names')) {
     }
 }
 
+if (!function_exists('safe_table_name')) {
+    /**
+     * 单个贴吧分表名白名单校验：只允许小写字母/数字/下划线（≤64 位），
+     * 不合法时回退到默认表。用于 users.t、TABLE 常量等来自数据库或用户配置、
+     * 最终要拼进 SQL 标识符位置的值（二阶注入防线）。
+     */
+    function safe_table_name($value, $fallback = 'tieba')
+    {
+        if (!is_scalar($value)) {
+            return $fallback;
+        }
+        $value = strtolower(trim((string) $value));
+        return preg_match('/^[a-z0-9_]{1,64}$/', $value) ? $value : $fallback;
+    }
+}
+
 if (!function_exists('safe_announcement_hooks')) {
     function safe_announcement_hooks($value)
     {

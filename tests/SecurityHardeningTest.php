@@ -102,6 +102,35 @@ final class SecurityHardeningTest extends TestCase
         $this->assertSame('', api_token_storable(null));
     }
 
+    public function testSafeTableNameRejectsNonIdentifierValues(): void
+    {
+        $this->assertSame('tieba', safe_table_name('tieba'));
+        $this->assertSame('my_table2', safe_table_name(' My_Table2 '), '合法表名应归一化为小写');
+        $this->assertSame('tieba', safe_table_name('tieba; DROP TABLE tc_users'));
+        $this->assertSame('tieba', safe_table_name('tieba` WHERE 1=1 --'));
+        $this->assertSame('tieba', safe_table_name("tieba' OR '1'='1"));
+        $this->assertSame('tieba', safe_table_name(''));
+        $this->assertSame('tieba', safe_table_name(null));
+        $this->assertSame('tieba', safe_table_name(array('tieba')));
+        $this->assertSame('tieba', safe_table_name(str_repeat('a', 65)), '超过 64 位一律回退');
+        $this->assertSame('other', safe_table_name('bad name', 'other'), '自定义回退表名');
+    }
+
+    public function testEntryPointsContainNoInterpolatedSql(): void
+    {
+        // V7.0 收敛：ajax/setting/api 三个入口的 SQL 一律参数化或白名单标识符，
+        // 双引号 SQL 中出现 {$var} 插值即回归，必须走 pquery 绑定
+        foreach (array('ajax.php', 'setting.php', 'api.php') as $file) {
+            $source = file_get_contents(dirname(__DIR__) . '/' . $file);
+            $this->assertNotFalse($source, '无法读取 ' . $file);
+            $this->assertSame(
+                0,
+                preg_match_all('/->(?:query|once_fetch_array)\("[^"]*\{\$/', $source),
+                $file . ' 出现插值拼接 SQL，请改用 pquery 参数绑定'
+            );
+        }
+    }
+
     public function testApiTokenMatchesBothHashedAndLegacyPlaintext(): void
     {
         $storedHash = api_token_storable('my-secret-token');

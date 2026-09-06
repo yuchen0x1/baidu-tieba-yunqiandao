@@ -5,10 +5,8 @@
  * 获取开发文档：https://github.com/yuchen0x1/baidu-tieba-yunqiandao/wiki
  */
 
-define('SYSTEM_FN', '百度贴吧云签到');
-define('SYSTEM_VER', '6.6');
-define('SYSTEM_VER_NOTE', 'V6.6：移动端适配深化、视觉细节统一（cs-badge 体系全覆盖）、工作台首屏快捷操作');
 define('SYSTEM_ROOT', dirname(__FILE__));
+require SYSTEM_ROOT . '/version.php';
 require_once SYSTEM_ROOT . '/lib/request.php';
 define('PLUGIN_ROOT', dirname(__FILE__) . '/plugins/');
 define('SYSTEM_ISCONSOLE', (PHP_SAPI === 'cli') || defined('STDIN'));

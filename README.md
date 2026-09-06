@@ -177,7 +177,7 @@ powershell -ExecutionPolicy Bypass -File windows/start-web.ps1 -Port 8081
 - 在线更新使用 Gitee Release 的源码 ZIP，不会覆盖当前站点的 `config.php`、`key.php`、`.env`、`docker/.env` 或 `setup/install.lock`，也不会修改数据库。
 - 若 Gitee API 返回 `403` 或 `429`，请在部署环境设置只读 `UPDATE_GITEE_TOKEN`；令牌不会写入配置文件，也不会发送到其他域名。
 - 更新前会再次获取最新 Release，避免使用过期页面提交；网络不可用或服务器不可写时会保留原程序并提示手动更新。
-- 发布新版本时，请在 Gitee 创建正式 Release，并使用数字版本 tag（例如 `v5.09`）。Windows 部署包建议命名为包含 `windows` 的 `.zip` 文件，程序会自动将其作为下载入口展示。现有部署还可以运行 `windows/check-update.ps1` 做独立检查；`tools/publish-gitee.ps1 -Tag v5.10` 默认只生成本地包和 SHA-256，必须额外传入 `-Publish` 才会创建 Gitee Release。
+- 发布新版本时，请在 Gitee 创建正式 Release，并使用数字版本 tag（例如 `v7.0`）。Windows 部署包建议命名为包含 `windows` 的 `.zip` 文件，程序会自动将其作为下载入口展示。现有部署还可以运行 `windows/check-update.ps1` 做独立检查；完整发布流程（打 tag、`tools/publish-gitee.ps1 -Publish` 上传 ZIP + SHA-256、`-CleanOldReleases` 清理旧版本、发布后验证）见 [`docs/RELEASE.md`](docs/RELEASE.md)。
 
 ## 六、计划任务：让签到按时跑起来
 
@@ -195,6 +195,15 @@ Linux `crontab` 示例：
 ```
 
 密码注意事项：如果没有设置 `cron_pw`，Web 方式会拒绝执行；CLI 方式可以不带密码，但生产环境仍建议设置密码。计划任务密码会出现在 URL 或进程参数中，请使用强随机值并限制日志、历史记录和进程信息的访问权限。
+
+**常驻模式（可选）**：无 crond 的环境（如 Windows）可用常驻循环替代计划任务——
+
+```bash
+php /var/www/do.php --pw=你的密码 --loop        # 默认每 30 秒调度一轮
+php /var/www/do.php --pw=你的密码 --loop=60     # 自定义间隔（秒，上限 600）
+```
+
+常驻模式复用与 cron 完全相同的调度、防重入锁与失败退避机制，二者不会重复执行任务；`Ctrl+C` 或停止进程即可退出。调度架构的演进评估（常驻 Worker/队列/分表合并）见 [`docs/architecture-evolution.md`](docs/architecture-evolution.md)。
 
 ## 七、常见问题排查
 
@@ -232,19 +241,29 @@ powershell -ExecutionPolicy Bypass -File windows/check-health.ps1 -Mode ready
 Authorization: Bearer <api-token>
 ```
 
-接口均位于 `/api.php`：
+接口均位于 `/api.php`，所有 JSON 响应携带 `api_version`（当前 `v1`）；权限矩阵与 openapi 文档（`action=openapi`）由同一份定义（`lib/api-contract.php`）驱动：
 
-| 接口 | 方法 | 用途 |
-| --- | --- | --- |
-| `/api.php?action=update` | `GET` | 获取 Gitee 最新正式版本并判断是否需要更新 |
-| `/api.php?action=status` | `GET` | 签到状态汇总 |
-| `/api.php?action=health` | `GET` | 百度账号健康状态 |
-| `/api.php?action=sign` | `POST` | 立即执行全部签到 |
-| `/api.php?action=retry` | `POST` | 执行失败复签 |
-| `/api.php?action=health_check` | `POST` | 执行账号健康检查 |
-| `/api.php?action=logs&limit=50` | `GET` | 获取最近批次日志；`limit` 范围为 1–200 |
+| 接口 | 方法 | 访问 | 用途 |
+| --- | --- | --- | --- |
+| `/api.php?action=status` | `GET` | 任意 | 签到状态汇总 |
+| `/api.php?action=health` | `GET` | 任意 | 百度账号健康状态 |
+| `/api.php?action=sign` | `POST` | 任意 | 立即执行全部签到 |
+| `/api.php?action=retry` | `POST` | 任意 | 执行失败复签 |
+| `/api.php?action=health_check` | `POST` | 仅全局 | 执行账号健康检查 |
+| `/api.php?action=logs&limit=50` | `GET` | 任意 | 获取最近日志；`limit` 范围为 1–200 |
+| `/api.php?action=calendar&days=90` | `GET` | 任意 | 个人签到日历 |
+| `/api.php?action=streak` | `GET` | 任意 | 连续签到统计 |
+| `/api.php?action=ranking&limit=20` | `GET` | 任意 | 用户签到排行榜 |
+| `/api.php?action=failures&limit=10` | `GET` | 任意 | 失败原因分布 |
+| `/api.php?action=monitor&limit=20` | `GET` | 仅个人 | 帖子监控命中记录 |
+| `/api.php?action=trend&days=30` | `GET` | 任意 | 签到趋势（每日成功/失败） |
+| `/api.php?action=tieba_health&days=30` | `GET` | 任意 | 每个贴吧的健康度统计 |
+| `/api.php?action=export` | `GET` | 任意 | 导出签到日志 CSV（用户 Token 仅本人） |
+| `/api.php?action=update` | `GET` | 仅全局 | 获取 Gitee 最新正式版本并判断是否需要更新 |
+| `/api.php?action=webhook_test` | `GET` | 仅全局 | 测试 Webhook 推送 |
+| `/api.php?action=openapi` | `GET` | 任意 | 接口文档（由权限矩阵自动生成） |
 
-写操作必须使用 `POST`，认证失败返回 HTTP 401，API 未启用返回 HTTP 503，未知 action 返回 HTTP 400。
+「任意」指全局 Token（全站视角）与用户 Token（仅本人数据）皆可调用。方法与权限由统一矩阵强制：方法不符返回 HTTP 405（`method_not_allowed`），权限不符返回 HTTP 403（`forbidden_user_token` / `forbidden_global_token`）。错误响应统一为 `{"error": "人类可读信息", "code": "稳定错误码", "api_version": "v1"}`，常见错误码：`missing_token`、`auth_failed`、`rate_limited`、`method_not_allowed`、`forbidden_user_token`、`forbidden_global_token`、`unknown_action`、`upstream_unavailable`。API 未启用返回 HTTP 503，未知 action 返回 HTTP 400。
 
 调用示例：
 
@@ -283,13 +302,16 @@ composer install
 composer test
 composer lint
 composer check
+composer integration
 ```
 
 - `composer test`：运行 `tests/` 下的 PHPUnit 冒烟测试。
 - `composer lint`：检查仓库内全部非依赖 PHP 文件的语法。
 - `composer check`：依次运行全仓语法检查和 PHPUnit 测试。
-- CI 会在 PHP 8.2 与 8.4 上执行 Composer 校验、依赖审计、全仓语法检查和 PHPUnit 测试，并验证 PowerShell 脚本与 Docker Compose 配置。
-- 测试不连接真实数据库或百度网络，不代表完整生产环境验收。
+- `composer integration`：数据库集成测试（迁移/调度/API/备份恢复四条链路）。需要可连接的 MySQL/MariaDB（用 `TCS_IT_DB_HOST/PORT/USER/PASS` 指定，默认 `127.0.0.1:3306 root`）；数据库不可达时自动跳过。测试只在系统临时目录与自建的 `tcs_it_*` 临时数据库中工作：`tools/migrate-integration-test.php` 完整演练 6.6 → 7.0 升级、失败恢复、幂等重跑、checksum 漂移阻断、迁移锁与全新安装基线；`tools/scheduler-integration-test.php` 完整演练任务执行排程、锁冲突跳过、过期锁恢复、失败退避、通知去重与 `do.php` 调度边界；`tools/api-integration-test.php` 以内置服务器端到端验证 API 合同（认证/错误码/方法与权限门禁/限流）；`tools/backup-restore-drill.php` 用应用自身备份逻辑做一次完整备份恢复演练。
+- `composer gate`：一键发布门禁（`tools/release-gate.php`），聚合语法扫描、单元测试、版本元数据一致性、迁移规范、SQL 注入面守卫与全部数据库集成链路，发布前必须全绿。
+- CI 会在 PHP 8.2 与 8.4 上执行 Composer 校验、依赖审计、全仓语法检查和 PHPUnit 测试，在 MariaDB 11.4 服务容器上运行迁移/调度/备份恢复集成测试，构建 Docker 镜像并验证容器启动后的存活健康检查与应用路由（安装向导/首页），以内置服务器端到端验证 API 合同，并对临时 tag 执行发布脚本打包演练（ZIP + SHA-256 校验），同时校验 PowerShell 脚本与 Docker Compose 配置。
+- 冒烟测试不连接真实数据库或百度网络；迁移集成测试不代表完整生产环境验收。
 
 **持续集成与镜像发布**
 

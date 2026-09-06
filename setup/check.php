@@ -1,8 +1,7 @@
 <?php
 if (!defined('DO_NOT_LOAD_UI')) {
-    define('SYSTEM_FN', '百度贴吧云签到');
-    define('SYSTEM_VER', '1.0');
     define('SYSTEM_ROOT', dirname(__FILE__) . '/..');
+    require_once SYSTEM_ROOT . '/version.php';
     require_once SYSTEM_ROOT . '/lib/request.php';
     define('SYSTEM_PAGE', request_text_value($_REQUEST, 'mod', 'default'));
     header("content-type:text/html; charset=utf-8");
@@ -128,14 +127,14 @@ function checkbool($ok, $m = false)
         </tr>
         <tr>
             <td><a href="http://php.net/manual/zh/book.openssl.php" target="_blank">OpenSSL</a></td>
-            <td>推荐</td>
-            <td><?php echo checkfunc('openssl_encrypt'); ?></td>
-            <td>HTTPS 连接与加密相关操作</td>
+            <td>必须</td>
+            <td><?php echo checkfunc('openssl_encrypt', true); ?></td>
+            <td>HTTPS 连接与 BDUSS/STOKEN 等 AES-256-GCM 凭证加密</td>
         </tr>
         <tr>
             <td><a href="http://php.net/manual/zh/class.ziparchive.php" target="_blank">ZipArchive</a></td>
-            <td>推荐</td>
-            <td><?php echo checkclass('ZipArchive'); ?></td>
+            <td>必须</td>
+            <td><?php echo checkclass('ZipArchive', true); ?></td>
             <td>Zip 解包和压缩，用于在线更新和上传等</td>
         </tr>
         <tr>

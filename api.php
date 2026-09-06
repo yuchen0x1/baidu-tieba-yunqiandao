@@ -20,6 +20,7 @@
 define('SYSTEM_NO_UI', true);
 define('SYSTEM_NO_CHECK_LOGIN', true);
 require dirname(__FILE__) . '/init.php';
+require_once SYSTEM_ROOT . '/lib/api-contract.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 
@@ -31,8 +32,7 @@ if ($auth === '' && isset($_SERVER['HTTP_X_API_TOKEN'])) {
     $auth = trim((string) $_SERVER['HTTP_X_API_TOKEN']);
 }
 if ($auth === '') {
-    http_response_code(401);
-    die(json_encode(array('error' => '缺少 API Token'), JSON_UNESCAPED_UNICODE));
+    api_error('missing_token', '缺少 API Token', 401);
 }
 
 global $m, $i;
@@ -42,7 +42,8 @@ $tokenHash = hash('sha256', $auth);
 $tokenRow = array();
 $usersHasTokenColumn = $m->once_fetch_array("SELECT COUNT(*) AS c FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = '" . $m->real_escape_string(DB_PREFIX . 'users') . "' AND column_name = 'api_token_hash'");
 if (!empty($usersHasTokenColumn['c'])) {
-    $tokenRow = $m->once_fetch_array("SELECT `id`, `name`, `t`, `role` FROM `" . DB_PREFIX . "users` WHERE `api_token_hash` = '" . $m->real_escape_string($tokenHash) . "' LIMIT 1");
+    $tokenRow = $m->pquery("SELECT `id`, `name`, `t`, `role` FROM `" . DB_PREFIX . "users` WHERE `api_token_hash` = ? LIMIT 1", array($tokenHash));
+    $tokenRow = $tokenRow ? $m->fetch_array($tokenRow) : array();
 }
 if (!empty($tokenRow['id'])) {
     $apiUserId = (int) $tokenRow['id'];
@@ -53,8 +54,7 @@ if (!empty($tokenRow['id'])) {
     require_once SYSTEM_ROOT . '/lib/security.php';
     $globalToken = (string) option::get('api_token');
     if ($globalToken === '' || !api_token_matches($globalToken, $auth)) {
-        http_response_code(401);
-        die(json_encode(array('error' => '认证失败'), JSON_UNESCAPED_UNICODE));
+        api_error('auth_failed', '认证失败', 401);
     }
 }
 
@@ -67,8 +67,8 @@ function api_user_tables($uid, $user)
         global $i;
         return isset($i['table']) && is_array($i['table']) ? $i['table'] : array('tieba');
     }
-    $table = isset($user['t']) ? strtolower(trim((string) $user['t'])) : 'tieba';
-    return preg_match('/^[a-z0-9_]{1,64}$/', $table) ? array($table) : array('tieba');
+    $table = isset($user['t']) ? $user['t'] : 'tieba';
+    return array(function_exists('safe_table_name') ? safe_table_name($table) : 'tieba');
 }
 
 $action = request_text_value($_GET, 'action');
@@ -84,12 +84,11 @@ if ($rateLimit > 0) {
         PRIMARY KEY (`token_hash`, `window_start`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
     $window = (int) floor(time() / 60) * 60;
-    $th = $m->real_escape_string($tokenHash);
-    $rateRow = $m->once_fetch_array("SELECT `count` FROM `" . DB_PREFIX . "api_rate_limits` WHERE `token_hash` = '{$th}' AND `window_start` = {$window}");
+    $rateRs = $m->pquery("SELECT `count` FROM `" . DB_PREFIX . "api_rate_limits` WHERE `token_hash` = ? AND `window_start` = ?", array($tokenHash, $window));
+    $rateRow = $rateRs ? $m->fetch_array($rateRs) : false;
     $rateCount = !empty($rateRow) ? (int) $rateRow['count'] : 0;
     if ($rateCount >= $rateLimit) {
-        http_response_code(429);
-        die(json_encode(array('error' => '请求过于频繁，请稍后再试', 'limit' => $rateLimit, 'window' => 60), JSON_UNESCAPED_UNICODE));
+        api_error('rate_limited', '请求过于频繁，请稍后再试', 429, array('limit' => $rateLimit, 'window' => 60));
     }
     if ($rateCount === 0) {
         $m->pquery("INSERT INTO `" . DB_PREFIX . "api_rate_limits` (`token_hash`, `window_start`, `count`) VALUES (?, ?, 1) ON DUPLICATE KEY UPDATE `count` = `count` + 1", array($tokenHash, $window));
@@ -99,16 +98,35 @@ if ($rateLimit > 0) {
 }
 
 
+$apiActions = api_actions();
+
+// 合同门禁：未登记的 action 一律 400；已登记的按矩阵校验方法与 Token 权限
+if (!isset($apiActions[$action])) {
+    http_response_code(400);
+    echo json_encode(api_error_payload('unknown_action', '未知 action', array(
+        'available' => array_keys($apiActions),
+    )), JSON_UNESCAPED_UNICODE);
+    exit;
+}
+$expectedMethod = $apiActions[$action]['method'];
+$actualMethod = isset($_SERVER['REQUEST_METHOD']) ? strtoupper((string) $_SERVER['REQUEST_METHOD']) : 'GET';
+if ($expectedMethod !== $actualMethod) {
+    api_error('method_not_allowed', $expectedMethod . ' required', 405);
+}
+if (!api_action_allowed($action, $apiUserId)) {
+    api_error(
+        $apiUserId > 0 ? 'forbidden_user_token' : 'forbidden_global_token',
+        '当前 Token 类型无权访问该接口',
+        403
+    );
+}
+
 switch ($action) {
     case 'update':
-        if ($apiUserId > 0) {
-            http_response_code(403);
-            die(json_encode(array('error' => '用户 API Token 无权查询全站版本信息'), JSON_UNESCAPED_UNICODE));
-        }
         try {
             $release = ProjectUpdater::fetchLatestRelease();
             $status = ProjectUpdater::buildStatus(SYSTEM_VER, $release);
-            echo json_encode(array('ok' => true, 'data' => array(
+            echo json_encode(api_ok(array(
                 'current_version' => $status['current_version'],
                 'latest_version' => $status['latest_version'],
                 'update_available' => $status['update_available'],
@@ -116,21 +134,25 @@ switch ($action) {
             )), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         } catch (Throwable $e) {
             error_log('API 在线更新检查失败：' . $e->getMessage());
-            http_response_code(502);
-            echo json_encode(array('error' => '无法获取最新版本信息'), JSON_UNESCAPED_UNICODE);
+            api_error('upstream_unavailable', '无法获取最新版本信息', 502);
         }
         break;
 
     case 'status':
         require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
         $stat = SignManager::signSummary($apiUserId);
-        echo json_encode(array('ok' => true, 'data' => $stat), JSON_UNESCAPED_UNICODE);
+        echo json_encode(api_ok($stat), JSON_UNESCAPED_UNICODE);
         break;
 
     case 'health':
         $rows = array();
-        $healthWhere = $apiUserId > 0 ? " WHERE b.uid = {$apiUserId}" : '';
-        $rs = $m->query("SELECT h.* FROM `" . DB_PREFIX . "baiduid_health` h LEFT JOIN `" . DB_PREFIX . "baiduid` b ON b.id = h.pid{$healthWhere} ORDER BY h.status ASC, h.fail_count DESC;");
+        $healthSql = "SELECT h.* FROM `" . DB_PREFIX . "baiduid_health` h LEFT JOIN `" . DB_PREFIX . "baiduid` b ON b.id = h.pid";
+        if ($apiUserId > 0) {
+            $healthSql .= " WHERE b.uid = ?";
+            $rs = $m->pquery($healthSql . " ORDER BY h.status ASC, h.fail_count DESC", array($apiUserId));
+        } else {
+            $rs = $m->query($healthSql . " ORDER BY h.status ASC, h.fail_count DESC");
+        }
         while ($r = $m->fetch_array($rs)) {
             $rows[] = array(
                 'pid' => (int) $r['pid'],
@@ -142,14 +164,10 @@ switch ($action) {
                 'error_msg' => $r['error_msg'],
             );
         }
-        echo json_encode(array('ok' => true, 'data' => $rows), JSON_UNESCAPED_UNICODE);
+        echo json_encode(api_ok($rows), JSON_UNESCAPED_UNICODE);
         break;
 
     case 'sign':
-        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
-            http_response_code(405);
-            die(json_encode(array('error' => 'POST required'), JSON_UNESCAPED_UNICODE));
-        }
         ignore_user_abort(true);
         set_time_limit(0);
         require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
@@ -162,14 +180,10 @@ switch ($action) {
         $stat = SignManager::signSummary($apiUserId);
         $msg = "[签到结束 " . date('H:i:s') . "] 已签到 {$stat['signed']} 个贴吧，出错 {$stat['error']} 个";
         SignManager::log($apiUserId, 'sign_api', $stat['error'] > 0 ? 'partial' : 'ok', $msg, $duration);
-        echo json_encode(array('ok' => true, 'data' => $stat, 'msg' => $msg, 'duration_ms' => $duration), JSON_UNESCAPED_UNICODE);
+        echo json_encode(api_ok($stat, array('msg' => $msg, 'duration_ms' => $duration)), JSON_UNESCAPED_UNICODE);
         break;
 
     case 'retry':
-        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
-            http_response_code(405);
-            die(json_encode(array('error' => 'POST required'), JSON_UNESCAPED_UNICODE));
-        }
         ignore_user_abort(true);
         set_time_limit(0);
         foreach ($apiTables as $value) {
@@ -177,23 +191,15 @@ switch ($action) {
         }
         require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
         $stat = SignManager::signSummary($apiUserId);
-        echo json_encode(array('ok' => true, 'data' => $stat), JSON_UNESCAPED_UNICODE);
+        echo json_encode(api_ok($stat), JSON_UNESCAPED_UNICODE);
         break;
 
     case 'health_check':
-        if ($apiUserId > 0) {
-            http_response_code(403);
-            die(json_encode(array('error' => '用户 API Token 无权执行全站健康检查'), JSON_UNESCAPED_UNICODE));
-        }
-        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
-            http_response_code(405);
-            die(json_encode(array('error' => 'POST required'), JSON_UNESCAPED_UNICODE));
-        }
         ignore_user_abort(true);
         set_time_limit(0);
         require_once SYSTEM_ROOT . '/lib/cron_system_health_check.php';
         $msg = cron_system_health_check();
-        echo json_encode(array('ok' => true, 'msg' => $msg), JSON_UNESCAPED_UNICODE);
+        echo json_encode(api_ok(array('msg' => $msg)), JSON_UNESCAPED_UNICODE);
         break;
 
     case 'logs':
@@ -210,39 +216,33 @@ switch ($action) {
         while ($r = $m->fetch_array($rs)) {
             $rows[] = $r;
         }
-        echo json_encode(array('ok' => true, 'data' => $rows), JSON_UNESCAPED_UNICODE);
+        echo json_encode(api_ok($rows), JSON_UNESCAPED_UNICODE);
         break;
 
     case 'calendar':
         require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
         $days = isset($_GET['days']) ? (int) $_GET['days'] : 90;
-        echo json_encode(array('ok' => true, 'data' => SignManager::calendar($days, $apiUserId)), JSON_UNESCAPED_UNICODE);
+        echo json_encode(api_ok(SignManager::calendar($days, $apiUserId)), JSON_UNESCAPED_UNICODE);
         break;
 
     case 'streak':
         require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
-        echo json_encode(array('ok' => true, 'data' => SignManager::streak($apiUserId)), JSON_UNESCAPED_UNICODE);
+        echo json_encode(api_ok(SignManager::streak($apiUserId)), JSON_UNESCAPED_UNICODE);
         break;
 
     case 'ranking':
         require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
         $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 20;
-        echo json_encode(array('ok' => true, 'data' => SignManager::ranking($limit, $apiUserId)), JSON_UNESCAPED_UNICODE);
+        echo json_encode(api_ok(SignManager::ranking($limit, $apiUserId)), JSON_UNESCAPED_UNICODE);
         break;
 
     case 'failures':
         require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
         $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 10;
-        echo json_encode(array('ok' => true, 'data' => SignManager::failureBreakdown($apiUserId, $limit)), JSON_UNESCAPED_UNICODE);
+        echo json_encode(api_ok(SignManager::failureBreakdown($apiUserId, $limit)), JSON_UNESCAPED_UNICODE);
         break;
 
     case 'monitor':
-        //帖子监控命中记录（仅个人 Token 可访问）
-        if ($apiUserId <= 0) {
-            http_response_code(403);
-            echo json_encode(array('error' => '监控数据仅支持个人 Token 访问'), JSON_UNESCAPED_UNICODE);
-            break;
-        }
         $monLimit = isset($_GET['limit']) ? min(100, max(1, (int) $_GET['limit'])) : 20;
         $monRows = array();
         try {
@@ -263,19 +263,19 @@ switch ($action) {
         } catch (Throwable $monE) {
             $monRows = array();
         }
-        echo json_encode(array('ok' => true, 'data' => $monRows), JSON_UNESCAPED_UNICODE);
+        echo json_encode(api_ok($monRows), JSON_UNESCAPED_UNICODE);
         break;
 
     case 'trend':
         require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
         $days = isset($_GET['days']) ? max(1, min(365, (int) $_GET['days'])) : 30;
-        echo json_encode(array('ok' => true, 'data' => SignManager::trend($days, $apiUserId)), JSON_UNESCAPED_UNICODE);
+        echo json_encode(api_ok(SignManager::trend($days, $apiUserId)), JSON_UNESCAPED_UNICODE);
         break;
 
     case 'tieba_health':
         require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
         $days = isset($_GET['days']) ? max(1, min(365, (int) $_GET['days'])) : 30;
-        echo json_encode(array('ok' => true, 'data' => SignManager::tiebaHealth($apiUserId, $days)), JSON_UNESCAPED_UNICODE);
+        echo json_encode(api_ok(SignManager::tiebaHealth($apiUserId, $days)), JSON_UNESCAPED_UNICODE);
         break;
 
     case 'export':
@@ -313,41 +313,37 @@ switch ($action) {
 
 
     case 'webhook_test':
-        if ($apiUserId > 0) {
-            http_response_code(403);
-            die(json_encode(array('error' => '仅管理员全局 Token 可测试 Webhook'), JSON_UNESCAPED_UNICODE));
-        }
         require_once SYSTEM_ROOT . '/lib/class.webhook.php';
         $res = Webhook::push('test', array('version' => SYSTEM_VER));
-        echo json_encode(array('ok' => $res['ok'], 'detail' => $res['detail']), JSON_UNESCAPED_UNICODE);
+        echo json_encode(array(
+            'ok' => (bool) $res['ok'],
+            'api_version' => api_contract_version(),
+            'detail' => $res['detail'],
+        ), JSON_UNESCAPED_UNICODE);
         break;
 
     case 'openapi':
+        $endpoints = array();
+        foreach ($apiActions as $name => $meta) {
+            if ($name === 'openapi') {
+                continue;
+            }
+            $endpoints[] = array(
+                'action' => $name,
+                'method' => $meta['method'],
+                'access' => $meta['access'],
+                'desc' => $meta['desc'],
+            );
+        }
         $doc = array(
             'name' => SYSTEM_FN,
+            'api_version' => api_contract_version(),
             'version' => SYSTEM_VER,
             'auth' => 'Bearer Token（管理员全局 Token 或逐用户 Token）',
             'rate_limit_per_minute' => (int) option::get('api_rate_limit'),
-            'endpoints' => array(
-                array('action' => 'status', 'method' => 'GET', 'desc' => '签到状态汇总'),
-                array('action' => 'health', 'method' => 'GET', 'desc' => '账号健康度'),
-                array('action' => 'sign', 'method' => 'POST', 'desc' => '立即执行签到'),
-                array('action' => 'retry', 'method' => 'POST', 'desc' => '执行复签'),
-                array('action' => 'health_check', 'method' => 'POST', 'desc' => '执行健康检查'),
-                array('action' => 'logs', 'method' => 'GET', 'desc' => '最近日志'),
-                array('action' => 'calendar', 'method' => 'GET', 'desc' => '个人签到日历'),
-                array('action' => 'trend', 'method' => 'GET', 'desc' => '签到趋势（每日成功/失败）'),
-                array('action' => 'tieba_health', 'method' => 'GET', 'desc' => '每个贴吧的健康度统计'),
-                array('action' => 'export', 'method' => 'GET', 'desc' => '导出签到日志 CSV'),
-                array('action' => 'update', 'method' => 'GET', 'desc' => '在线版本检查'),
-                array('action' => 'webhook_test', 'method' => 'GET', 'desc' => '测试 Webhook 推送（管理员）'),
-            ),
+            'error_format' => array('error' => '人类可读信息', 'code' => '稳定错误码', 'api_version' => api_contract_version()),
+            'endpoints' => $endpoints,
         );
-        echo json_encode(array('ok' => true, 'data' => $doc), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        break;
-
-    default:
-        http_response_code(400);
-        echo json_encode(array('error' => '未知 action', 'available' => array('update', 'status', 'health', 'sign', 'retry', 'health_check', 'logs', 'calendar', 'export', 'streak', 'ranking', 'failures', 'trend', 'tieba_health', 'webhook_test', 'openapi')), JSON_UNESCAPED_UNICODE);
+        echo json_encode(api_ok($doc), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         break;
 }

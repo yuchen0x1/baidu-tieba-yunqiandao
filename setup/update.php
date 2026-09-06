@@ -38,6 +38,10 @@ foreach ($x as $value) {
     } else {
         $other = '[ <font color="green">下一步</font> ] ';
     }
+    // V7.0 起统一迁移器接管升级：6.6 → 7.0 的脚本与 CLI 走同一套迁移与状态记录
+    if ($fromVersion === '6.6') {
+        $other .= '（V7.0 起使用统一迁移器，推荐服务器上执行 <code>php tools/migrate.php up</code>）';
+    }
     $v .= '<li>' . $other . '<a href="' . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . '" onclick="return confirm(\'你确定要升级到此版本吗？\');">从 ' . htmlspecialchars($fromVersion, ENT_QUOTES, 'UTF-8') . ' 升级到 ' . htmlspecialchars($targetVersion, ENT_QUOTES, 'UTF-8') . ' [ ' . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . ' ]</a></li><br/>';
 }
 ?>

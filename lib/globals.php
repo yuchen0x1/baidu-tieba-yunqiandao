@@ -169,7 +169,8 @@ if (isset($_COOKIE['uid']) && isset($_COOKIE['pwd'])) {
                 define('CON_UID', $con_p['id']);
                 define('CON_NAME', $con_p['name']);
                 define('CON_EMAIL', $con_p['email']);
-                define('CON_TABLE', $con_p['t']);
+                // 二阶注入防线：分表名进入 SQL 标识符前统一走白名单
+                define('CON_TABLE', function_exists('safe_table_name') ? safe_table_name($con_p['t']) : 'tieba');
             }
         }
     }
@@ -195,7 +196,8 @@ if (isset($_COOKIE['uid']) && isset($_COOKIE['pwd'])) {
         define('UID', $p['id']);
         define('NAME', $p['name']);
         define('EMAIL', $p['email']);
-        define('TABLE', $p['t']);
+        // 二阶注入防线：TABLE 来自数据库 users.t，拼入 SQL 标识符前必须过白名单
+        define('TABLE', function_exists('safe_table_name') ? safe_table_name($p['t']) : 'tieba');
         if (!defined('SYSTEM_ONLY_CHECK_LOGIN')) {
             $i['user']['login'] = true;
             $i['user']['role'] = $p['role'];

@@ -301,6 +301,50 @@ function plugin_manifest_validate($plugin)
 }
 
 /**
+ * V7.0：插件兼容性检查（纯函数，便于测试）。
+ * $info 为 _desc.php 返回的清单数组：
+ * - plugin.for：适用的最低云签到版本（'all' 或数字版本）；
+ * - plugin.forphp：适用的最低 PHP 版本（'all' 或数字版本）。
+ * 返回 array('ok'=>bool,'errors'=>array)
+ */
+function plugin_compatibility_errors($info)
+{
+    $errors = array();
+    $p = (is_array($info) && isset($info['plugin']) && is_array($info['plugin'])) ? $info['plugin'] : array();
+    $for = isset($p['for']) ? trim((string) $p['for']) : 'all';
+    if ($for !== '' && strtolower($for) !== 'all' && version_compare(SYSTEM_VER, $for, '<')) {
+        $errors[] = '该插件需要 V' . $for . ' 及以上版本的云签到（当前 V' . SYSTEM_VER . '）';
+    }
+    $forphp = isset($p['forphp']) ? trim((string) $p['forphp']) : 'all';
+    if ($forphp !== '' && strtolower($forphp) !== 'all' && version_compare(PHP_VERSION, $forphp, '<')) {
+        $errors[] = '该插件需要 PHP ' . $forphp . ' 及以上版本（当前 ' . PHP_VERSION . '）';
+    }
+    return array('ok' => count($errors) === 0, 'errors' => $errors);
+}
+
+/**
+ * V7.0：插件启用前检查：manifest 完整性 + 核心版本 + PHP 版本。
+ * 任一不满足即禁止启用；返回 array('ok'=>bool,'errors'=>array)
+ */
+function plugin_compatibility_check($plugin)
+{
+    $result = plugin_manifest_validate($plugin);
+    if (!$result['ok']) {
+        return $result;
+    }
+    $path = SYSTEM_ROOT . '/plugins/' . $plugin . '/';
+    $info = array();
+    if (file_exists($path . $plugin . '_desc.php')) {
+        $info = include $path . $plugin . '_desc.php';
+    }
+    $compat = plugin_compatibility_errors($info);
+    if (!$compat['ok']) {
+        return array('ok' => false, 'errors' => array_merge($result['errors'], $compat['errors']));
+    }
+    return array('ok' => true, 'errors' => array());
+}
+
+/**
  * 加载所有激活的插件
  */
 function loadplugins()
@@ -328,6 +372,11 @@ function activePlugin($plugin)
 
     global $m;
     if (!valid_plugin_id($plugin)) {
+        return false;
+    }
+    // V7.0：启用前强制兼容检查（manifest / 云签到版本 / PHP 版本）
+    $compat = plugin_compatibility_check($plugin);
+    if (!$compat['ok']) {
         return false;
     }
     if (file_exists(SYSTEM_ROOT . '/plugins/' . $plugin . '/' . $plugin . '.php')) {

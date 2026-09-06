@@ -1,5 +1,113 @@
 # 更新日志
 
+## 2026-09-06 V7.0 发布准备
+
+- **修复 Windows 脚本在 PowerShell 5.1 下解析失败**：`windows/*.ps1` 为无 BOM 的 UTF-8，5.1 按 GBK 误读中文导致 `start-web.ps1`（README 推荐的 `powershell -File` 调用方式）直接解析报错；已为全部含中文的 PS1 补 UTF-8 BOM，CI 新增 5.1 解析守卫防回归。
+- 发布脚本 `tools/publish-gitee.ps1` 新增 `-CleanOldReleases <N>`（发布成功后按创建时间倒序仅保留最近 N 个 Release）与 `-DeleteOldTags`（连同被清理版本的远端标签一并删除，显式开关）；本地打包模式不做任何远端变更。
+- 新增 `release-notes/v7.0.md`（V7.0 发布说明）与 `docs/RELEASE.md`（发布手册：门禁 → 打 tag → 发布 → 清旧 → 发布后验证与回滚）。
+
+## 2026-09-06 V7.0 批次8：架构演进评估 + 常驻调度模式
+
+> 架构评估为文档交付（docs/architecture-evolution.md）；唯一代码变更为 do.php 的可选常驻模式，默认 cron 路径零改动。
+
+### 调度：新增可选常驻模式
+- `php do.php --pw=密码 --loop[=间隔秒]`（默认 30 秒，上限 600）：CLI 常驻循环调度，复用 runall 的防重入锁/nextrun/失败退避全部机制，与 cron 触发天然互斥不重复执行；断线自动重建数据库连接，单轮异常不中断守护。适合无 crond 的 Windows 部署或不便配置计划任务的场景。
+- 常驻进程输出即时落盘（关闭控制台缓冲转换），便于重定向到日志文件。
+
+### 演进评估（docs/architecture-evolution.md）
+- **Worker/队列**：对比 cron+do.php、常驻 Worker、消息队列三方案的多节点去重/延迟/依赖/失败语义；结论为队列暂不引入（零 Composer 运行时依赖的架构原则不变），给出三条重新评估触发条件，且引入时应走 cron_1/cron_2 插件钩子。
+- **动态分表合并**：盘点约 10 个消费方文件与既有白名单防线，结论暂不合并（跨用户统计已由 sign_history 规避，插件 ABI 风险最大），给出单表 500 万行等重新评估触发条件与 expand/contract 合并路径。
+
+### 测试
+- 调度集成测试新增场景 G（真实进程级验证）：常驻循环 6 秒内执行到期任务、日志即时落盘、按 PID 干净终止。全量 49 项断言通过。
+
+## 2026-09-06 V7.0 批次7：发布流程收口
+
+> 测试与流程建设，无功能变更；其中 dataBak 与安装模板为真实缺陷修复。
+
+### 备份恢复
+- **修复 dataBak 导出丢失 NULL 值**：可空列（error_message、stoken、last_error 等）此前导出为空字符串，恢复后 NULL→'' 静默失真；现导出为 SQL NULL。
+- **修复安装模板缺 `api_rate_limits` 表**：全新安装此前靠 API 限流器懒建该表，模板已补齐与迁移一致的定义。
+- 新增 `tools/backup-restore-drill.php`（15 项断言，真实数据库）：用应用自身的备份逻辑执行「全新安装 → 播种数据（含引号/反斜杠/序列化值）→ 备份 → 空库恢复 → 15 张表逐行指纹比对 → 序列化配置语义校验 → keep 轮换」完整演练，每次 CI 自动执行一次。
+
+### 发布门禁
+- 新增一键发布门禁 `tools/release-gate.php`（`composer gate`）：语法扫描、单元测试、版本元数据一致性、迁移文件规范、入口 SQL 注入面守卫、四条数据库集成链路，共 9 项检查一次跑完，任一失败即阻断发布；数据库不可达时集成项标记 SKIP（CI 中保证可达）。
+- CI 新增 Windows `release-packaging` 作业：对临时 tag 执行发布脚本本地打包模式，验证 ZIP 生成、SHA-256 校验文件一致性、核心入口文件齐全——发布包生产线本身进入回归范围。
+
+### 测试基建
+- `composer integration` 现包含四条链路（迁移/调度/API/备份恢复）；API 集成测试的内置服务器改为文件日志并按真实 PID 强杀，修复 Windows 下进程残留导致父进程永久等待的问题。
+
+## 2026-09-06 V7.0 批次6：API 合同与插件 ABI
+
+> API 响应新增 api_version 字段与稳定错误码（纯增量，旧字段不变）；HTTP 方法现在严格按矩阵强制（此前 sign 等写接口用 GET 访问会执行成功，现在返回 405）；插件启用前强制兼容检查。
+
+### 开放 API 合同（lib/api-contract.php）
+- **版本标识**：所有 JSON 响应携带 `api_version`（当前 v1），破坏性变更时递增。
+- **统一错误格式**：错误响应固定为 `{error, code, api_version, ...}`，新增稳定错误码 `missing_token/auth_failed/rate_limited/method_not_allowed/forbidden_user_token/forbidden_global_token/unknown_action/upstream_unavailable`；文本可优化，code 面向程序判断。
+- **权限矩阵单一事实源**：`api_actions()` 同时驱动三件事——HTTP 方法与 Token 类型门禁（update/health_check/webhook_test 仅全局 Token，monitor 仅个人 Token）、openapi 文档自动生成（修复此前文档缺 streak/ranking/failures/monitor 等条目的漂移）、README 表格。新增合同守卫测试：README 记录的 action 与方法必须与矩阵一致，双向防漂移。
+- **方法严格化**：方法不符统一 405（此前仅 sign/retry/health_check 校验，其余 action 任何方法都放行）。
+
+### 插件 ABI
+- **启用前兼容检查**：新增 `plugin_compatibility_check()`（manifest 完整性 + 云签到最低版本 `for` + PHP 最低版本 `forphp`），不满足即拒绝启用并给出明确原因；`activePlugin()` 内部同门禁兜底。此前插件启用完全不校验版本兼容。
+- 兼容判定为纯函数 `plugin_compatibility_errors()`，11 项单元测试覆盖边界（all/数值版本/未满足/空清单）。
+
+### 全新安装修复
+- 修复安装模板缺少 007000 基线迁移所播种选项的问题（`api_rate_limit`/`metrics_token`/`webhook_*`/`cleanup_*`）——该缺失导致全新安装的 API 限流静默失效、数据保留清理默认关闭，与升级安装行为不一致；迁移集成测试新增 6 项「模板选项与基线迁移同步」断言防复发。
+
+### 集成测试
+- 新增 `tools/api-integration-test.php`（20 项断言，PHP 内置服务器 + 真实 MySQL 端到端）：认证、响应信封、方法门禁、全局/个人 Token 权限边界、unknown_action、openapi 完整性、限流 429 全链路验证；`composer integration` 与 CI 同步运行三条集成链路（迁移/调度/API）。
+
+## 2026-09-06 V7.0 批次5：数据库访问收敛
+
+> 纯代码安全收敛，无数据库结构变更、无升级步骤；对既有数据行为无影响（参数化绑定原始值，消除历史双重转义隐患）。
+
+### 注入面收敛（ajax.php / setting.php / api.php）
+- **账号绑定全链路参数化**：Cookie 绑定、扫码登录（qrlogin）、账号密码获取（getverify）、批量导入中所有「拼接 + sqladds/escape_string 预转义」的 SQL 全部改为 `pquery` 参数绑定原始值——既消除注入面，又避免转义值入库的历史隐患；批量导入的 STOKEN 空值经 NULL 绑定落库。
+- **二阶注入防线**：新增 `safe_table_name()` 单表名白名单助手（小写字母/数字/下划线 ≤64 位，非法回退 tieba），接入 `TABLE`/`CON_TABLE` 常量定义（lib/globals.php）、账号解绑分表、复签控制表与 API 用户表选择——来自数据库 `users.t` 的值在拼入 SQL 标识符前统一过白名单。
+- **API 收尾**：令牌哈希查找、限流计数读取、health 账号过滤全部参数化；经真实数据库验证 NULL 绑定、含引号/反斜杠值原样存储。
+- **回归守卫**：新增断言「三个入口禁止出现插值拼接 SQL（`{$var}` 进 query/once_fetch_array）」，后续引入即 CI 失败；`safe_table_name` 白名单行为覆盖 10 项边界。
+
+## 2026-09-06 V7.0 批次4：调度可靠性加固
+
+> 随 V7.0 持续集成，无额外升级步骤（新选项 cron_notify_interval 由迁移 007100 自动写入）。
+
+### 调度引擎（do.php / cron）
+- **排程写入持锁完成**：`cron::runOnce` 调整为「执行 → 记录运行历史 → 排程 → 释放锁（finally 保证）」，消除并发进程在解锁与排程之间交错读写 retry/nextrun 的窗口。
+- **失败通知去重**：渠道告警（Webhook/Notify）新增节流窗口 `cron_notify_interval`（默认 3600 秒，0 = 每次耗尽都告警）；重试阶段的失败本就不告警，同一任务持续失败时渠道告警最多每窗口一次；结构化错误日志不受节流影响，保证可观测性。
+- 新增迁移 007100 写入默认选项；全新安装模板同步预置。
+
+### 集成测试
+- 新增 `tools/scheduler-integration-test.php`（43 项断言，真实数据库）：到期任务执行与排程、锁冲突跳过、过期锁接管恢复、失败指数退避、耗尽告警去重（窗口抑制/关闭）、一次性任务清理、`do.php` 只跑到期任务与持锁并发保护。
+- 迁移与调度集成测试共用 `tools/lib-integration.php`；`composer integration` 与 CI 的 MariaDB 11.4 作业同时运行两者。
+
+## 2026-09-06 V7.0 升级治理：可恢复迁移、统一版本源与发布校验
+
+> 数据库版本 6.6 → 7.0（无破坏性结构变更）。升级入口：管理员访问 `/setup/update6.6to7.0.php`，或服务器执行 `php tools/migrate.php up`（同一迁移器）。升级前请备份数据库。
+
+### 升级与迁移
+- **统一迁移器**：新增 `lib/class.migrator.php`，`tools/migrate.php` 改为薄 CLI 入口。`schema_migrations` 升级为完整状态模型（description/checksum/status/started_at/finished_at/batch_id/error_message），旧记录按成功兼容；每次执行前通过 `GET_LOCK` 取得库级迁移锁，防止 Web/CLI/容器并发迁移。
+- **失败可恢复**：迁移失败写入 failed 状态与错误信息后中止，修复后重跑即可继续；任一迁移未全部成功时绝不更新 `core_version`；已应用迁移文件被改写时 checksum 校验阻断。
+- **版本门禁**：7.0 迁移仅允许从 `core_version=6.6` 进入，5.13 及更早版本明确阻断并提示先走旧升级链；已在新版本时幂等退出。`setup/update6.6to7.0.php` 为受管理员登录保护的 Web 升级入口，版本门禁页会自动引导。
+- **7.0 基线迁移**（007000）：校验 6.6 必备核心表齐全（缺失即失败，不猜不跳），幂等补齐调度结构与既有系统选项/任务，兼容经旧脚本链升级、迁移记录为空的存量库。
+
+### 版本元数据统一
+- 新增 `version.php` 作为唯一版本源，`init.php`、安装向导、环境检查页共用；修复安装页标记 5.12、环境检查页标记 1.0 的漂移。
+- 新安装模板 `core_version` 直接写入 7.0，并预置 `schema_migrations` 基线记录，全新安装不再显示待应用迁移。
+- `windows/check-update.ps1` 默认当前版本由 5.09 修正为 7.0。
+- Composer 平台要求补齐 `ext-zip`/`ext-openssl`/`ext-session`（与 Docker、安装检查一致）；OpenSSL 与 ZipArchive 在环境检查中升级为“必须”。
+
+### 更新器安全
+- 在线更新安装前强制校验发布包 SHA-256：优先 Release `digest` 字段，其次随包发布的 `.sha256` 附件；拿不到可信摘要或哈希不一致时拒绝覆盖安装（ZIP 魔数不再作为完整性依据）。
+- Docker 部署的更新令牌命名由 `UPDATE_GITHUB_TOKEN` 统一为 `UPDATE_GITEE_TOKEN`，与更新器、README、Windows 脚本一致。
+
+### Linux 兼容与 CI
+- **类加载大小写加固**：`class_autoload` 原按"类名小写拼文件名"查找，在大小写敏感的 Linux 容器上会漏掉 `class.SignManager.php`、`class.P.php` 等混合命名文件；现改为基于真实目录清单的解析器（`lib/class.loader.php`，含 `wmysql`/`ProjectUpdater` 命名别名），新增静态回归测试强制 lib 下每个类文件都能解析回自身。
+- **CI 新增 Docker 镜像冒烟**：构建镜像并 `compose up --wait` 启动完整栈，验证 `healthz.php?mode=live` 存活检查返回 ok、安装向导与首页路由经 Caddy + PHP-FPM 正常响应（HTTP 200）。
+
+### 测试
+- 新增 `MigratorTest`（14 项：建表升级、legacy 兼容、锁冲突、状态流转、失败重试、checksum 漂移、版本门禁、007000 基线校验）与 `ReleaseConfigTest`（7 项：版本源唯一性、安装模板基线、Docker/Windows/Composer 配置防漂移）；`UpdaterTest` 新增 5 项摘要校验测试。全量 105 项测试通过。
+- 新增真实数据库迁移集成测试 `tools/migrate-integration-test.php`（`composer integration`）：自动构建 6.6 存量库夹具，完整演练失败恢复 → 升级 → 幂等 → checksum 漂移阻断 → 迁移锁 → down 回滚 → 全新安装基线共 35 项断言；CI 新增 MariaDB 11.4 服务容器作业运行该测试。
+
 ## 2026-09-05 V6.6 移动端适配深化 + 视觉细节统一 + 工作台快捷操作
 
 > 数据库版本 6.5 → 6.6（无任何表结构变更，纯界面版本）；CSS 缓存戳随版本号自动更新，浏览器将强制拉取新样式。

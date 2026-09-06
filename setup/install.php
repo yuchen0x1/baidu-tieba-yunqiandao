@@ -1,8 +1,7 @@
 <?php
-define('SYSTEM_FN', '百度贴吧云签到');
-define('SYSTEM_VER', '5.12');
 define('SYSTEM_ROOT2', dirname(__FILE__));
 define('SYSTEM_ROOT', dirname(__FILE__) . '/..');
+require_once SYSTEM_ROOT . '/version.php';
 require_once SYSTEM_ROOT . '/lib/request.php';
 define('SYSTEM_PAGE', request_text_value($_REQUEST, 'mod', 'default'));
 header("content-type:text/html; charset=utf-8");

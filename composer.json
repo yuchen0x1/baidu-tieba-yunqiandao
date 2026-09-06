@@ -8,7 +8,10 @@
         "ext-curl": "*",
         "ext-json": "*",
         "ext-mbstring": "*",
-        "ext-mysqli": "*"
+        "ext-mysqli": "*",
+        "ext-openssl": "*",
+        "ext-session": "*",
+        "ext-zip": "*"
     },
     "require-dev": {
         "phpunit/phpunit": "^11.5"
@@ -16,6 +19,13 @@
     "scripts": {
         "test": "phpunit",
         "lint": "@php tools/lint.php",
+        "integration": [
+            "@php tools/migrate-integration-test.php",
+            "@php tools/scheduler-integration-test.php",
+            "@php tools/api-integration-test.php",
+            "@php tools/backup-restore-drill.php"
+        ],
+        "gate": "@php tools/release-gate.php",
         "check": [
             "@lint",
             "@test"

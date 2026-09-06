@@ -49,9 +49,10 @@ if ((empty($i['opt']['core_version']) || SYSTEM_VER != $i['opt']['core_version']
     if (empty($i['opt']['core_version'])) {
         $i['opt']['core_version'] = '3.45';
     }
-    if (file_exists(SYSTEM_ROOT . '/setup/update' . $i['opt']['core_version'] . 'to' . SYSTEM_VER . '.php')) {
+    $upgradeFile = SYSTEM_ROOT . '/setup/update' . $i['opt']['core_version'] . 'to' . SYSTEM_VER . '.php';
+    if (file_exists($upgradeFile)) {
         $updatefile = '<a href="setup/update' . $i['opt']['core_version'] . 'to' . SYSTEM_VER . '.php">请点击运行: ' . 'update' . $i['opt']['core_version'] . 'to' . SYSTEM_VER . '.php</a>';
-        msg('严重错误：数据库中的云签到版本与文件版本不符，是否已运行升级脚本？<br/><br/>' . $updatefile);
+        msg('数据库中的云签到版本(' . htmlspecialchars($i['opt']['core_version'], ENT_QUOTES, 'UTF-8') . ')与文件版本(' . SYSTEM_VER . ')不符，站点已进入升级模式。<br/><br/>' . $updatefile . '<br/><br/>推荐在服务器上以命令行执行（同样的迁移器，输出更完整）：<br/><code>php tools/migrate.php up</code><br/><br/>升级前请先备份数据库。');
     } else {
         msg('严重错误：数据库中的云签到版本(' . htmlspecialchars($i['opt']['core_version'], ENT_QUOTES, 'UTF-8') . ')与文件版本(' . SYSTEM_VER . ')不符，且未找到对应的升级脚本。请先运行 setup/update.php 逐步升级，不要跳过中间版本。');
     }
@@ -71,12 +72,13 @@ if (!defined('SYSTEM_NO_PLUGIN')) {
     }
 }
 
-//autoload
+//autoload（大小写无关解析见 lib/class.loader.php，兼容 Linux 容器文件系统）
+require_once SYSTEM_ROOT . '/lib/class.loader.php';
 function class_autoload($c)
 {
-    $c = strtolower($c);
-    if (file_exists(SYSTEM_ROOT . '/lib/class.' . $c . '.php')) {
-        include SYSTEM_ROOT . '/lib/class.' . $c . '.php';
+    $file = lib_class_file($c);
+    if ($file !== null) {
+        include $file;
     } else {
         throw new Exception('无法加载此类：' . $c, 10001);
     }

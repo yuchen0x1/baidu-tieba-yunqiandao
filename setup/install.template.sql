@@ -117,7 +117,7 @@ INSERT INTO `{VAR-PREFIX}options` VALUES ('cron_sign_again', 'a:2:{s:3:\"num\";i
 INSERT INTO `{VAR-PREFIX}options` VALUES ('sign_hour', '0');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('mail_secure', 'none');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('freetable', 'tieba');
-INSERT INTO `{VAR-PREFIX}options` VALUES ('core_version', '5.12');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('core_version', '7.0');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('core_revision', '');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('vid', '10000');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('update_server', '0');
@@ -316,7 +316,48 @@ CREATE TABLE `{VAR-PREFIX}task_runs` (
   KEY `started_at` (`started_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+DROP TABLE IF EXISTS `{VAR-PREFIX}api_rate_limits`;
+CREATE TABLE `{VAR-PREFIX}api_rate_limits` (
+  `token_hash` VARCHAR(64) NOT NULL DEFAULT '',
+  `window_start` INT UNSIGNED NOT NULL DEFAULT 0,
+  `count` INT UNSIGNED NOT NULL DEFAULT 0,
+  PRIMARY KEY (`token_hash`, `window_start`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 INSERT INTO `{VAR-PREFIX}options` VALUES ('cron_max_retry', '2');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('cron_retry_backoff', '300');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('cron_lock_timeout', '600');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('cron_notify_on_fail', '1');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('cron_notify_interval', '3600');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('metrics_token', '');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('api_rate_limit', '60');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('webhook_enable', '0');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('webhook_url', '');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('webhook_secret', '');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('webhook_events', '');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('cleanup_enable', '1');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('cleanup_sign_history_days', '180');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('cleanup_task_runs_days', '90');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('cleanup_cron_log_days', '30');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('cleanup_plugin_log_days', '90');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('cleanup_api_rate_days', '7');
+
+DROP TABLE IF EXISTS `{VAR-PREFIX}schema_migrations`;
+CREATE TABLE `{VAR-PREFIX}schema_migrations` (
+  `version` VARCHAR(64) NOT NULL DEFAULT '',
+  `applied_at` INT UNSIGNED NOT NULL DEFAULT 0,
+  `description` VARCHAR(255) NOT NULL DEFAULT '',
+  `checksum` CHAR(64) NOT NULL DEFAULT '',
+  `status` VARCHAR(20) NOT NULL DEFAULT 'success',
+  `started_at` INT UNSIGNED NOT NULL DEFAULT 0,
+  `finished_at` INT UNSIGNED NOT NULL DEFAULT 0,
+  `batch_id` INT UNSIGNED NOT NULL DEFAULT 0,
+  `error_message` TEXT,
+  PRIMARY KEY (`version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+# 新安装基线：结构与最新安装模板一致，无需重放历史迁移（checksum 留空按 legacy 成功处理）
+INSERT INTO `{VAR-PREFIX}schema_migrations` (`version`, `applied_at`, `description`, `status`, `started_at`, `finished_at`) VALUES
+  ('001001', UNIX_TIMESTAMP(), 'V5.13：cron 表调度增强列 + task_runs + api_rate_limits + 新增选项', 'success', UNIX_TIMESTAMP(), UNIX_TIMESTAMP()),
+  ('007000', UNIX_TIMESTAMP(), 'V7.0：升级基线校验与调度结构修复（幂等，无破坏性变更）', 'success', UNIX_TIMESTAMP(), UNIX_TIMESTAMP()),
+  ('007100', UNIX_TIMESTAMP(), 'V7.0：新增 cron_notify_interval 失败通知去重选项', 'success', UNIX_TIMESTAMP(), UNIX_TIMESTAMP());
