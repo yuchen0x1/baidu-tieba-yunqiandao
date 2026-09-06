@@ -485,17 +485,17 @@ textarea.form-control {
 .btn-success { color: #fff; background: var(--color-success); border-color: var(--color-success); }
 .btn-warning { color: #3e2c02; background: var(--color-accent); border-color: var(--color-accent); }
 .btn-danger { color: #fff; background: var(--color-danger); border-color: var(--color-danger); }
-.btn-default,
-.btn-info {
+.btn-info { color: #fff; background: var(--color-info); border-color: var(--color-info); }
+.btn-info:hover,
+.btn-info:focus { color: #fff; background: var(--color-info-deep); border-color: var(--color-info-deep); }
+.btn-default {
   color: var(--color-ink-soft);
   background: var(--color-surface);
   border-color: var(--color-line-strong);
 }
 
 .btn-default:hover,
-.btn-default:focus,
-.btn-info:hover,
-.btn-info:focus {
+.btn-default:focus {
   color: var(--color-brand-deep);
   background: var(--color-surface-soft);
   border-color: var(--color-brand);
@@ -1266,8 +1266,7 @@ body.app-body {
   color: #fff;
 }
 
-.btn-default,
-.btn-info {
+.btn-default {
   background: var(--glass-bg-strong);
   border-color: var(--glass-border);
   color: var(--color-ink-soft);
@@ -1275,17 +1274,14 @@ body.app-body {
 }
 
 .btn-default:hover,
-.btn-default:focus,
-.btn-info:hover,
-.btn-info:focus {
+.btn-default:focus {
   background: rgba(255,255,255,.92);
   border-color: var(--color-brand);
   color: var(--color-brand-deep);
   box-shadow: 0 0 0 3px rgba(91, 58, 255, .14);
 }
 
-[data-theme="dark"] .btn-default,
-[data-theme="dark"] .btn-info {
+[data-theme="dark"] .btn-default {
   background: rgba(255,255,255,.08);
   border-color: var(--glass-border-dark);
   box-shadow: none;
@@ -1723,3 +1719,28 @@ a:focus {
 .table {
   --bs-table-bg: transparent;
 }
+
+/* ============================================================
+   布局工具类（收敛模板/插件层重复内联样式）
+   ============================================================ */
+/* 页面底部常驻保存/操作工具条（贴吧与签到、用户管理、AI 页等） */
+.u-toolbar-sticky {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  padding: 10px 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  box-shadow: 0 -4px 12px rgba(23, 29, 36, .08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+/* 轻量操作/筛选行（按钮组、筛选 chips） */
+.u-chip-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+/* 自适应两栏/多栏卡片网格（面板并排，窄屏自动单列） */
+.u-grid-auto { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; align-items: start; }
+/* 弱化辅助文字（元数据、说明） */
+.u-muted-sm { font-size: var(--fs-xs); color: var(--color-muted); }

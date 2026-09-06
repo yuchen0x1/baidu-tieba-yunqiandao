@@ -96,7 +96,7 @@ $week = SignManager::calendar(7, UID);
             <thead><tr><th style="width:130px">日期</th><th>成功</th><th>失败</th><th>总计</th></tr></thead>
             <tbody>
             <?php foreach ($week as $w) {
-                $errClass = $w['error'] > 0 ? ' style="color:var(--color-danger,#e05252);font-weight:600"' : '';
+                $errClass = $w['error'] > 0 ? ' style="color:var(--color-danger);font-weight:600"' : '';
                 echo '<tr>'
                     . '<td>' . htmlspecialchars($w['day'], ENT_QUOTES, 'UTF-8') . '</td>'
                     . '<td>' . (int) $w['success'] . '</td>'

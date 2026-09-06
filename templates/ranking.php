@@ -62,7 +62,7 @@ foreach ($rankRows as $idx => $r) {
         break;
     }
 }
-$rankMedals = array(1 => '🥇', 2 => '🥈', 3 => '🥉');
+
 ?>
 <section class="dashboard-hero" style="margin:16px 1%">
     <div class="eyebrow hero-eyebrow">User Ranking / <?php echo date('Y-m-d'); ?></div>
@@ -117,10 +117,10 @@ $rankMedals = array(1 => '🥇', 2 => '🥈', 3 => '🥉');
         <?php foreach ($rankRows as $idx => $r) {
             $rank = $idx + 1;
             $positionClass = $rank <= 3 ? 'rank-' . $rank : '';
-            $medal = isset($rankMedals[$rank]) ? $rankMedals[$rank] . ' ' : '';
+            
         ?>
             <tr>
-                <td><span class="cs-rank-position <?php echo $positionClass; ?>"><?php echo $medal . $rank; ?></span></td>
+                <td><span class="cs-rank-position <?php echo $positionClass; ?>"><?php echo $rank; ?></span></td>
                 <td><?php echo htmlspecialchars($r['name'], ENT_QUOTES, 'UTF-8'); ?><?php if ($r['is_hidden']) { ?> <span class="cs-badge cs-badge-neutral" style="margin-left:6px">已隐藏</span><?php } ?></td>
                 <td><?php echo (int) $r['success_count']; ?></td>
                 <td><?php echo (int) $r['total_count']; ?></td>

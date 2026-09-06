@@ -230,3 +230,48 @@
     border-color: var(--color-border) var(--color-border) transparent;
     font-weight: 600;
 }
+
+/* ============================================================
+   BS3 → Design System v2（仅补充 ui.css 未覆盖的缺口；
+   .btn 家族/.form-control/.table/.modal 的 token 化由 ui.css 权威层负责）
+   ============================================================ */
+
+/* 标签页：.nav-tabs → cs-tab 视觉 */
+.nav-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-left: 0;
+  margin-bottom: var(--space-4);
+  list-style: none;
+  border-bottom: 1px solid var(--color-line);
+}
+.nav-tabs > li { margin: 0 0 -1px; }
+.nav-tabs > li > a {
+  display: block;
+  padding: 8px 14px;
+  color: var(--color-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  text-decoration: none;
+  transition: color var(--motion-fast) var(--ease-productive), background var(--motion-fast) var(--ease-productive);
+}
+.nav-tabs > li > a:hover { background: var(--color-surface-soft); color: var(--color-text); }
+.nav-tabs > li.active > a,
+.nav-tabs > li.active > a:hover,
+.nav-tabs > li.active > a:focus {
+  color: var(--color-primary);
+  font-weight: var(--fw-semibold);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-bottom-color: var(--color-surface);
+}
+
+/* 按钮缺口尺寸与状态 */
+.btn-xs { padding: 1px 8px; font-size: var(--fs-xs); border-radius: calc(var(--radius-sm) - 2px); }
+.btn-link { background: transparent; border-color: transparent; color: var(--color-primary); box-shadow: none; }
+.btn-link:hover, .btn-link:focus { background: transparent; color: var(--color-brand-deep); text-decoration: underline; }
+.btn:focus-visible { outline: var(--focus-outline); outline-offset: var(--focus-outline-offset); }
+.btn[disabled], .btn.disabled { opacity: .55; cursor: not-allowed; pointer-events: none; }
+.form-control::placeholder { color: var(--color-muted-light); opacity: 1; }

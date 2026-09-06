@@ -56,13 +56,13 @@ foreach ($i['cron'] as $cs) {
         $status .= ' | <a href="setting.php?mod=admin:cron&retry=' . htmlspecialchars($cs['name'], ENT_QUOTES, 'UTF-8') . '">重试</a>';
     }
     $status .= ' | <a href="index.php?mod=admin:editcron&edit=' . htmlspecialchars($cs['name'], ENT_QUOTES, 'UTF-8') . '">编辑</a>';
-    $status .= ' | <a href="setting.php?mod=admin:cron&uninst=' . htmlspecialchars($cs['name'], ENT_QUOTES, 'UTF-8') . '" style="color:red; " onclick="return confirm(\'你想要卸载此计划任务吗？\');">卸载</a>';
+    $status .= ' | <a href="setting.php?mod=admin:cron&uninst=' . htmlspecialchars($cs['name'], ENT_QUOTES, 'UTF-8') . '" class="cs-text-danger" onclick="return confirm(\'你想要卸载此计划任务吗？\');">卸载</a>';
     if (empty($cs['log'])) {
         $status .= '<br/>没有日志可查看';
     } else {
         $status .= '<br/><a href="javascript:;" data-log="' . htmlspecialchars($cs['log'], ENT_QUOTES, 'UTF-8') . '" onclick="alert(this.getAttribute(\'data-log\'));">点击查看此任务的日志</a>';
     }
-    $status .= '<br/>运行顺序：<span style="cursor:grab" class="cron-drag-handle" title="拖拽调整顺序">⋮⋮</span> <input required class="form-control input-sm cron-order-input" style="width:30%; display:inline" type="number" name="order[' . htmlspecialchars($cs['name'], ENT_QUOTES, 'UTF-8') . ']" value="' . htmlspecialchars($cs['orde'], ENT_QUOTES, 'UTF-8') . '">';
+    $status .= '<br/>运行顺序：<span style="cursor:grab" class="cron-drag-handle" title="拖拽调整顺序"><svg class="icon-inline" aria-hidden="true" style="width:13px;height:13px;vertical-align:-2px;color:var(--color-muted-light)"><use href="#i-list"/></svg></span> <input required class="form-control input-sm cron-order-input" style="width:30%; display:inline" type="number" name="order[' . htmlspecialchars($cs['name'], ENT_QUOTES, 'UTF-8') . ']" value="' . htmlspecialchars($cs['orde'], ENT_QUOTES, 'UTF-8') . '">';
     $cron .= '<input type="hidden" value="' . htmlspecialchars($cs['name'], ENT_QUOTES, 'UTF-8') . '" name="ids[]"><tr><td style="width:30%"><b>' . htmlspecialchars($cs['name'], ENT_QUOTES, 'UTF-8') . '</b><br/>' . htmlspecialchars($cs['file'], ENT_QUOTES, 'UTF-8') . '<br/>' . str_replace(array("\n", "\r\n"), '<br/>', htmlspecialchars($cs['desc'] ? $cs['desc'] : '', ENT_QUOTES, 'UTF-8')) . '</td><td style="width:30%">' . $badge . $freq . '<br/>上次执行：' . $lastdo . '<br/>下次执行：' . $nextText . '<br/>上次耗时：' . $durText . '</td><td style="width:40%">' . $status . '</td></tr>';
 }
 

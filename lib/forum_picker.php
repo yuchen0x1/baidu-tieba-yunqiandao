@@ -35,16 +35,16 @@ if (!function_exists('forum_picker_render')) {
             return;
         }
         echo '<div class="kws-picker" data-target="' . htmlspecialchars($targetName, ENT_QUOTES, 'UTF-8') . '" style="margin-bottom:8px">';
-        echo '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">';
+        echo '<div class="u-chip-row" style="margin-bottom:6px">';
         echo '<input type="text" class="form-control kws-search" placeholder="搜索贴吧…" style="width:150px;height:28px;padding:2px 8px">';
         echo '<button type="button" class="cs-btn cs-btn-secondary cs-btn-sm kws-all">全选筛选结果</button>';
         echo '<button type="button" class="cs-btn cs-btn-ghost cs-btn-sm kws-none">清空</button>';
-        echo '<span class="text-muted" style="font-size:12px">已选 <b class="kws-count">0</b> / 共 ' . count($forums) . ' 个（勾选自动写入下方文本框，也可手动补充）</span>';
+        echo '<span class="u-muted-sm">已选 <b class="kws-count">0</b> / 共 ' . count($forums) . ' 个（勾选自动写入下方文本框，也可手动补充）</span>';
         echo '</div>';
-        echo '<div class="kws-chips" style="max-height:150px;overflow:auto;border:1px solid var(--color-line,#ddd);border-radius:6px;padding:8px;display:flex;flex-wrap:wrap;gap:6px">';
+        echo '<div class="kws-chips">';
         foreach ($forums as $forumName) {
-            echo '<label class="kws-chip" data-name="' . htmlspecialchars($forumName, ENT_QUOTES, 'UTF-8') . '" style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--color-line,#ddd);border-radius:999px;padding:2px 10px;cursor:pointer;font-size:12px;margin:0">'
-                . '<input type="checkbox" class="kws-check" value="' . htmlspecialchars($forumName, ENT_QUOTES, 'UTF-8') . '" style="margin:0">'
+            echo '<label class="kws-chip" data-name="' . htmlspecialchars($forumName, ENT_QUOTES, 'UTF-8') . '">'
+                . '<input type="checkbox" class="kws-check" value="' . htmlspecialchars($forumName, ENT_QUOTES, 'UTF-8') . '">'
                 . '<span>' . htmlspecialchars($forumName, ENT_QUOTES, 'UTF-8') . '</span></label>';
         }
         echo '</div></div>';

@@ -122,7 +122,7 @@ if (!empty($i['user']['bduss'])) {
                 echo '<div id="tbpidpanel_' . $pkey . '" class="tbpanel cs-alert cs-alert-warning" style="display:none;margin-top:16px"><svg class="cs-alert-icon" aria-hidden="true"><use href="#i-alert"/></svg><div class="cs-alert-body">还没有添加任何贴吧，点击上方的按钮扫描贴吧。<br/>扫描不到贴吧？请检查百度账号BDUSS是否已经失效（尝试重新绑定）</div></div>';
             }
         }
-        echo '<div id="showtb-savebar" style="position:sticky;bottom:0;z-index:20;margin-top:16px;padding:10px 14px;background:var(--color-surface,#fff);border:1px solid var(--color-line);border-radius:8px;box-shadow:0 -4px 12px rgba(0,0,0,.08);display:flex;justify-content:flex-end"><button type="submit" id="submit_button" class="cs-btn cs-btn-primary"><svg class="cs-icon" style="width:16px;height:16px" aria-hidden="true"><use href="#i-check"/></svg> 提交更改</button></div></form>';
+        echo '<div id="showtb-savebar" class="u-toolbar-sticky" style="margin-top:16px;justify-content:flex-end"><button type="submit" id="submit_button" class="cs-btn cs-btn-primary"><svg class="cs-icon" style="width:16px;height:16px" aria-hidden="true"><use href="#i-check"/></svg> 提交更改</button></div></form>';
     } else {
         echo '<div class="cs-alert cs-alert-warning" role="alert"><svg class="cs-alert-icon" aria-hidden="true"><use href="#i-alert"/></svg><div class="cs-alert-body">你已经成功绑定了一个贴吧账号，但是还没有添加任何贴吧，点击上方的按钮扫描贴吧。<br/>扫描不到贴吧？请检查百度账号BDUSS是否已经失效（尝试重新绑定）</div></div>';
     }

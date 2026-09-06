@@ -87,7 +87,7 @@ if (isset($_GET['add'])) {  ?>
 </table>
 </div>
 <a name="submit_button" id="submit_button"></a>
-<div id="user-batch-bar" style="display:none;position:sticky;bottom:0;z-index:20;margin-top:12px;padding:10px 14px;background:var(--color-surface,#fff);border:1px solid var(--color-line);border-radius:8px;box-shadow:0 -4px 12px rgba(0,0,0,.08);flex-wrap:wrap;align-items:center;gap:10px">
+<div id="user-batch-bar" class="u-toolbar-sticky" style="display:none;margin-top:12px;flex-wrap:wrap">
     <b style="font-size:12px">已选 <span id="user-sel-count">0</span> 位，选择操作：</b>
     <label><input type="radio" name="do" value="cookie" checked> 清除 Cookie</label>
     <label><input type="radio" name="do" value="clean"> 清除贴吧数据</label>

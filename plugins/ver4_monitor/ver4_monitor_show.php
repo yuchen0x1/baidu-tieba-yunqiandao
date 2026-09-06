@@ -150,7 +150,7 @@ $myForums = forum_picker_forums();
     <div class="panel panel-default">
         <div class="panel-heading" id="monitor-preview-title"></div>
         <div class="panel-body">
-            <div id="monitor-preview-content" style="white-space:pre-wrap;color:#ccc;font-size:13px"></div>
+            <div id="monitor-preview-content" style="white-space:pre-wrap;color:var(--color-text-secondary);font-size:13px"></div>
             <a id="monitor-preview-link" href="#" target="_blank" rel="noopener" class="cs-btn cs-btn-secondary cs-btn-sm" style="margin-top:8px;display:inline-block">在贴吧打开</a>
         </div>
     </div>

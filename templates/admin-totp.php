@@ -22,7 +22,7 @@ global $i;
             <p><b>账户标识：</b><?php echo htmlspecialchars((string) $i['totp_account'], ENT_QUOTES, 'UTF-8'); ?></p>
             <p><b>密钥（Secret）：</b><code><?php echo htmlspecialchars((string) $i['totp_secret'], ENT_QUOTES, 'UTF-8'); ?></code></p>
             <p><b>otpauth 链接（用于二维码 / 手动添加）：</b><br/><code style="word-break:break-all;"><?php echo htmlspecialchars((string) $i['totp_uri'], ENT_QUOTES, 'UTF-8'); ?></code></p>
-            <p style="color:#999;">在认证器应用中添加上述密钥后，输入应用生成的 6 位验证码完成一次校验：</p>
+            <p style="color:var(--color-muted)">在认证器应用中添加上述密钥后，输入应用生成的 6 位验证码完成一次校验：</p>
             <form method="post" action="setting.php?mod=admin:totp&setting=verify" class="form-inline">
                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
                 <div class="form-group">

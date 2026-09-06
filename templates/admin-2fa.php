@@ -14,7 +14,7 @@ loadhead('双因素认证'); ?>
             </div>
             <button type="submit" class="cs-btn cs-btn-primary">验证并登录</button>
         </form>
-        <p style="margin-top:12px;color:#999;">提示：若无法获取验证码，请联系站点管理员重置双因素安全设置。</p>
+        <p style="margin-top:12px;color:var(--color-muted)">提示：若无法获取验证码，请联系站点管理员重置双因素安全设置。</p>
     </div>
 </div>
 <?php loadfoot(); ?>

@@ -289,7 +289,7 @@ while ($r = $m->fetch_array($logRs)) {
 
 <?php if (!empty($drafts)): ?>
 <div class="panel panel-warning" style="margin:16px 1% 0">
-<div class="panel-heading"><span class="panel-title">📮 发帖草稿箱</span><span style="float:right;font-size:12px">半自动模式候选 · 7 天后自动清理</span></div>
+<div class="panel-heading"><span class="panel-title"><svg class="icon-inline" aria-hidden="true" style="width:14px;height:14px;vertical-align:-2px"><use href="#i-list"/></svg> 发帖草稿箱</span><span style="float:right;font-size:12px">半自动模式候选 · 7 天后自动清理</span></div>
 <div class="panel-body" style="padding-top:8px">
 <div class="cs-table-wrap"><div class="cs-table-scroll">
 <table class="table table-striped">
@@ -297,7 +297,7 @@ while ($r = $m->fetch_array($logRs)) {
     <?php foreach ($drafts as $d): ?>
     <tr>
         <td><b><?php echo htmlspecialchars((string) $d['kw'], ENT_QUOTES, 'UTF-8'); ?>吧</b><br/><span class="text-muted" style="font-size:12px">账号 ID <?php echo (int) $d['pid']; ?></span></td>
-        <td><b><?php echo htmlspecialchars((string) $d['title'], ENT_QUOTES, 'UTF-8'); ?></b><br/><span style="white-space:pre-wrap;color:#555;font-size:13px"><?php echo htmlspecialchars(mb_substr((string) $d['content'], 0, 160), ENT_QUOTES, 'UTF-8'); ?><?php echo mb_strlen((string) $d['content']) > 160 ? '…' : ''; ?></span></td>
+        <td><b><?php echo htmlspecialchars((string) $d['title'], ENT_QUOTES, 'UTF-8'); ?></b><br/><span style="white-space:pre-wrap;color:var(--color-text-secondary);font-size:13px"><?php echo htmlspecialchars(mb_substr((string) $d['content'], 0, 160), ENT_QUOTES, 'UTF-8'); ?><?php echo mb_strlen((string) $d['content']) > 160 ? '…' : ''; ?></span></td>
         <td><?php echo htmlspecialchars(date('m-d H:i', (int) $d['created_at']), ENT_QUOTES, 'UTF-8'); ?></td>
         <td>
             <form method="post" action="index.php?plugin=ver4_ai" style="display:inline" data-confirm="确认把《<?php echo htmlspecialchars((string) $d['title'], ENT_QUOTES, 'UTF-8'); ?>》发布到 <?php echo htmlspecialchars((string) $d['kw'], ENT_QUOTES, 'UTF-8'); ?>吧 吗？">
@@ -548,13 +548,13 @@ while ($r = $m->fetch_array($logRs)) {
     </div>
     </div>
 
-    <div style="position:sticky;bottom:0;z-index:20;margin:16px 1% 0;padding:10px 14px;background:var(--color-surface,#fff);border:1px solid var(--color-line,#ddd);border-radius:8px;box-shadow:0 -4px 12px rgba(0,0,0,.08);display:flex;justify-content:space-between;align-items:center">
+    <div class="u-toolbar-sticky" style="margin:16px 1% 0">
         <span class="text-muted" style="font-size:12px">所有改动需保存后才会被计划任务使用</span>
         <input type="submit" class="cs-btn cs-btn-primary" name="uai_save" value="保存设置">
     </div>
 </form>
 <div class="panel panel-success" style="margin:16px 1% 0">
-    <div class="panel-heading"><span class="panel-title">⚡ 快速试一句</span><span style="float:right;font-size:12px">使用已保存的配置生成一个主题帖 · 不实际发帖</span></div>
+    <div class="panel-heading"><span class="panel-title"><svg class="icon-inline" aria-hidden="true" style="width:14px;height:14px;vertical-align:-2px"><use href="#i-zap"/></svg> 快速试一句</span><span style="float:right;font-size:12px">使用已保存的配置生成一个主题帖 · 不实际发帖</span></div>
     <div class="panel-body">
     <form method="post" action="index.php?plugin=ver4_ai" class="form-inline">
         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">

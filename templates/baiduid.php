@@ -222,7 +222,7 @@ $bindMax = (option::get('bduss_num') != '0' && ISVIP != true && option::get('bdu
 </div>
 <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 8px">
     <b>聚合操作</b>
-    <button type="button" class="cs-btn cs-btn-warning cs-btn-sm" id="sign-run-all">⚡ 立即签到（我的全部账号）</button>
+    <button type="button" class="cs-btn cs-btn-warning cs-btn-sm" id="sign-run-all"><svg class="icon-inline" aria-hidden="true" style="width:14px;height:14px;vertical-align:-2px"><use href="#i-zap"/></svg> 立即签到（我的全部账号）</button>
     <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm" id="sign-run-one">立即签到（选中账号）</button>
     <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm" id="bulk-refresh-tieba">刷新贴吧列表（全部账号）</button>
     <span class="text-muted" style="font-size:12px" id="sign-summary">单次立即签到最多处理 15 个贴吧，其余由计划任务继续完成</span>

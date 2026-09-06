@@ -62,12 +62,13 @@
   color: var(--color-ink-soft);
   background: var(--glass-bg-strong);
   border-color: var(--color-line-strong);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7);
+  box-shadow: var(--glass-highlight);
 }
 .cs-btn-secondary:hover,
 .cs-btn-secondary:focus {
   color: var(--color-brand-deep);
-  background: rgba(255, 255, 255, .92);
+  background: var(--color-surface);
+  border-color: var(--color-primary);
   border-color: var(--color-brand);
   box-shadow: 0 0 0 3px rgba(91, 58, 255, .14);
 }
@@ -1402,8 +1403,8 @@ textarea.cs-form-control { min-height: 80px; resize: vertical; }
 }
 
 .cs-list-item {
-  background: rgba(255, 255, 255, .16);
-  border-bottom-color: rgba(255, 255, 255, .35);
+  background: rgba(255, 255, 255, .55);
+  border-bottom-color: rgba(29, 35, 43, .08);
 }
 
 .cs-list-item:last-child { border-bottom: 0; }
@@ -1454,3 +1455,34 @@ textarea.cs-form-control { min-height: 80px; resize: vertical; }
     background: var(--glass-bg-strong);
   }
 }
+
+/* ============================================================
+   目标贴吧勾选 chips（lib/forum_picker.php 各插件共用）
+   ============================================================ */
+.kws-picker .kws-chips {
+  max-height: 150px;
+  overflow: auto;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  padding: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  background: var(--color-surface);
+}
+.kws-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  padding: 2px 10px;
+  cursor: pointer;
+  font-size: var(--fs-xs);
+  margin: 0;
+  color: var(--color-text);
+  transition: border-color var(--motion-fast) var(--ease-productive), background var(--motion-fast) var(--ease-productive);
+}
+.kws-chip:hover { border-color: var(--color-primary); }
+.kws-chip:has(input:checked) { background: var(--color-brand-soft); border-color: var(--color-primary); }
+.kws-chip input { margin: 0; accent-color: var(--color-primary); }
