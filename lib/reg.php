@@ -5,6 +5,25 @@ if (!defined('SYSTEM_ROOT')) {
 }
 global $m;
 require_once SYSTEM_ROOT . '/lib/security.php';
+
+/**
+ * 升级模式提示：命令行为第一路径（任何环境可用，含 /setup/ 被 nginx 封禁的站点），
+ * Web 入口为第二路径并注明可能 404 的原因。历史上不少站点按安装指引封禁了 /setup/，
+ * 门禁页若只给 Web 链接会让用户困在死路。
+ */
+if (!function_exists('upgrade_notice_html')) {
+    function upgrade_notice_html($webPath, $webLabel)
+    {
+        $coreVersion = htmlspecialchars($GLOBALS['i']['opt']['core_version'], ENT_QUOTES, 'UTF-8');
+        $ver = htmlspecialchars(SYSTEM_VER, ENT_QUOTES, 'UTF-8');
+        return '数据库中的云签到版本(' . $coreVersion . ')与文件版本(' . $ver . ')不符，站点已进入升级模式。<br/><br/>'
+            . '<b>方式一（推荐，任何服务器环境都可用）</b>：SSH 进入站点根目录，执行统一迁移器<br/><code>php tools/migrate.php up</code><br/><br/>'
+            . '<b>方式二</b>：<a href="' . htmlspecialchars($webPath, ENT_QUOTES, 'UTF-8') . '">点击运行 ' . htmlspecialchars($webLabel, ENT_QUOTES, 'UTF-8') . '</a><br/>'
+            . '<span class="text-muted">若你的 Web 服务器封禁了 <code>/setup/</code> 目录（常见安全加固，如 nginx <code>location ^~ /setup/ { return 404; }</code>），方式二会 404，请改用方式一。</span><br/><br/>'
+            . '升级前请先备份数据库。';
+    }
+}
+
 /**
  * 环境准备
  */
@@ -51,12 +70,10 @@ if ((empty($i['opt']['core_version']) || SYSTEM_VER != $i['opt']['core_version']
     }
     $upgradeFile = SYSTEM_ROOT . '/setup/update' . $i['opt']['core_version'] . 'to' . SYSTEM_VER . '.php';
     if (file_exists($upgradeFile)) {
-        $updatefile = '<a href="setup/update' . $i['opt']['core_version'] . 'to' . SYSTEM_VER . '.php">请点击运行: ' . 'update' . $i['opt']['core_version'] . 'to' . SYSTEM_VER . '.php</a>';
-        msg('数据库中的云签到版本(' . htmlspecialchars($i['opt']['core_version'], ENT_QUOTES, 'UTF-8') . ')与文件版本(' . SYSTEM_VER . ')不符，站点已进入升级模式。<br/><br/>' . $updatefile . '<br/><br/>推荐在服务器上以命令行执行（同样的迁移器，输出更完整）：<br/><code>php tools/migrate.php up</code><br/><br/>升级前请先备份数据库。');
+        msg(upgrade_notice_html('setup/update' . $i['opt']['core_version'] . 'to' . SYSTEM_VER . '.php', 'update' . $i['opt']['core_version'] . 'to' . SYSTEM_VER . '.php（专用升级脚本）'));
     } elseif (version_compare($i['opt']['core_version'], '6.6', '>=') && version_compare($i['opt']['core_version'], SYSTEM_VER, '<')) {
         // 6.6 及以上版本由统一迁移器直接升到当前版本，无需逐版本升级脚本
-        $updatefile = '<a href="setup/upgrade.php">请点击运行: setup/upgrade.php（统一迁移器）</a>';
-        msg('数据库中的云签到版本(' . htmlspecialchars($i['opt']['core_version'], ENT_QUOTES, 'UTF-8') . ')与文件版本(' . SYSTEM_VER . ')不符，站点已进入升级模式。<br/><br/>' . $updatefile . '<br/><br/>推荐在服务器上以命令行执行（同样的迁移器，输出更完整）：<br/><code>php tools/migrate.php up</code><br/><br/>升级前请先备份数据库。');
+        msg(upgrade_notice_html('setup/upgrade.php', 'setup/upgrade.php（统一迁移器）'));
     } else {
         msg('严重错误：数据库中的云签到版本(' . htmlspecialchars($i['opt']['core_version'], ENT_QUOTES, 'UTF-8') . ')与文件版本(' . SYSTEM_VER . ')不符，且未找到对应的升级脚本。请先运行 setup/update.php 逐步升级，不要跳过中间版本。');
     }
