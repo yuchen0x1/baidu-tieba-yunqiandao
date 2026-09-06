@@ -19,6 +19,7 @@
     "scripts": {
         "test": "phpunit",
         "lint": "@php tools/lint.php",
+        "security-scan": "@php tools/secret-scan.php",
         "integration": [
             "@php tools/migrate-integration-test.php",
             "@php tools/scheduler-integration-test.php",
@@ -28,6 +29,7 @@
         "gate": "@php tools/release-gate.php",
         "check": [
             "@lint",
+            "@security-scan",
             "@test"
         ]
     }

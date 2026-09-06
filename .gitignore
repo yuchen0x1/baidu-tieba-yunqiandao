@@ -18,3 +18,9 @@ vendor/
 # 运行产物（不入库）
 data/log/
 plugins/.rollback/
+
+# 官方服务/密钥安全边界（private key / 实例库不入开源仓库）
+official-service/keys/
+official-service/data/
+*.pem
+*.key

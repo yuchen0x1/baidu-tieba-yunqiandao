@@ -34,15 +34,22 @@ function ver4_ai_decrypt_key($stored)
 
 /**
  * 读取站点共享配置（管理员维护）
- * @return array|false 无可用 Key 时返回 false
+ * Provider 两态：direct=实例自带 Provider Key；official=走官方网关（Key 在官方侧，实例不持有）
+ * @return array|false 无可用配置时返回 false
  */
 function ver4_ai_shared_cfg()
 {
+    $provider = ver4_ai_cfg('ver4_ai_provider', 'direct');
     $key = ver4_ai_api_key();
     if ($key === '') {
-        return false;
+        if ($provider !== 'official') {
+            return false;
+        }
+        //官方服务模式：Provider Key 保留在官方网关，实例侧无需占位 Key
+        $key = 'official-gateway';
     }
     return array(
+        'provider'    => $provider,
         'base'        => rtrim(ver4_ai_cfg('ver4_ai_api_url', 'https://open.bigmodel.cn/api/coding/paas/v4'), '/'),
         'key'         => $key,
         'model'       => ver4_ai_cfg('ver4_ai_model', 'glm-5.3-flash'),
@@ -71,10 +78,11 @@ function ver4_ai_user_cfg($uid)
 
     $ownKey = ver4_ai_decrypt_key(trim((string) option::uget('uai_api_key', $uid)));
     if ($ownKey !== '') {
-        //用户自己的 API 配置
+        //用户自己的 API 配置（始终直连，不经官方网关）
         $base = trim((string) option::uget('uai_api_url', $uid));
         $model = trim((string) option::uget('uai_model', $uid));
         $cfg = array(
+            'provider'    => 'direct',
             'base'        => rtrim($base !== '' ? $base : ($shared !== false ? $shared['base'] : 'https://open.bigmodel.cn/api/coding/paas/v4'), '/'),
             'key'         => $ownKey,
             'model'       => $model !== '' ? $model : ($shared !== false ? $shared['model'] : 'glm-5.3-flash'),
@@ -519,6 +527,10 @@ function ver4_ai_url_allowed($url)
  */
 function ver4_ai_chat($cfg, array $messages, &$err = null)
 {
+    //official：经官方网关代理。实例不持有 Provider Key，模型路由/配额/风控由网关裁决
+    if (isset($cfg['provider']) && $cfg['provider'] === 'official') {
+        return ver4_ai_chat_official($cfg, $messages, $err);
+    }
     $url = ver4_ai_endpoint($cfg);
     if (!ver4_ai_url_allowed($url)) {
         $err = '接口地址不可用（仅允许公网 http/https 地址）';
@@ -562,6 +574,32 @@ function ver4_ai_chat($cfg, array $messages, &$err = null)
     }
     if ($text === '') {
         $err = '接口未返回内容';
+        return false;
+    }
+    return $text;
+}
+
+/**
+ * 经官方网关的对话调用（provider=official 时由 ver4_ai_chat 分发至此）
+ * 网关返回上游 OpenAI 兼容结构，取首条回复文本；授权/配额失败原因见 $err
+ * @return string|false
+ */
+function ver4_ai_chat_official($cfg, array $messages, &$err = null)
+{
+    $resp = official::request('/v1/ai/chat', array(
+        'messages'    => array_values($messages),
+        'temperature' => $cfg['temperature'],
+        'max_tokens'  => $cfg['max_tokens'],
+    ), 'ai:generate', $err);
+    if ($resp === false) {
+        return false;
+    }
+    $text = '';
+    if (isset($resp['choices'][0]['message']['content']) && is_string($resp['choices'][0]['message']['content'])) {
+        $text = trim($resp['choices'][0]['message']['content']);
+    }
+    if ($text === '') {
+        $err = '官方网关未返回内容';
         return false;
     }
     return $text;

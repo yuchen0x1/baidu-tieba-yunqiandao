@@ -1217,8 +1217,20 @@ function get_mime($ext)
  */
 function csrf_token()
 {
-    $secret = defined('SYSTEM_SALT') && SYSTEM_SALT !== '' ? (string) SYSTEM_SALT : (class_exists('option', false) ? (string) option::get('crypto_key') : '');
-    if ($secret === '' || $secret === null) { $secret = 'tieba-cloud-sign-csrf-fallback'; }
+    $secret = defined('SYSTEM_SALT') && SYSTEM_SALT !== '' ? (string) SYSTEM_SALT : '';
+    if ($secret === '' && class_exists('option', false)) {
+        //与 P::cryptoKey 相同的按需供应：首次使用即生成随机密钥落库。
+        //禁止硬编码回退盐——那会让任何拿到源码的人算出合法 CSRF 令牌。
+        $secret = (string) option::get('crypto_key');
+        if ($secret === '') {
+            $secret = bin2hex(random_bytes(32));
+            option::add('crypto_key', $secret);
+        }
+    }
+    if ($secret === '') {
+        //无数据库上下文（Web 请求不应到达此处）：逐请求随机，宁可令牌失效降级到 Referer 门控，也不落入稳定弱密钥
+        $secret = bin2hex(random_bytes(32));
+    }
     $nonce = isset($_COOKIE['tc_csrf']) ? (string) $_COOKIE['tc_csrf'] : '';
     $uid = defined('UID') ? (string) UID : 'visitor';
     return hash_hmac('sha256', 'csrf:' . $uid . ':' . $nonce, $secret);

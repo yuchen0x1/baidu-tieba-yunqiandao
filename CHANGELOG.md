@@ -1,5 +1,13 @@
 # 更新日志
 
+## 未发布（架构安全批次）
+
+- **安全修复**：CSRF 令牌的回退盐由硬编码常量改为按需自动生成的 `crypto_key`（已配置 `SYSTEM_SALT` 或已有密钥的实例行为不变）；此前全新实例在密钥未生成时可被推算出合法令牌。
+- **安全修复**：发布脚本 `tools/publish-gitee.ps1` 清理旧版本时，Gitee 令牌从 URL 查询串改为 Authorization 头（查询串会落入反代/访问日志）。
+- **架构**：确立「开源实现 vs 官方服务能力」边界（`docs/architecture-boundary.md`）。新增官方服务网关客户端 `lib/class.official.php`（HMAC-SHA256 请求签名 + 时间戳/nonce 防重放、短期 Access Token 缓存、License RSA-2048 非对称验签）；零密钥参考网关 `official-service/`（实例认证/防重放/配额限流/Provider 代理，全部凭据走 env，生产部署须迁入私有仓库）。
+- **AI 插件**：Provider 形态可选「直连（自带 Key）」（默认，行为不变）或「官方 AI 服务」（实例不持有 Provider Key，模型路由/配额/风控由官方网关裁决）；管理页新增官方服务接入配置（实例 Secret 加密存库）。
+- **工具链**：新增 `tools/secret-scan.php` 仓库 Secret 扫描（接入 `composer check`、发布门禁与 CI）；新增 `tools/official-keygen.php` 授权密钥对生成器（私钥仅输出到官方服务器，不入仓库）；`.gitignore` 排除私钥/网关数据目录。
+
 ## 2026-09-07 V7.1.1：修复 7.0 升级被版本门禁阻断
 
 - **修复**：从 7.0 升级到 7.1 时，站点会被版本门禁以「未找到对应的升级脚本」阻断（7.1 无数据库结构变更，本应直升）。现新增通用升级入口 `setup/upgrade.php`：无专用逐版本脚本时，6.6 及以上任意版本均可一键直升当前版本（同一迁移器、同一状态记录，失败可恢复）；命令行 `php tools/migrate.php up` 不受影响。

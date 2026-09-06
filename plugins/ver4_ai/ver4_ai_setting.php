@@ -11,6 +11,19 @@ if (isset($_POST['ver4_ai_save'])) {
     //站点开关
     option::set('ver4_ai_user_enable', $_POST['ver4_ai_user_enable'] == '1' ? '1' : '0');
     option::set('ver4_ai_shared_enable', $_POST['ver4_ai_shared_enable'] == '1' ? '1' : '0');
+    //Provider 形态：direct=实例自带 Key；official=官方 AI 网关（Key 在官方侧）
+    $providerInput = trim((string) $_POST['ver4_ai_provider']);
+    option::set('ver4_ai_provider', $providerInput === 'official' ? 'official' : 'direct');
+    //官方服务接入（核心平台配置，未来其他官方能力复用；Secret 加密存库）
+    option::set('official_gateway_url', trim((string) $_POST['official_gateway_url']));
+    option::set('official_instance_id', trim((string) $_POST['official_instance_id']));
+    $officialSecret = trim((string) $_POST['official_instance_secret']);
+    if ($officialSecret !== '') {
+        option::set('official_instance_secret', P::encrypt($officialSecret));
+    } elseif (isset($_POST['official_instance_secret_clear']) && $_POST['official_instance_secret_clear'] == '1') {
+        option::set('official_instance_secret', '');
+        option::set('official_access_token', '');
+    }
     //站点共享 API 配置（用户未填自己 Key 时，若允许共享则回退使用）
     option::set('ver4_ai_api_url', trim((string) $_POST['ver4_ai_api_url']));
     $keyInput = trim((string) $_POST['ver4_ai_api_key']);
@@ -48,12 +61,16 @@ if (isset($_POST['ver4_ai_save'])) {
 
 $userEnable = ver4_ai_cfg('ver4_ai_user_enable', '1');
 $sharedEnable = ver4_ai_cfg('ver4_ai_shared_enable', '0');
+$provider = ver4_ai_cfg('ver4_ai_provider', 'direct');
 $aiUrl = htmlspecialchars(ver4_ai_cfg('ver4_ai_api_url', 'https://open.bigmodel.cn/api/coding/paas/v4'), ENT_QUOTES, 'UTF-8');
 $aiModel = htmlspecialchars(ver4_ai_cfg('ver4_ai_model', 'glm-5.3-flash'), ENT_QUOTES, 'UTF-8');
 $aiTemp = htmlspecialchars(ver4_ai_cfg('ver4_ai_temperature', '0.9'), ENT_QUOTES, 'UTF-8');
 $aiMaxTokens = htmlspecialchars(ver4_ai_cfg('ver4_ai_max_tokens', '1500'), ENT_QUOTES, 'UTF-8');
 $aiPersona = htmlspecialchars(ver4_ai_cfg('ver4_ai_persona', ''), ENT_QUOTES, 'UTF-8');
 $hasKey = trim((string) option::get('ver4_ai_api_key')) !== '';
+$officialUrl = htmlspecialchars(ver4_ai_cfg('official_gateway_url'), ENT_QUOTES, 'UTF-8');
+$officialId = htmlspecialchars(ver4_ai_cfg('official_instance_id'), ENT_QUOTES, 'UTF-8');
+$hasOfficialSecret = trim((string) option::get('official_instance_secret')) !== '';
 $userCountRow = $m->once_fetch_array("SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "users_options` WHERE `name` = 'uai_enable' AND `value` = '1'");
 $userEnabledCount = (int) $userCountRow['c'];
 $cronRow = $m->once_fetch_array("SELECT `enable` FROM `" . DB_PREFIX . "cron` WHERE `name` = 'ver4_ai_do' LIMIT 1");
@@ -85,11 +102,41 @@ $cronOn = !empty($cronRow['enable']);
             </td>
         </tr>
         <tr>
-            <td><b>API 地址</b><br/>填到版本号为止</td>
+            <td><b>AI Provider 形态</b><br/><b>直连</b>：使用下方共享 API Key 直连大模型厂商（Key 存本站，加密）。<br/><b>官方 AI 服务</b>：经官方网关代理，Provider Key 由官方持有，实例只需接入凭据；模型路由、配额与风控由官方裁决</td>
+            <td>
+                <select name="ver4_ai_provider" class="form-control" style="width:180px">
+                    <option value="direct" <?php echo $provider !== 'official' ? 'selected' : ''; ?>>直连（自带 Key）</option>
+                    <option value="official" <?php echo $provider === 'official' ? 'selected' : ''; ?>>官方 AI 服务</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2"><b>官方服务接入</b>（选择「官方 AI 服务」时必填；凭据由官方控制台签发）
+                <table class="table" style="margin-top:6px">
+                    <tr>
+                        <td style="width:35%"><b>网关地址</b><br/>仅允许公网 https 地址</td>
+                        <td><input type="text" class="form-control" name="official_gateway_url" value="<?php echo $officialUrl; ?>" placeholder="https://gw.example.com"></td>
+                    </tr>
+                    <tr>
+                        <td><b>实例 ID</b></td>
+                        <td><input type="text" class="form-control" name="official_instance_id" value="<?php echo $officialId; ?>" placeholder="inst-..."></td>
+                    </tr>
+                    <tr>
+                        <td><b>实例 Secret</b><br/>加密存储；留空表示保持不变<?php echo $hasOfficialSecret ? '（已配置）' : '（未配置）'; ?></td>
+                        <td>
+                            <input type="password" class="form-control" name="official_instance_secret" value="" placeholder="<?php echo $hasOfficialSecret ? '已配置，输入新值可覆盖' : '官方控制台签发的 Secret'; ?>" autocomplete="new-password">
+                            <?php if ($hasOfficialSecret) { ?><label style="display:block;margin-top:4px"><input type="checkbox" name="official_instance_secret_clear" value="1"> 清除已保存的 Secret（断开官方服务）</label><?php } ?>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td><b>API 地址</b><br/>填到版本号为止；仅「直连」模式使用</td>
             <td><input type="text" class="form-control" name="ver4_ai_api_url" value="<?php echo $aiUrl; ?>" placeholder="https://open.bigmodel.cn/api/coding/paas/v4"></td>
         </tr>
         <tr>
-            <td><b>API Key</b><br/>加密存储；留空表示保持不变<?php echo $hasKey ? '（已配置）' : '（未配置）'; ?></td>
+            <td><b>API Key</b><br/>加密存储；留空表示保持不变<?php echo $hasKey ? '（已配置）' : '（未配置）'; ?>；仅「直连」模式使用</td>
             <td><input type="password" class="form-control" name="ver4_ai_api_key" value="" placeholder="<?php echo $hasKey ? '已配置，输入新值可覆盖' : 'sk-...'; ?>" autocomplete="new-password"></td>
         </tr>
         <tr>

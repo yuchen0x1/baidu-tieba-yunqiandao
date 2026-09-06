@@ -10,7 +10,7 @@ require_once dirname(__DIR__) . '/lib/class.totp.php';
 
 /**
  * TOTP 双因素认证实现测试（V5.13 B5）
- * 使用 RFC 6238 附录 B 官方测试向量（secret = "12345678901234567890"）。
+ * 使用 RFC 6238 附录 B 官方测试向量（secret = "12345678901234567890"）。 secret-scan:allow（RFC 公开测试常量）
  */
 class TotpTest extends TestCase
 {

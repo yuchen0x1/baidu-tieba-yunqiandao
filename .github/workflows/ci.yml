@@ -36,6 +36,9 @@ jobs:
       - name: Run project checks
         run: composer check
 
+      - name: Secret scan
+        run: php tools/secret-scan.php
+
   migration-integration:
     name: MariaDB 11.4 migration integration
     runs-on: ubuntu-latest

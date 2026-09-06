@@ -118,7 +118,9 @@ try {
     # 可选：清理旧版本（删除旧 Release；配合 -DeleteOldTags 连同远端标签一并删除）。
     # 仅在发布成功后执行；刚发布的 $Tag 永远保留，保留数量按 Release 创建时间倒序由 -CleanOldReleases 指定。
     if ($CleanOldReleases -gt 0) {
-        $releases = Invoke-RestMethod -Uri "$apiRoot/releases?per_page=100&access_token=$([Uri]::EscapeDataString($token))" -Headers @{ 'User-Agent' = 'Tieba-Cloud-Sign-Gitee-Publisher' }
+        # 令牌只走 Authorization 头，不进 URL（查询串会落入反代/访问日志）
+        $authHeaders = @{ Authorization = "Bearer $token"; 'User-Agent' = 'Tieba-Cloud-Sign-Gitee-Publisher' }
+        $releases = Invoke-RestMethod -Uri "$apiRoot/releases?per_page=100" -Headers $authHeaders
         $sorted = @($releases | Sort-Object -Property created_at -Descending)
         $toDelete = @($sorted | Select-Object -Skip $CleanOldReleases | Where-Object { [string]$_.tag_name -ne $Tag })
         if ($toDelete.Count -eq 0) {
@@ -128,7 +130,7 @@ try {
             $oldId = [string]$old.id
             $oldTag = [string]$old.tag_name
             try {
-                Invoke-RestMethod -Method Delete -Uri "$apiRoot/releases/$oldId`?access_token=$([Uri]::EscapeDataString($token))" | Out-Null
+                Invoke-RestMethod -Method Delete -Uri "$apiRoot/releases/$oldId" -Headers $authHeaders | Out-Null
                 Write-Host "已删除旧版本：$oldTag（Release $oldId）"
             } catch {
                 Write-Warning "删除 Release $oldTag 失败，跳过其标签清理：$($_.Exception.Message)"
@@ -136,7 +138,7 @@ try {
             }
             if ($DeleteOldTags -and $oldTag -ne '') {
                 try {
-                    Invoke-RestMethod -Method Delete -Uri "$apiRoot/tags/$([Uri]::EscapeDataString($oldTag))?access_token=$([Uri]::EscapeDataString($token))" | Out-Null
+                    Invoke-RestMethod -Method Delete -Uri "$apiRoot/tags/$([Uri]::EscapeDataString($oldTag))" -Headers $authHeaders | Out-Null
                     Write-Host "已删除远端标签：$oldTag"
                 } catch {
                     Write-Warning "删除标签 $oldTag 失败（Release 已删除）：$($_.Exception.Message)"

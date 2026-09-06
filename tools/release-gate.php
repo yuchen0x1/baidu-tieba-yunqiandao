@@ -48,6 +48,10 @@ function runStep($script, $args = array())
 list($code, $output) = runStep($repoRoot . '/tools/lint.php');
 gate('全仓语法与安全扫描', $code === 0 ? 'pass' : 'fail', $code === 0 ? trim($output) : substr(trim($output), 0, 400));
 
+// ---------- 1.5 Secret 扫描（Git 追踪文件凭据模式） ----------
+list($code, $output) = runStep($repoRoot . '/tools/secret-scan.php');
+gate('Secret 扫描', $code === 0 ? 'pass' : 'fail', $code === 0 ? '无疑似泄露' : substr(trim($output), 0, 400));
+
 // ---------- 2. 单元测试 ----------
 $phpunit = $repoRoot . '/vendor/bin/phpunit';
 if (file_exists($phpunit)) {
