@@ -352,6 +352,8 @@ while ($r = $m->fetch_array($logRs)) {
                 <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm ai-preset" data-url="https://dashscope.aliyuncs.com/compatible-mode/v1" data-models="qwen-plus,qwen-turbo,qwen-max">通义千问</button>
                 <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm ai-preset" data-url="https://api.moonshot.cn/v1" data-models="moonshot-v1-8k,kimi-k2-0711-preview">月之暗面</button>
                 <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm ai-preset" data-url="https://api.openai.com/v1" data-models="gpt-4o-mini,gpt-4o">OpenAI</button>
+                <button type="button" class="cs-btn cs-btn-ghost cs-btn-sm" id="uai-conn-test"><svg class="cs-icon" style="width:13px;height:13px" aria-hidden="true"><use href="#i-pulse"/></svg> 测试连接</button>
+                <div id="uai-conn-result" class="u-muted-sm" style="margin-top:6px;min-height:18px">用当前表单里的地址 / Key / 模型发起一次真实请求（约消耗数十 Token），未保存的修改也会被测试。</div>
             </td>
         </tr>
         <tr>
@@ -618,6 +620,39 @@ while ($r = $m->fetch_array($logRs)) {
 </div>
 <script>
 (function () {
+    //连通性检测：用当前表单值直接发一次真实请求（无需先保存）
+    var connBtn = document.getElementById('uai-conn-test');
+    if (connBtn) {
+        connBtn.addEventListener('click', function () {
+            var resultEl = document.getElementById('uai-conn-result');
+            if (connBtn.disabled) { return; }
+            connBtn.disabled = true;
+            if (resultEl) { resultEl.textContent = '正在连接模型服务…'; }
+            $.ajax({
+                url: 'ajax.php?mod=ver4_ai:testconn',
+                type: 'POST',
+                dataType: 'json',
+                timeout: 30000,
+                data: {
+                    url: document.getElementById('uai_api_url') ? document.getElementById('uai_api_url').value : '',
+                    key: document.querySelector('input[name="uai_api_key"]') ? document.querySelector('input[name="uai_api_key"]').value : '',
+                    model: document.getElementById('uai_model') ? document.getElementById('uai_model').value : ''
+                },
+                success: function (x) {
+                    if (resultEl) {
+                        resultEl.textContent = x.ok
+                            ? '✓ 连接成功（' + (x.ms || 0) + ' ms）模型返回：' + (x.msg || '')
+                            : '✗ 连接失败：' + (x.msg || '未知错误');
+                        resultEl.style.color = x.ok ? 'var(--color-success-deep, #446652)' : 'var(--color-danger-deep, #97413c)';
+                    }
+                },
+                error: function () {
+                    if (resultEl) { resultEl.textContent = '✗ 请求失败：网络错误或登录已过期，请刷新重试'; resultEl.style.color = 'var(--color-danger-deep, #97413c)'; }
+                },
+                complete: function () { connBtn.disabled = false; }
+            });
+        });
+    }
     //服务商预设：一键填入接口地址与模型候选
     var urlInput = document.getElementById('uai_api_url');
     var modelInput = document.getElementById('uai_model');

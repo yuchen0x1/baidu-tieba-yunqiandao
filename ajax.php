@@ -447,6 +447,45 @@ switch (SYSTEM_PAGE) {
         echo json_encode($loginResult, JSON_UNESCAPED_UNICODE);
 
         break;
+    case 'ver4_ai:testconn':
+        // AI 模型连通性检测：优先用提交的地址/Key/模型（允许未保存即测），缺项回退已保存/共享配置
+        if (!defined('UID')) {
+            msg('请先登录');
+        }
+        require_once SYSTEM_ROOT . '/plugins/ver4_ai/ver4_ai_client.php';
+        header('content-type: application/json; charset=utf-8');
+        $url   = trim((string) ($_POST['url'] ?? ''));
+        $key   = trim((string) ($_POST['key'] ?? ''));
+        $model = trim((string) ($_POST['model'] ?? ''));
+        $saved = ver4_ai_user_cfg(UID);
+        if ($saved === false) {
+            if ($url === '' || $key === '' || $model === '') {
+                echo json_encode(array('ok' => false, 'msg' => '请先填写 API 地址、Key 和模型名称（或使用站点共享配置）'), JSON_UNESCAPED_UNICODE);
+                die;
+            }
+            $cfg = array('base' => rtrim($url, '/'), 'key' => $key, 'model' => $model, 'temperature' => 0.1, 'max_tokens' => 256);
+        } else {
+            $cfg = $saved;
+            if ($url !== '') {
+                $cfg['base'] = rtrim($url, '/');
+            }
+            if ($key !== '') {
+                $cfg['key'] = $key;
+            }
+            if ($model !== '') {
+                $cfg['model'] = $model;
+            }
+        }
+        $err = null;
+        $t0 = microtime(true);
+        $reply = ver4_ai_chat($cfg, array(array('role' => 'user', 'content' => '回复两个字：正常')), $err);
+        $ms = (int) round((microtime(true) - $t0) * 1000);
+        if ($reply === false) {
+            echo json_encode(array('ok' => false, 'msg' => (string) $err), JSON_UNESCAPED_UNICODE);
+            die;
+        }
+        echo json_encode(array('ok' => true, 'msg' => mb_substr((string) $reply, 0, 60), 'ms' => $ms), JSON_UNESCAPED_UNICODE);
+        die;
     default:
         msg('未定义操作');
         break;
