@@ -164,7 +164,8 @@ switch (SYSTEM_PAGE) {
                 msg('当前已经是最新版本，无需更新。');
             }
             ProjectUpdater::installSourceRelease($release);
-            msg('恭喜您，已更新到 V' . htmlspecialchars($release['version'], ENT_QUOTES, 'UTF-8') . '！', SYSTEM_URL . 'index.php?mod=admin:update&ok');
+            //文件已覆盖：跳转根目录一键升级入口（新请求加载新代码，自动备份+迁移+清缓存），实现点一次「立即更新」全自动完成
+            msg('文件已更新到 V' . htmlspecialchars($release['version'], ENT_QUOTES, 'UTF-8') . '，正在跳转完成升级……', SYSTEM_URL . 'upgrade.php?autostart=1');
         } catch (Throwable $e) {
             error_log('在线更新失败：' . $e->getMessage());
             msg('更新失败：' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'));

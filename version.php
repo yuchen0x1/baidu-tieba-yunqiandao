@@ -8,8 +8,8 @@ if (!defined('SYSTEM_FN')) {
     define('SYSTEM_FN', '百度贴吧云签到');
 }
 if (!defined('SYSTEM_VER')) {
-    define('SYSTEM_VER', '7.2.1');
+    define('SYSTEM_VER', '7.2.2');
 }
 if (!defined('SYSTEM_VER_NOTE')) {
-    define('SYSTEM_VER_NOTE', 'V7.2.1：升级门禁提示以命令行为第一路径——/setup/ 被 Web 服务器封禁的站点不再被 404 卡死');
+    define('SYSTEM_VER_NOTE', 'V7.2.2：一键全自动升级——点一次「立即更新」自动完成备份、迁移与缓存清理，无需 SSH');
 }
