@@ -53,6 +53,10 @@ if ((empty($i['opt']['core_version']) || SYSTEM_VER != $i['opt']['core_version']
     if (file_exists($upgradeFile)) {
         $updatefile = '<a href="setup/update' . $i['opt']['core_version'] . 'to' . SYSTEM_VER . '.php">请点击运行: ' . 'update' . $i['opt']['core_version'] . 'to' . SYSTEM_VER . '.php</a>';
         msg('数据库中的云签到版本(' . htmlspecialchars($i['opt']['core_version'], ENT_QUOTES, 'UTF-8') . ')与文件版本(' . SYSTEM_VER . ')不符，站点已进入升级模式。<br/><br/>' . $updatefile . '<br/><br/>推荐在服务器上以命令行执行（同样的迁移器，输出更完整）：<br/><code>php tools/migrate.php up</code><br/><br/>升级前请先备份数据库。');
+    } elseif (version_compare($i['opt']['core_version'], '6.6', '>=') && version_compare($i['opt']['core_version'], SYSTEM_VER, '<')) {
+        // 6.6 及以上版本由统一迁移器直接升到当前版本，无需逐版本升级脚本
+        $updatefile = '<a href="setup/upgrade.php">请点击运行: setup/upgrade.php（统一迁移器）</a>';
+        msg('数据库中的云签到版本(' . htmlspecialchars($i['opt']['core_version'], ENT_QUOTES, 'UTF-8') . ')与文件版本(' . SYSTEM_VER . ')不符，站点已进入升级模式。<br/><br/>' . $updatefile . '<br/><br/>推荐在服务器上以命令行执行（同样的迁移器，输出更完整）：<br/><code>php tools/migrate.php up</code><br/><br/>升级前请先备份数据库。');
     } else {
         msg('严重错误：数据库中的云签到版本(' . htmlspecialchars($i['opt']['core_version'], ENT_QUOTES, 'UTF-8') . ')与文件版本(' . SYSTEM_VER . ')不符，且未找到对应的升级脚本。请先运行 setup/update.php 逐步升级，不要跳过中间版本。');
     }

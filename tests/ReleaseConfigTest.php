@@ -89,4 +89,16 @@ final class ReleaseConfigTest extends TestCase
         $this->assertSame('6.6', Migrator::MIN_UPGRADE_VERSION);
         $this->assertTrue(class_exists('Migrator'));
     }
+
+    public function testGenericUpgradeEntryIsWiredForAnySupportedVersion(): void
+    {
+        // 无专用 update{旧}to{新}.php 脚本时，6.6+ 版本必须能通过通用升级入口直升当前版本
+        $this->assertFileExists(dirname(__DIR__) . '/setup/upgrade.php');
+        $reg = $this->read('lib/reg.php');
+        $this->assertStringContainsString('setup/upgrade.php', $reg, '版本门禁应引导到通用升级入口');
+        $upgrade = $this->read('setup/upgrade.php');
+        $this->assertStringContainsString('SYSTEM_NO_CHECK_VER', $upgrade, '升级入口需绕过版本门禁');
+        $this->assertStringContainsString('Migrator::runUp', $upgrade, '升级入口应使用统一迁移器');
+        $this->assertStringContainsString("ROLE != 'admin'", $upgrade, '升级入口必须校验管理员身份');
+    }
 }
