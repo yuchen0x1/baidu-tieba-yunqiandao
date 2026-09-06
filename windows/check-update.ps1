@@ -1,6 +1,6 @@
 ﻿param(
     [string]$Repository = "yuchen0x1/baidu-tieba-yunqiandao",
-    [string]$CurrentVersion = "7.2.0"
+    [string]$CurrentVersion = "7.2.1"
 )
 
 # 在线更新仅使用 Gitee 国内 Release 通道。
