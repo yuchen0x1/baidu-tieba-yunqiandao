@@ -288,8 +288,9 @@ while ($r = $m->fetch_array($logRs)) {
 <?php endif; ?>
 
 <?php if (!empty($drafts)): ?>
-<h4 style="margin:20px 1% 8px">📮 发帖草稿箱（半自动模式候选，7 天后自动清理）</h4>
-<div style="margin:0 1%">
+<div class="panel panel-warning" style="margin:16px 1% 0">
+<div class="panel-heading"><span class="panel-title">📮 发帖草稿箱</span><span style="float:right;font-size:12px">半自动模式候选 · 7 天后自动清理</span></div>
+<div class="panel-body" style="padding-top:8px">
 <div class="cs-table-wrap"><div class="cs-table-scroll">
 <table class="table table-striped">
     <tr><th style="width:110px">目标贴吧</th><th>候选内容</th><th style="width:150px">生成时间</th><th style="width:170px">操作</th></tr>
@@ -315,8 +316,9 @@ while ($r = $m->fetch_array($logRs)) {
 </table>
 </div></div>
 </div>
+</div>
 <?php elseif ($threadSemi == '1'): ?>
-<div class="alert alert-info" style="margin:10px 1% 0">半自动模式已开启：计划任务到点后会为「目标贴吧」各生成 3 条候选，出现在这里的「发帖草稿箱」供你挑选发布。当前暂无待发布候选。</div>
+<div class="alert alert-info" style="margin:16px 1% 0">半自动模式已开启：计划任务到点后会为「目标贴吧」各生成 3 条候选，出现在这里的「发帖草稿箱」供你挑选发布。当前暂无待发布候选。</div>
 <?php endif; ?>
 
 <?php if (!empty($draftHistory)): ?>
@@ -329,8 +331,9 @@ while ($r = $m->fetch_array($logRs)) {
 
 <form method="post" action="index.php?plugin=ver4_ai">
     <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
+    <div class="panel panel-primary" style="margin:16px 1% 0">
+    <div class="panel-heading"><span class="panel-title">① 模型服务（OpenAI 兼容）</span><span style="float:right;font-size:12px">当前配置来源：<?php echo $sourceText; ?></span></div>
     <table class="table table-striped form-table">
-        <tr><th colspan="2"><h4>① 开关与模型服务</h4></th></tr>
         <tr>
             <td style="width:35%"><b>AI 功能总开关</b></td>
             <td>
@@ -439,7 +442,13 @@ while ($r = $m->fetch_array($logRs)) {
             <td><b>话题标签</b><br/>发主题帖时自动附加在正文末尾，留空不附加</td>
             <td><input type="text" class="form-control" name="uai_style_tags" value="<?php echo htmlspecialchars($g('uai_style_tags'), ENT_QUOTES, 'UTF-8'); ?>" placeholder="例如：#日常分享# #记录生活#"></td>
         </tr>
-        <tr><th colspan="2"><h4>② AI 智能回帖</h4></th></tr>
+    </table>
+    </div>
+
+    <div style="margin:16px 1% 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(430px,1fr));gap:16px;align-items:start">
+    <div class="panel panel-info">
+    <div class="panel-heading"><span class="panel-title">② AI 智能回帖</span></div>
+    <table class="table table-striped form-table">
         <tr>
             <td><b>功能开关</b></td>
             <td>
@@ -485,7 +494,11 @@ while ($r = $m->fetch_array($logRs)) {
             <td><b>仅对指定账号生效</b><br/>填账号 ID（<?php echo $accountHint ?: '尚无绑定账号'; ?>），每行一个，留空 = 我的所有账号</td>
             <td><textarea class="form-control" name="uai_reply_pids" style="height:50px" placeholder="留空 = 全部"><?php echo $replyPids; ?></textarea></td>
         </tr>
-        <tr><th colspan="2"><h4>③ AI 定时发主题帖</h4></th></tr>
+    </table>
+    </div>
+    <div class="panel panel-info">
+    <div class="panel-heading"><span class="panel-title">③ AI 定时发主题帖</span></div>
+    <table class="table table-striped form-table">
         <tr>
             <td><b>功能开关</b></td>
             <td>
@@ -531,22 +544,32 @@ while ($r = $m->fetch_array($logRs)) {
             <td><b>仅对指定账号生效</b><br/>填账号 ID，每行一个，留空 = 我的所有账号</td>
             <td><textarea class="form-control" name="uai_thread_pids" style="height:50px" placeholder="留空 = 全部"><?php echo $threadPids; ?></textarea></td>
         </tr>
-        <tr>
-            <td></td>
-            <td><input type="submit" class="btn btn-primary" name="uai_save" value="保存设置"></td>
-        </tr>
     </table>
+    </div>
+    </div>
+
+    <div style="position:sticky;bottom:0;z-index:20;margin:16px 1% 0;padding:10px 14px;background:var(--color-surface,#fff);border:1px solid var(--color-line,#ddd);border-radius:8px;box-shadow:0 -4px 12px rgba(0,0,0,.08);display:flex;justify-content:space-between;align-items:center">
+        <span class="text-muted" style="font-size:12px">所有改动需保存后才会被计划任务使用</span>
+        <input type="submit" class="cs-btn cs-btn-primary" name="uai_save" value="保存设置">
+    </div>
 </form>
-<hr/>
-<form method="post" action="index.php?plugin=ver4_ai" class="form-inline">
-    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
-    <b>生成测试</b>（用我的配置生成一个主题帖，不实际发帖）：
-    <input type="text" class="form-control" name="uai_test_kw" placeholder="贴吧名" style="width:180px" required>
-    <input type="submit" class="btn btn-success" name="uai_test" value="测试生成">
-</form>
-<?php if (!empty($recentRows)): ?>
-<h4 style="margin-top:20px;">最近执行记录</h4>
-<div style="margin:0 1%">
+<div class="panel panel-success" style="margin:16px 1% 0">
+    <div class="panel-heading"><span class="panel-title">⚡ 快速试一句</span><span style="float:right;font-size:12px">使用已保存的配置生成一个主题帖 · 不实际发帖</span></div>
+    <div class="panel-body">
+    <form method="post" action="index.php?plugin=ver4_ai" class="form-inline">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
+        <input type="text" class="form-control" name="uai_test_kw" placeholder="目标贴吧名（不带吧字）" style="width:240px" required>
+        <input type="submit" class="cs-btn cs-btn-success" name="uai_test" value="测试生成">
+        <span class="text-muted" style="font-size:12px;margin-left:8px">刚改过的配置请先点上方「保存设置」再测试</span>
+    </form>
+    </div>
+</div>
+<div class="panel panel-default" style="margin:16px 1% 0">
+<div class="panel-heading"><span class="panel-title">④ 执行记录</span><span style="float:right;font-size:12px">最近 8 条任务结果</span></div>
+<div class="panel-body" style="padding-top:8px">
+<?php if (empty($recentRows)): ?>
+<p class="text-muted" style="margin:0">还没有执行记录。功能开启并保存后，计划任务每 5 分钟检查一次，执行结果会出现在这里。</p>
+<?php else: ?>
 <div class="cs-table-wrap"><div class="cs-table-scroll">
 <table class="table table-striped">
     <tr><th>时间</th><th>账号</th><th>类型</th><th>结果</th><th>详情</th></tr>
@@ -565,12 +588,11 @@ while ($r = $m->fetch_array($logRs)) {
 </table>
 </div></div>
 <?php endif; ?>
-
-<h4 style="margin-top:20px;">内容审查拦截记录 <span class="text-muted" style="font-size:12px">（命中敏感词或内容重复而被跳过的内容，最近 20 条，用于排查人设/敏感词配置）</span></h4>
-<?php if (empty($auditRows)): ?>
-<p class="text-muted" style="margin:6px 1%">暂无拦截记录：AI 生成的内容均通过了敏感词与重复检查。</p>
-<?php else: ?>
-<div style="margin:0 1%">
+</div>
+<?php if (!empty($auditRows)): ?>
+<details style="border-top:1px solid var(--color-line,#ddd)">
+<summary style="cursor:pointer;padding:8px 12px;font-weight:600;font-size:13px">内容审查拦截记录（<?php echo count($auditRows); ?> 条）—— 默认折叠，用于排查人设/敏感词配置</summary>
+<div style="padding:0 12px 12px">
 <div class="cs-table-wrap"><div class="cs-table-scroll">
 <table class="table table-striped">
     <tr><th style="width:110px">时间</th><th style="width:70px">账号</th><th style="width:60px">类型</th><th style="width:80px">目标</th><th>拦截原因</th></tr>
@@ -586,7 +608,9 @@ while ($r = $m->fetch_array($logRs)) {
 </table>
 </div></div>
 </div>
+</details>
 <?php endif; ?>
+</div>
 
 <div class="alert alert-warning" style="margin-top:15px;">
     <b>温馨提示：</b>任务由系统计划任务每 5 分钟检查执行；请遵守目标贴吧的吧规，<span class="text-danger">请勿发布违法违规内容，后果由使用者自负</span>。
