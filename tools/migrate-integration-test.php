@@ -29,6 +29,12 @@ $repoRoot = dirname(__DIR__);
 $workRoot = sys_get_temp_dir() . '/tcs-it-run-' . getmypid() . '-' . mt_rand(1000, 9999);
 $dbUp = 'tcs_it_up_' . mt_rand(1000, 9999);
 $dbFresh = 'tcs_it_fresh_' . mt_rand(1000, 9999);
+// 当前版本号以 version.php 为唯一来源，升版后演练断言自动跟随
+$workVersion = '0';
+preg_match("/define\('SYSTEM_VER', '([^']+)'\)/", (string) file_get_contents($repoRoot . '/version.php'), $itVm);
+if (!empty($itVm[1])) {
+    $workVersion = $itVm[1];
+}
 
 echo "集成测试开始：服务器版本 " . $conn->server_version . "，工作目录 {$workRoot}\n";
 
@@ -52,7 +58,7 @@ try {
 
     // 6.6 存量夹具：完整结构但无迁移记录、core_version=6.6（等价经旧脚本链升级的 6.6 库）
     $fixture66 = substr($template, 0, $baselinePos);
-    $fixture66 = str_replace("('core_version', '7.0')", "('core_version', '6.6')", $fixture66);
+    $fixture66 = str_replace("('core_version', '{$workVersion}')", "('core_version', '6.6')", $fixture66);
     $fixture66 = str_replace('{VAR-PREFIX}', 'tca_', $fixture66);
     $fixture66 = str_replace('{VAR-DB}', $dbUp, $fixture66);
     $fixture66 = str_replace('{VAR-COOKIE-SALT}', bin2hex(random_bytes(32)), $fixture66);
@@ -80,7 +86,7 @@ try {
     unlink($workRoot . '/setup/migrations/009000_it_fail.php');
     list($code, $output) = it_run_php($workRoot . '/tools/migrate.php', array('up'));
     check('修复后重跑成功退出', $code === 0);
-    check('升级后 core_version=7.0', it_query_value($conn, $dbUp, "SELECT `value` FROM `tca_options` WHERE `name` = 'core_version'") === '7.0');
+    check('升级后 core_version 为当前版本', it_query_value($conn, $dbUp, "SELECT `value` FROM `tca_options` WHERE `name` = 'core_version'") === $workVersion);
     check('task_runs 表已创建', it_table_exists($conn, $dbUp, 'tca_task_runs'));
     check('api_rate_limits 表已创建', it_table_exists($conn, $dbUp, 'tca_api_rate_limits'));
     check('cron 调度列已补齐', it_column_exists($conn, $dbUp, 'tca_cron', 'nextrun') && it_column_exists($conn, $dbUp, 'tca_cron', 'enable'));
@@ -90,7 +96,7 @@ try {
     // ---------- 场景 3：幂等重跑 ----------
     list($code, $output) = it_run_php($workRoot . '/tools/migrate.php', array('up'));
     check('重复 up 幂等退出', $code === 0 && strpos($output, '无待应用迁移') !== false);
-    check('幂等后 core_version 仍为 7.0', it_query_value($conn, $dbUp, "SELECT `value` FROM `tca_options` WHERE `name` = 'core_version'") === '7.0');
+    check('幂等后 core_version 仍为当前版本', it_query_value($conn, $dbUp, "SELECT `value` FROM `tca_options` WHERE `name` = 'core_version'") === $workVersion);
 
     // ---------- 场景 4：checksum 漂移阻断 ----------
     $foundationFile = $workRoot . '/setup/migrations/007000_v70_foundation.php';
@@ -124,7 +130,7 @@ try {
     check('down 007000 成功退出', $code === 0);
     check('007000 记录已回滚', migrationStatus($conn, $dbUp, 'tca_', '007000') === 'absent');
     check('001001 记录保留', migrationStatus($conn, $dbUp, 'tca_', '001001') === 'success');
-    check('down 不回退 core_version', it_query_value($conn, $dbUp, "SELECT `value` FROM `tca_options` WHERE `name` = 'core_version'") === '7.0');
+    check('down 不回退 core_version', it_query_value($conn, $dbUp, "SELECT `value` FROM `tca_options` WHERE `name` = 'core_version'") === $workVersion);
 
     // ---------- 场景 7：全新安装基线（自定义前缀） ----------
     check('写入测试配置（全新库）', it_write_config($workRoot, $dbFresh, 'tcz_', $port));
@@ -139,7 +145,7 @@ try {
     check('全新安装无待应用迁移', $code === 0 && strpos($output, '待应用') === false);
     list($code, $output) = it_run_php($workRoot . '/tools/migrate.php', array('up'));
     check('全新安装 up 幂等成功', $code === 0 && strpos($output, '无待应用迁移') !== false);
-    check('全新安装 core_version 保持 7.0', it_query_value($conn, $dbFresh, "SELECT `value` FROM `tcz_options` WHERE `name` = 'core_version'") === '7.0');
+    check('全新安装 core_version 为当前版本', it_query_value($conn, $dbFresh, "SELECT `value` FROM `tcz_options` WHERE `name` = 'core_version'") === $workVersion);
     check('全新安装基线记录为 success', migrationStatus($conn, $dbFresh, 'tcz_', '007000') === 'success');
     // 防漂移：基线迁移播种的选项必须与模板预置一致（缺失会导致新装与升级装行为不同）
     foreach (array('api_rate_limit', 'metrics_token', 'webhook_enable', 'cleanup_enable', 'cleanup_sign_history_days', 'cron_notify_interval') as $option) {

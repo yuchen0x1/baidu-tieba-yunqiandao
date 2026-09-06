@@ -17,7 +17,29 @@ $healthTotal = $healthStats['ok'] + $healthStats['invalid'] + $healthStats['unkn
 <section class="dashboard-hero" style="margin:16px 1%">
     <div class="eyebrow hero-eyebrow">Sign Management / Health & Logs</div>
     <h1>签到管理 - 健康度与日志</h1>
-    <p>自动检测百度账号 BDUSS 是否失效，记录签到批次日志。</p>
+    <p>自动检测百度账号 BDUSS 是否失效，记录签到批次日志。健康度检查每天自动执行一次，也可手动执行。</p>
+    <div class="dashboard-hero-meta">
+        <span class="hero-tag">正常 <?php echo (int) $healthStats['ok']; ?></span>
+        <span class="hero-tag">失效 <?php echo (int) $healthStats['invalid']; ?></span>
+        <span class="hero-tag">未知 <?php echo (int) $healthStats['unknown']; ?></span>
+    </div>
+    <div class="hero-actions">
+        <form action="do.php?mod=runcron&cron=system_sign" method="post" target="_blank" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="hidden" name="pw" value="<?php echo htmlspecialchars(option::get('cron_pw'), ENT_QUOTES, 'UTF-8'); ?>">
+            <button type="submit" class="cs-btn cs-btn-primary cs-btn-sm"><svg class="cs-icon" style="width:12px;height:12px" aria-hidden="true"><use href="#i-check"/></svg> 立即执行全部签到</button>
+        </form>
+        <form action="do.php?mod=runcron&cron=system_sign_retry" method="post" target="_blank" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="hidden" name="pw" value="<?php echo htmlspecialchars(option::get('cron_pw'), ENT_QUOTES, 'UTF-8'); ?>">
+            <button type="submit" class="cs-btn cs-btn-secondary cs-btn-sm"><svg class="cs-icon" style="width:12px;height:12px" aria-hidden="true"><use href="#i-refresh"/></svg> 立即复签失败贴吧</button>
+        </form>
+        <form action="do.php?mod=runcron&cron=system_health_check" method="post" target="_blank" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="hidden" name="pw" value="<?php echo htmlspecialchars(option::get('cron_pw'), ENT_QUOTES, 'UTF-8'); ?>">
+            <button type="submit" class="cs-btn cs-btn-secondary cs-btn-sm"><svg class="cs-icon" style="width:12px;height:12px" aria-hidden="true"><use href="#i-pulse"/></svg> 手动健康度检查</button>
+        </form>
+    </div>
 </section>
 
 <div class="cs-tabs" id="sign-dashboard-tabs" style="margin:0 1%">
@@ -30,25 +52,7 @@ $healthTotal = $healthStats['ok'] + $healthStats['invalid'] + $healthStats['unkn
 <div class="cs-tabpanel" id="panel-dash" role="tabpanel" aria-labelledby="tab-dash" <?php if ($action != 'dashboard') echo 'hidden' ?>>
     <div class="cs-alert cs-alert-info" role="alert" style="margin:16px 1% 0">
         <svg class="cs-alert-icon" aria-hidden="true"><use href="#i-info"/></svg>
-        <div class="cs-alert-body">自动检测百度账号 BDUSS 是否失效。健康度检查每天自动执行一次，也可以手动执行。</div>
-    </div>
-
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin:16px 1%">
-        <form action="do.php?mod=runcron&cron=system_sign_retry" method="post" target="_blank" style="display:inline;">
-            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
-            <input type="hidden" name="pw" value="<?php echo htmlspecialchars(option::get('cron_pw'), ENT_QUOTES, 'UTF-8'); ?>">
-            <button type="submit" class="cs-btn cs-btn-warning cs-btn-sm"><svg class="cs-icon" style="width:12px;height:12px" aria-hidden="true"><use href="#i-refresh"/></svg> 立即复签失败贴吧</button>
-        </form>
-        <form action="do.php?mod=runcron&cron=system_sign" method="post" target="_blank" style="display:inline;">
-            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
-            <input type="hidden" name="pw" value="<?php echo htmlspecialchars(option::get('cron_pw'), ENT_QUOTES, 'UTF-8'); ?>">
-            <button type="submit" class="cs-btn cs-btn-success cs-btn-sm"><svg class="cs-icon" style="width:12px;height:12px" aria-hidden="true"><use href="#i-check"/></svg> 立即执行全部签到</button>
-        </form>
-        <form action="do.php?mod=runcron&cron=system_health_check" method="post" target="_blank" style="display:inline;">
-            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
-            <input type="hidden" name="pw" value="<?php echo htmlspecialchars(option::get('cron_pw'), ENT_QUOTES, 'UTF-8'); ?>">
-            <button type="submit" class="cs-btn cs-btn-primary cs-btn-sm"><svg class="cs-icon" style="width:12px;height:12px" aria-hidden="true"><use href="#i-pulse"/></svg> 手动健康度检查</button>
-        </form>
+        <div class="cs-alert-body">自动检测百度账号 BDUSS 是否失效。需要立即执行的任务已收在页头右上角。</div>
     </div>
 
     <section class="dashboard-grid" style="margin:0 1% 24px">

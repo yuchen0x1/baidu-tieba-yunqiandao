@@ -36,6 +36,18 @@ $currentPage = $result['page'];
 $unreadCount = MessageCenter::unreadCount($viewUid);
 $typeLabels = array('reply' => '回复', 'at' => '@我');
 $typeColors = array('reply' => 'info', 'at' => 'brand');
+if (!function_exists('message_relative_time')) {
+    /** 把时间戳渲染为「10 分钟前」样式相对时间，超过 7 天回退绝对日期 */
+    function message_relative_time($timestamp)
+    {
+        $diff = time() - (int) $timestamp;
+        if ($diff < 60) return '刚刚';
+        if ($diff < 3600) return floor($diff / 60) . ' 分钟前';
+        if ($diff < 86400) return floor($diff / 3600) . ' 小时前';
+        if ($diff < 7 * 86400) return floor($diff / 86400) . ' 天前';
+        return date('Y-m-d H:i', (int) $timestamp);
+    }
+}
 ?>
 <section class="dashboard-hero">
     <div class="eyebrow hero-eyebrow">Messages / <?php echo date('Y-m-d'); ?></div>
@@ -104,8 +116,8 @@ $typeColors = array('reply' => 'info', 'at' => 'brand');
                         <?php } ?>
                     </td>
                     <td style="font-size:12px"><?php echo htmlspecialchars($row['sender_name'], ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td style="font-size:12px;color:var(--color-muted)">
-                        <?php echo htmlspecialchars(date('Y-m-d H:i', $row['created_at']), ENT_QUOTES, 'UTF-8'); ?>
+                    <td style="font-size:12px;color:var(--color-muted)" title="<?php echo htmlspecialchars(date('Y-m-d H:i', $row['created_at']), ENT_QUOTES, 'UTF-8'); ?>">
+                        <?php echo htmlspecialchars(message_relative_time($row['created_at']), ENT_QUOTES, 'UTF-8'); ?>
                     </td>
                     <td>
                         <?php if ($row['url']) { ?>

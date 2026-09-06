@@ -1,14 +1,11 @@
 <?php if (!defined('SYSTEM_ROOT')) {
     die('Insufficient Permissions');
 }
-loadhead();
+loadhead('知道商城抽奖');
 global $m;
 $uid = UID;
 $b = $m->fetch_array($m->query("SELECT count(id) AS `c`FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `uid` = {$uid}"));
-if ($b['c'] < 1) {
-    echo '<div class="alert alert-warning">您需要先绑定至少一个百度ID才可以使用本功能</div>';
-    die;
-}
+$lotteryOn = !empty(option::uget('ver4_lottery_check', $uid));
 if (isset($_GET['save'])) {
     $check = isset($_POST['c']) ? $_POST['c'] : '0';
     if (!empty($check)) {
@@ -19,9 +16,23 @@ if (isset($_GET['save'])) {
     redirect('index.php?plugin=ver4_lottery&success=' . urlencode('您的设置已成功保存'));
 }
 ?>
-<h2>知道商城抽奖</h2>
-<br>
+<section class="dashboard-hero">
+    <div class="eyebrow hero-eyebrow">EXTENSIONS · 福利</div>
+    <h1>知道商城抽奖</h1>
+    <p>开启后每日 12 时自动使用绑定的百度账号进行两次知道商城抽奖。</p>
+    <div class="dashboard-hero-meta">
+        <span class="hero-tag"><?php echo $lotteryOn ? '已开启' : '未开启'; ?></span>
+    </div>
+    <div class="hero-actions">
+        <a href="https://zhidao.baidu.com/ihome/myitem/index" target="_blank" class="cs-btn cs-btn-secondary cs-btn-sm">查看奖品 ↗</a>
+    </div>
+</section>
 <?php
+if ($b['c'] < 1) {
+    echo '<div class="alert alert-warning">您需要先绑定至少一个百度ID才可以使用本功能，请前往 <a href="index.php?mod=baiduid">百度账号</a> 页绑定。</div>';
+    loadfoot();
+    die;
+}
 if (isset($_GET['success'])) {
     echo '<div class="alert alert-success">' . htmlspecialchars($_GET['success']) . '</div>';
 }
@@ -29,25 +40,23 @@ if (isset($_GET['error'])) {
     echo '<div class="alert alert-danger">' . htmlspecialchars($_GET['error']) . '</div>';
 }
 ?>
-<h4>基本设置</h4>
-<br>
 <form action="index.php?plugin=ver4_lottery&save" method="post">
     <table class="table table-hover">
         <tbody>
         <tr>
-            <td>
+            <td style="width:35%">
                 <b>开启抽奖</b><br>
                 开启后每日12时开始进行两次抽奖
             </td>
             <td>
-                <input type="radio" name="c" value="1" <?php echo empty(option::uget('ver4_lottery_check', $uid)) ? '' : 'checked'  ?>> 开启
-                <input type="radio" name="c" value="0" <?php echo empty(option::uget('ver4_lottery_check', $uid)) ? 'checked' : ''  ?>> 关闭
+                <select name="c" class="form-control" style="width:140px">
+                    <option value="1" <?php echo $lotteryOn ? 'selected' : ''; ?>>开启</option>
+                    <option value="0" <?php echo $lotteryOn ? '' : 'selected'; ?>>关闭</option>
+                </select>
             </td>
         </tr>
         <tr>
-            <td>
-                <input type="submit" class="btn btn-primary" value="保存设置">
-            </td>
+            <td><input type="submit" class="btn btn-primary" value="保存设置"></td>
             <td></td>
         </tr>
         </tbody>
@@ -61,7 +70,11 @@ if (isset($_GET['error'])) {
     $a = 0;
     $bid = $m->query("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `uid` = {$uid}");
     ?>
-    <ul id="myTabs" class="nav nav-tabs" role="tablist">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <label style="margin:0;font-size:12px;color:var(--color-muted)">账号</label>
+        <select id="lottery-acc" class="form-control" style="width:auto"></select>
+    </div>
+    <ul id="myTabs" class="nav nav-tabs" role="tablist" style="display:none">
         <?php
         while ($x = $m->fetch_array($bid)) {
             ?>
@@ -72,6 +85,21 @@ if (isset($_GET['error'])) {
         }
         ?>
     </ul>
+    <script type="text/javascript">
+    (function () {
+        var sel = document.getElementById('lottery-acc');
+        var tabs = document.querySelectorAll('#myTabs a[data-toggle="tab"]');
+        tabs.forEach(function (a, i) {
+            var opt = document.createElement('option');
+            opt.value = i;
+            opt.textContent = a.textContent;
+            sel.appendChild(opt);
+        });
+        sel.addEventListener('change', function () {
+            tabs[parseInt(this.value, 10)].click();
+        });
+    })();
+    </script>
     <div id="myTabContent" class="tab-content">
         <?php
         $b = 0;
@@ -109,4 +137,3 @@ if (isset($_GET['error'])) {
         ?>
     </div>
 </div>
-<a href="https://zhidao.baidu.com/ihome/myitem/index" target="_blank" class="btn btn-success">查看奖品</a>

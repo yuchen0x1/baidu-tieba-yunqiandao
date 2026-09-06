@@ -22,7 +22,14 @@ switch ($_GET['act']) {
 
 
 ?>
-<h3>qq推送设置</h3><br/>
+<section class="dashboard-hero" style="margin-top:16px">
+    <div class="eyebrow hero-eyebrow">EXTENSIONS · 推送</div>
+    <h1>签到 QQ 推送 · 站点设置</h1>
+    <p>本页只包含站点级参数。推送列表与推送地址由每个用户在自己的「每日签到QQ推送」页面自行管理。</p>
+    <div class="dashboard-hero-meta">
+        <span class="hero-tag">管理端参数 1 项</span>
+    </div>
+</section>
 <form action="index.php?mod=admin:setplug&plug=weltolk_sign_qq&act=store" method="post">
     <table class="table table-striped">
         <thead>

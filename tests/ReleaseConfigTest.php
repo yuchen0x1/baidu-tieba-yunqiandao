@@ -16,10 +16,20 @@ final class ReleaseConfigTest extends TestCase
         return $content;
     }
 
+    /** 从 version.php 解析当前版本号（版本唯一的合法来源） */
+    private function currentVersion(): string
+    {
+        $content = $this->read('version.php');
+        $this->assertMatchesRegularExpression("/define\('SYSTEM_VER', '([^']+)'\)/", $content, 'version.php 缺少合法的 SYSTEM_VER 定义');
+        preg_match("/define\('SYSTEM_VER', '([^']+)'\)/", $content, $m);
+        return $m[1];
+    }
+
     public function testVersionPhpIsTheSingleSourceOfTruth(): void
     {
         $content = $this->read('version.php');
-        $this->assertMatchesRegularExpression("/define\('SYSTEM_VER', '7\.0'\)/", $content);
+        $version = $this->currentVersion();
+        $this->assertMatchesRegularExpression("/define\('SYSTEM_VER', '" . preg_quote($version, '/') . "'\)/", $content);
         $this->assertMatchesRegularExpression("/define\('SYSTEM_FN', '[^']+'\)/", $content);
         $this->assertMatchesRegularExpression("/define\('SYSTEM_VER_NOTE', '[^']+'\)/", $content);
     }
@@ -40,7 +50,7 @@ final class ReleaseConfigTest extends TestCase
     public function testInstallTemplateInstallsCurrentVersionWithBaseline(): void
     {
         $sql = $this->read('setup/install.template.sql');
-        $this->assertStringContainsString("('core_version', '7.0')", $sql);
+        $this->assertStringContainsString("('core_version', '" . $this->currentVersion() . "')", $sql);
         $this->assertStringContainsString('CREATE TABLE `{VAR-PREFIX}schema_migrations`', $sql);
         $this->assertStringContainsString("'001001'", $sql);
         $this->assertStringContainsString("'007000'", $sql);
@@ -59,7 +69,7 @@ final class ReleaseConfigTest extends TestCase
     public function testWindowsUpdateCheckDefaultsToCurrentVersion(): void
     {
         $content = $this->read('windows/check-update.ps1');
-        $this->assertMatchesRegularExpression('/CurrentVersion\s*=\s*"7\.0"/', $content);
+        $this->assertMatchesRegularExpression('/CurrentVersion\s*=\s*"' . preg_quote($this->currentVersion(), '/') . '"/', $content);
     }
 
     public function testComposerPlatformContractCoversRealDependencies(): void

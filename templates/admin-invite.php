@@ -15,11 +15,16 @@ $multiOn = option::get('yr_reg_multi') == '1';
 $total = $m->fetch_row($m->query("SELECT COUNT(*) FROM `" . DB_PREFIX . "invites`"));
 $active = $m->fetch_row($m->query("SELECT COUNT(*) FROM `" . DB_PREFIX . "invites` WHERE `status` = 1 AND (`expire` = 0 OR `expire` > " . time() . ") AND `used_count` < `max_uses`"));
 ?>
-<div class="alert alert-info">
-    目前共 <?php echo (int) $total[0]; ?> 个邀请码，其中 <?php echo (int) $active[0]; ?> 个当前可用。
-    多邀请码模式<?php echo $multiOn ? '<span class="label label-success">已启用</span>' : '<span class="label label-default">未启用</span>' ?>：
-    启用后注册须使用下方列表中的邀请码，设置中心的单一邀请码失效。
-</div>
+<section class="dashboard-hero" style="margin-top:16px">
+    <div class="eyebrow hero-eyebrow">OPERATIONS · 注册</div>
+    <h1>邀请码管理</h1>
+    <p>开启多邀请码模式后，注册须使用下方列表中的邀请码，设置中心的单一邀请码失效。</p>
+    <div class="dashboard-hero-meta">
+        <span class="hero-tag">共 <?php echo (int) $total[0]; ?> 个</span>
+        <span class="hero-tag">当前可用 <?php echo (int) $active[0]; ?> 个</span>
+        <span class="hero-tag">多邀请码模式：<?php echo $multiOn ? '已启用' : '未启用'; ?></span>
+    </div>
+</section>
 
 <div class="row">
     <div class="col-md-6">

@@ -62,7 +62,7 @@ foreach ($i['cron'] as $cs) {
     } else {
         $status .= '<br/><a href="javascript:;" data-log="' . htmlspecialchars($cs['log'], ENT_QUOTES, 'UTF-8') . '" onclick="alert(this.getAttribute(\'data-log\'));">点击查看此任务的日志</a>';
     }
-    $status .= '<br/>运行顺序：<input required class="form-control input-sm" style="width:30%; display:inline" type="number" name="order[' . htmlspecialchars($cs['name'], ENT_QUOTES, 'UTF-8') . ']" value="' . htmlspecialchars($cs['orde'], ENT_QUOTES, 'UTF-8') . '">';
+    $status .= '<br/>运行顺序：<span style="cursor:grab" class="cron-drag-handle" title="拖拽调整顺序">⋮⋮</span> <input required class="form-control input-sm cron-order-input" style="width:30%; display:inline" type="number" name="order[' . htmlspecialchars($cs['name'], ENT_QUOTES, 'UTF-8') . ']" value="' . htmlspecialchars($cs['orde'], ENT_QUOTES, 'UTF-8') . '">';
     $cron .= '<input type="hidden" value="' . htmlspecialchars($cs['name'], ENT_QUOTES, 'UTF-8') . '" name="ids[]"><tr><td style="width:30%"><b>' . htmlspecialchars($cs['name'], ENT_QUOTES, 'UTF-8') . '</b><br/>' . htmlspecialchars($cs['file'], ENT_QUOTES, 'UTF-8') . '<br/>' . str_replace(array("\n", "\r\n"), '<br/>', htmlspecialchars($cs['desc'] ? $cs['desc'] : '', ENT_QUOTES, 'UTF-8')) . '</td><td style="width:30%">' . $badge . $freq . '<br/>上次执行：' . $lastdo . '<br/>下次执行：' . $nextText . '<br/>上次耗时：' . $durText . '</td><td style="width:40%">' . $status . '</td></tr>';
 }
 
@@ -90,7 +90,22 @@ foreach ($runs as $r) {
     $runRows .= '<tr><td>' . htmlspecialchars($r['name'], ENT_QUOTES, 'UTF-8') . '</td><td><span class="cs-badge ' . $statusClass . '">' . htmlspecialchars($rs, ENT_QUOTES, 'UTF-8') . '</span></td><td>' . htmlspecialchars($timeText, ENT_QUOTES, 'UTF-8') . '</td><td>' . $durText2 . '</td><td style="max-width:380px;word-break:break-all;">' . htmlspecialchars($r['message'], ENT_QUOTES, 'UTF-8') . '</td></tr>';
 }
 ?>
-<div class="alert alert-info" id="tb_num">当前共有 <?php echo $count['c'] ?> 个计划任务，您需要添加根目录下 do.php 到您主机的计划任务后，下面的任务才能被执行<br/><a href="index.php?mod=admin:editcron">添加新计划任务</a> | <form action="do.php" method="post" style="display:inline;"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>"><input type="hidden" name="pw" value="<?php echo htmlspecialchars(option::get('cron_pw'), ENT_QUOTES, 'UTF-8'); ?>"><button type="submit" class="btn btn-link" style="padding:0;border:0;">运行全部计划任务</button></form></div>
+<section class="dashboard-hero" style="margin-top:16px">
+    <div class="eyebrow hero-eyebrow">OPERATIONS · 调度</div>
+    <h1>计划任务</h1>
+    <p>需将根目录下 do.php 加入主机计划任务（建议每分钟），以下任务才会被调度执行。列表支持拖拽调整运行顺序。</p>
+    <div class="dashboard-hero-meta">
+        <span class="hero-tag">任务 <?php echo $count['c']; ?> 个</span>
+    </div>
+    <div class="hero-actions">
+        <a href="index.php?mod=admin:editcron" class="cs-btn cs-btn-primary cs-btn-sm">+ 添加新计划任务</a>
+        <form action="do.php" method="post" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="hidden" name="pw" value="<?php echo htmlspecialchars(option::get('cron_pw'), ENT_QUOTES, 'UTF-8'); ?>">
+            <button type="submit" class="cs-btn cs-btn-secondary cs-btn-sm">运行全部计划任务</button>
+        </form>
+    </div>
+</section>
 <form action="setting.php?mod=admin:cron&xorder" method="post">
 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
 <div class="table-responsive">
@@ -110,8 +125,9 @@ foreach ($runs as $r) {
 <input type="submit" class="cs-btn cs-btn-primary" value="提交更改">
 </form>
 <br/>
-<h4>最近任务运行历史（V5.13）</h4>
-<div class="table-responsive">
+<details style="margin:0 1%">
+<summary style="cursor:pointer;font-weight:600;font-size:14px">最近任务运行历史（V5.13）—— 默认折叠</summary>
+<div class="table-responsive" style="margin-top:10px">
 <table class="cs-table">
    <thead>
         <tr>
@@ -127,3 +143,34 @@ foreach ($runs as $r) {
     </tbody>
 </table>
 </div>
+</details>
+<script>
+(function () {
+    var tbody = document.querySelector('form[action*="xorder"] table tbody');
+    if (!tbody) { return; }
+    var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+    rows.forEach(function (row) { row.setAttribute('draggable', 'true'); });
+    var dragRow = null;
+    tbody.addEventListener('dragstart', function (e) {
+        dragRow = e.target.closest('tr');
+        if (dragRow) { e.dataTransfer.effectAllowed = 'move'; }
+    });
+    tbody.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    });
+    tbody.addEventListener('drop', function (e) {
+        e.preventDefault();
+        var target = e.target.closest('tr');
+        if (!dragRow || !target || dragRow === target) { return; }
+        var rect = target.getBoundingClientRect();
+        var before = e.clientY < rect.top + rect.height / 2;
+        tbody.insertBefore(dragRow, before ? target : target.nextSibling);
+        dragRow = null;
+        Array.prototype.slice.call(tbody.querySelectorAll('tr')).forEach(function (row, i) {
+            var input = row.querySelector('input[name^="order["]');
+            if (input) { input.value = i + 1; }
+        });
+    });
+})();
+</script>

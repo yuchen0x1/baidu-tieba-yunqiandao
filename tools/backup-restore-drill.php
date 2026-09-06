@@ -175,7 +175,13 @@ PHP;
     $portrait = it_query_value($conn, $dbRestore, "SELECT `portrait` FROM `{$prefix}baiduid` WHERE `uid` = 1");
     check('含引号/空格的账号特征原样恢复', $portrait === 'p_or trait');
     $coreVersion = it_query_value($conn, $dbRestore, "SELECT `value` FROM `{$prefix}options` WHERE `name` = 'core_version'");
-    check('恢复库 core_version 正确', $coreVersion === '7.0');
+    // 期望版本以 version.php 为唯一来源，升版后演练断言自动跟随
+    $workVersion = '0';
+    preg_match("/define\('SYSTEM_VER', '([^']+)'\)/", (string) file_get_contents($repoRoot . '/version.php'), $itBkVm);
+    if (!empty($itBkVm[1])) {
+        $workVersion = $itBkVm[1];
+    }
+    check('恢复库 core_version 正确', $coreVersion === $workVersion);
 
     // ---------- 备份保留策略（keep=3 轮换） ----------
     // 触发轮换：3 个过期假备份 + 本次新备份 = 4 > keep，应删除最旧的 2000 份

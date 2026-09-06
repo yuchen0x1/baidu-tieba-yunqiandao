@@ -803,7 +803,11 @@ if ($page == 'config') {
 ?>
 <div id="head"></div>
 
-<h2>备份设置</h2>
+<section class="dashboard-hero" style="margin-top:16px">
+    <div class="eyebrow hero-eyebrow">EXTENSIONS · 推送</div>
+    <h1>每日数据库备份 QQ 推送</h1>
+    <p>每日定时备份数据库并把备份文件推送到你的 QQ。新增 / 修改通过下方对应按钮弹窗操作。</p>
+</section>
 <b>立即备份之前先保存设定</b>
 <br/>
 <br/>

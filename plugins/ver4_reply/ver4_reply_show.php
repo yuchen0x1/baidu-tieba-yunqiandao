@@ -14,8 +14,13 @@ global $m;
 $uid = UID;
 
 $bdRow = $m->once_fetch_array("SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "baiduid` WHERE `uid` = {$uid}");
+$replyKwCount = count(array_filter(preg_split('/\r\n|\r|\n/', (string) option::uget('ver4_reply_kws', $uid))));
+$contentCount = count(array_filter(preg_split('/\r\n|\r|\n/', (string) option::uget('ver4_reply_contents', $uid))));
+$threadKwCount = count(array_filter(preg_split('/\r\n|\r|\n/', (string) option::uget('ver4_reply_thread_kws', $uid))));
 if ((int) $bdRow['c'] < 1) {
-    echo '<div class="page-heading"><div><div class="eyebrow">AUTO REPLY</div><h1>自动回帖/发帖</h1></div></div>';
+    echo '<section class="dashboard-hero"><div class="eyebrow hero-eyebrow">EXTENSIONS · 内容</div><h1>自动回帖/发帖</h1>'
+        . '<p>让系统定时用你绑定的百度账号对目标贴吧回帖与发主题帖。</p>'
+        . '<div class="dashboard-hero-meta"><span class="hero-tag" style="color:#ffd7d7">未绑定百度账号</span></div></section>';
     echo '<div class="alert alert-warning">您还没有绑定百度账号，请先前往 <a href="index.php?mod=baiduid">百度账号</a> 页绑定后使用本功能。</div>';
     loadfoot();
     die;
@@ -54,9 +59,21 @@ $tTitles = htmlspecialchars($g('ver4_reply_thread_titles'), ENT_QUOTES, 'UTF-8')
 $tContents = htmlspecialchars($g('ver4_reply_thread_contents'), ENT_QUOTES, 'UTF-8');
 $tNum = htmlspecialchars($g('ver4_reply_thread_num', '1'), ENT_QUOTES, 'UTF-8');
 $tDaily = htmlspecialchars($g('ver4_reply_thread_daily', '3'), ENT_QUOTES, 'UTF-8');
+
+//我的贴吧列表（供目标贴吧勾选）
+require_once SYSTEM_ROOT . '/lib/forum_picker.php';
+$myForums = forum_picker_forums();
 ?>
-<div class="page-heading"><div><div class="eyebrow">AUTO REPLY</div><h1>自动回帖/发帖</h1></div></div>
-<p class="text-muted">让系统定时用你绑定的百度账号，对目标贴吧的最新主题帖回帖（内容从你的内容库随机选取），还可自动发布主题帖。支持楼中楼、按天去重与频率控制。</p>
+<section class="dashboard-hero">
+    <div class="eyebrow hero-eyebrow">EXTENSIONS · 内容</div>
+    <h1>自动回帖/发帖</h1>
+    <p>让系统定时用你绑定的百度账号，对目标贴吧的最新主题帖回帖（内容从你的内容库随机选取），还可自动发布主题帖。支持楼中楼、按天去重与频率控制。</p>
+    <div class="dashboard-hero-meta">
+        <span class="hero-tag">回帖目标吧 <?php echo $replyKwCount; ?> 个</span>
+        <span class="hero-tag">内容库 <?php echo $contentCount; ?> 条</span>
+        <span class="hero-tag">发帖目标吧 <?php echo $threadKwCount; ?> 个</span>
+    </div>
+</section>
 <?php if (isset($_GET['success'])): ?>
 <div class="alert alert-success"><?php echo htmlspecialchars((string) $_GET['success'], ENT_QUOTES, 'UTF-8'); ?></div>
 <?php endif; ?>
@@ -66,7 +83,10 @@ $tDaily = htmlspecialchars($g('ver4_reply_thread_daily', '3'), ENT_QUOTES, 'UTF-
         <tr><th colspan="2"><h4>① 自动回帖</h4></th></tr>
         <tr>
             <td style="width:35%"><b>目标贴吧</b><br/><br/>每行一个贴吧名（不带"吧"字）<br/>留空表示不执行回帖</td>
-            <td><textarea class="form-control" name="ver4_reply_kws" style="height:110px" placeholder="例如：&#10;来日易在心中"><?php echo $kws; ?></textarea></td>
+            <td>
+                <?php forum_picker_render('ver4_reply_kws', $myForums); ?>
+                <textarea class="form-control" name="ver4_reply_kws" style="height:110px" placeholder="例如：&#10;来日易在心中"><?php echo $kws; ?></textarea>
+            </td>
         </tr>
         <tr>
             <td><b>回帖内容库</b><br/><br/>每行一条，回复时随机选取<br/>建议 10 条以上且内容自然，降低风控风险<br/><span class="text-danger">请勿发布违法违规内容，后果由使用者自负</span></td>
@@ -91,7 +111,10 @@ $tDaily = htmlspecialchars($g('ver4_reply_thread_daily', '3'), ENT_QUOTES, 'UTF-
         <tr><th colspan="2"><h4>② 自动发主题帖</h4></th></tr>
         <tr>
             <td><b>目标贴吧</b><br/><br/>每行一个贴吧名（不带"吧"字）<br/>留空表示不执行发主题帖</td>
-            <td><textarea class="form-control" name="ver4_reply_thread_kws" style="height:100px" placeholder="例如：&#10;来日易在心中"><?php echo $tKws; ?></textarea></td>
+            <td>
+                <?php forum_picker_render('ver4_reply_thread_kws', $myForums); ?>
+                <textarea class="form-control" name="ver4_reply_thread_kws" style="height:100px" placeholder="例如：&#10;来日易在心中"><?php echo $tKws; ?></textarea>
+            </td>
         </tr>
         <tr>
             <td><b>标题库</b><br/><br/>每行一条，发帖时随机选取</td>
@@ -118,4 +141,5 @@ $tDaily = htmlspecialchars($g('ver4_reply_thread_daily', '3'), ENT_QUOTES, 'UTF-
 <div class="alert alert-warning" style="margin-top:15px;">
     <b>温馨提示：</b>同一主题帖每天只回一次；触发百度频率限制时会自动终止本轮。若内容发布成功但很快消失，多为百度风控（数据中心 IP 秒删），可为账号配置住宅代理或降低频率。
 </div>
+<?php forum_picker_script(); ?>
 <?php loadfoot(); ?>

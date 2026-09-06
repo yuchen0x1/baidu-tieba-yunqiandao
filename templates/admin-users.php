@@ -57,7 +57,19 @@ if (isset($_GET['add'])) {  ?>
     }
 
     ?>
-<div class="alert alert-info">目前共有 <?php echo $userc[0]; ?> 名用户。点击用户名表示控制用户，点击复选框表示对该用户进行操作<br/><a href="index.php?mod=admin:users&add">点击此处可以添加一名用户</a> | <a href="javascript:go('submit_button');">前往底部</a></div>
+<section class="dashboard-hero" style="margin-top:16px">
+    <div class="eyebrow hero-eyebrow">OPERATIONS · 用户</div>
+    <h1>用户管理</h1>
+    <p>点击用户名进入控制，勾选复选框后可批量执行操作。删除等操作不可逆，请谨慎。</p>
+    <div class="dashboard-hero-meta">
+        <span class="hero-tag">用户 <?php echo $userc[0]; ?> 名</span>
+    </div>
+    <div class="hero-actions">
+        <a class="cs-btn cs-btn-primary cs-btn-sm" href="index.php?mod=admin:users&add">+ 新建用户</a>
+        <a class="cs-btn cs-btn-secondary cs-btn-sm" href="#mailblast">邮件群发</a>
+        <input id="user-search" class="form-control" placeholder="搜索用户名 / 邮箱 / UID" style="max-width:240px;display:inline-block;height:28px;padding:2px 10px">
+    </div>
+</section>
 <form action="setting.php?mod=admin:users" method="post" onsubmit="return userAdminSubmit();">
 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
 <div class="table-responsive">
@@ -75,25 +87,27 @@ if (isset($_GET['add'])) {  ?>
 </table>
 </div>
 <a name="submit_button" id="submit_button"></a>
-选择操作
-    <label><input type="radio" name="do" value="cookie" checked> 清除 Cookie</label> &nbsp;&nbsp;&nbsp;&nbsp;
-    <label><input type="radio" name="do" value="clean"> 清除贴吧数据</label> &nbsp;&nbsp;&nbsp;&nbsp;
-    <label><input type="radio" name="do" value="delete"> 删除用户</label> &nbsp;&nbsp;&nbsp;&nbsp;
-    <label><input type="radio" name="do" value="cset"> 清除设置</label> &nbsp;&nbsp;&nbsp;&nbsp;
+<div id="user-batch-bar" style="display:none;position:sticky;bottom:0;z-index:20;margin-top:12px;padding:10px 14px;background:var(--color-surface,#fff);border:1px solid var(--color-line);border-radius:8px;box-shadow:0 -4px 12px rgba(0,0,0,.08);flex-wrap:wrap;align-items:center;gap:10px">
+    <b style="font-size:12px">已选 <span id="user-sel-count">0</span> 位，选择操作：</b>
+    <label><input type="radio" name="do" value="cookie" checked> 清除 Cookie</label>
+    <label><input type="radio" name="do" value="clean"> 清除贴吧数据</label>
+    <label><input type="radio" name="do" value="delete"> 删除用户</label>
+    <label><input type="radio" name="do" value="cset"> 清除设置</label>
     <input type="radio" name="do" id="userdo_crole" value="crole">
-<select class="form-control input-sm" style="display: inline; width: auto" name="crolev" onchange="$('#userdo_crole').attr('checked',true);">
-    <option>调整用户组为</option>
-    <option value="user">用户</option>
-    <option value="vip">VIP</option>
-    <option value="admin">管理员</option>
-    <option value="banned">禁止访问</option>
-</select>
-<br/><br/><input type="submit" class="cs-btn cs-btn-primary" value="执行操作">
+    <select class="form-control input-sm" style="display: inline; width: auto" name="crolev" onchange="$('#userdo_crole').attr('checked',true);">
+        <option>调整用户组为</option>
+        <option value="user">用户</option>
+        <option value="vip">VIP</option>
+        <option value="admin">管理员</option>
+        <option value="banned">禁止访问</option>
+    </select>
+    <input type="submit" class="cs-btn cs-btn-primary" value="执行操作">
+</div>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 <button type="button" class="cs-btn cs-btn-secondary" onclick="location = 'index.php?mod=admin:users&add'">添加用户</button>
 </form>
 
-<h4>邮件群发</h4>
+<h4 id="mailblast">邮件群发</h4>
 <form action="setting.php?mod=admin:users" method="post" onsubmit="return confirm('确定向全部留有邮箱的用户群发邮件吗？');">
 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
 <input type="hidden" name="do" value="mailblast">
@@ -120,4 +134,25 @@ if (isset($_GET['add'])) {  ?>
             return confirm('此操作不可逆，你确定要执行吗？');
         }
     }
+    (function () {
+        var boxes = document.querySelectorAll('input[name="user[]"]');
+        var bar = document.getElementById('user-batch-bar');
+        var countEl = document.getElementById('user-sel-count');
+        function refresh() {
+            var n = 0;
+            boxes.forEach(function (b) { if (b.checked) n++; });
+            bar.style.display = n > 0 ? 'flex' : 'none';
+            countEl.textContent = n;
+        }
+        boxes.forEach(function (b) { b.addEventListener('change', refresh); });
+        var search = document.getElementById('user-search');
+        if (search) {
+            search.addEventListener('input', function () {
+                var kw = this.value.trim().toLowerCase();
+                document.querySelectorAll('form table tbody tr').forEach(function (tr) {
+                    tr.style.display = tr.textContent.toLowerCase().indexOf(kw) >= 0 ? '' : 'none';
+                });
+            });
+        }
+    })();
 </script>

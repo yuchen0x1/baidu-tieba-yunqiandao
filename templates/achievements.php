@@ -106,6 +106,13 @@ $metricLabels = array(
 </form>
 <?php } ?>
 
+<div style="margin:8px 1%;display:flex;gap:8px;flex-wrap:wrap;align-items:center" id="ach-filter">
+    <button type="button" class="cs-btn cs-btn-ghost cs-btn-sm is-active" data-filter="all">全部</button>
+    <button type="button" class="cs-btn cs-btn-ghost cs-btn-sm" data-filter="unlocked">已解锁</button>
+    <button type="button" class="cs-btn cs-btn-ghost cs-btn-sm" data-filter="locked">待解锁</button>
+    <span class="text-muted" style="font-size:12px">已解锁 <?php echo (int) $summary['unlocked']; ?> / 共 <?php echo (int) $summary['total']; ?></span>
+</div>
+
 <div class="cs-achievement-grid" style="margin:16px 1%">
 <?php foreach ($items as $it) {
     $tierClass = 'tier-' . $it['tier'];
@@ -141,3 +148,22 @@ $metricLabels = array(
     </article>
 <?php } ?>
 </div>
+<script>
+(function () {
+    var bar = document.getElementById('ach-filter');
+    if (!bar) { return; }
+    var cards = document.querySelectorAll('.cs-achievement-grid .cs-achievement-card');
+    bar.addEventListener('click', function (e) {
+        var btn = e.target.closest('button[data-filter]');
+        if (!btn) { return; }
+        bar.querySelectorAll('button[data-filter]').forEach(function (b) { b.classList.remove('is-active'); });
+        btn.classList.add('is-active');
+        var f = btn.getAttribute('data-filter');
+        cards.forEach(function (card) {
+            var unlocked = card.classList.contains('cs-unlocked');
+            var show = f === 'all' || (f === 'unlocked' ? unlocked : !unlocked);
+            card.style.display = show ? '' : 'none';
+        });
+    });
+})();
+</script>

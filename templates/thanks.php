@@ -57,7 +57,7 @@ $credits = array(
         </div>
         <ul class="cs-list">
             <?php foreach ($creditGroup['items'] as $item) { ?>
-                <li class="cs-list-item">
+                <li class="cs-list-item cs-list-item--inline">
                     <strong>
                         <?php if (!empty($item['url'])) { ?>
                             <a href="<?php echo htmlspecialchars($item['url'], ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener"><?php echo htmlspecialchars($item['name'], ENT_QUOTES, 'UTF-8'); ?></a>

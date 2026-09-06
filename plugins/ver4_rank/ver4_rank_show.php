@@ -1,12 +1,34 @@
 <?php if (!defined('SYSTEM_ROOT')) {
     die('Insufficient Permissions');
 }
-loadhead();
+loadhead('贴吧名人堂助攻');
 global $m;
 $uid = UID;
 $b = $m->fetch_array($m->query("SELECT count(id) AS `c`FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `uid` = {$uid}"));
+$rankOn = !empty(option::uget('ver4_rank_check', $uid));
+$rankLogTable = $m->fetch_array($m->query("SHOW TABLES LIKE '" . DB_PREFIX . "ver4_rank_log'"));
+$myRankCount = !empty($rankLogTable)
+    ? (int) $m->fetch_array($m->query("SELECT count(id) AS `c` FROM `" . DB_NAME . "`.`" . DB_PREFIX . "ver4_rank_log` WHERE `uid` = {$uid}"))['c']
+    : 0;
+?>
+<section class="dashboard-hero">
+    <div class="eyebrow hero-eyebrow">EXTENSIONS · 助攻</div>
+    <h1>贴吧名人堂助攻</h1>
+    <p>开启后每日会对添加的名人自动助攻，助力 TA 冲击贴吧名人堂。</p>
+    <div class="dashboard-hero-meta">
+        <span class="hero-tag"><?php echo $rankOn ? '已开启' : '未开启'; ?></span>
+        <span class="hero-tag">关注名人 <?php echo $myRankCount; ?> 位</span>
+    </div>
+    <div class="hero-actions">
+        <button type="button" class="cs-btn cs-btn-primary cs-btn-sm" data-toggle="modal" data-target="#AddUser">+ 添加名人</button>
+        <a href="http://tieba.baidu.com/celebrity/rankHome" target="_blank" class="cs-btn cs-btn-secondary cs-btn-sm">名人堂 ↗</a>
+        <button type="button" class="cs-btn cs-btn-danger cs-btn-sm" data-toggle="modal" data-target="#DelUser">清空列表</button>
+    </div>
+</section>
+<?php
 if ($b['c'] < 1) {
     echo '<div class="alert alert-warning">您需要先绑定至少一个百度ID才可以使用本功能</div>';
+    loadfoot();
     die;
 }
 if (isset($_GET['save'])) {
@@ -58,8 +80,20 @@ if (isset($_GET['newuser'])) {
 }
 
 ?>
-<h2>贴吧名人堂助攻</h2>
-<br>
+<section class="dashboard-hero">
+    <div class="eyebrow hero-eyebrow">EXTENSIONS · 助攻</div>
+    <h1>贴吧名人堂助攻</h1>
+    <p>开启后每日会对添加的名人自动助攻，助力 TA 冲击贴吧名人堂。</p>
+    <div class="dashboard-hero-meta">
+        <span class="hero-tag"><?php echo $rankOn ? '已开启' : '未开启'; ?></span>
+        <span class="hero-tag">关注名人 <?php echo $myRankCount; ?> 位</span>
+    </div>
+    <div class="hero-actions">
+        <button type="button" class="cs-btn cs-btn-primary cs-btn-sm" data-toggle="modal" data-target="#AddUser">+ 添加名人</button>
+        <a href="http://tieba.baidu.com/celebrity/rankHome" target="_blank" class="cs-btn cs-btn-secondary cs-btn-sm">名人堂 ↗</a>
+        <button type="button" class="cs-btn cs-btn-danger cs-btn-sm" data-toggle="modal" data-target="#DelUser">清空列表</button>
+    </div>
+</section>
 <?php
 if (isset($_GET['success'])) {
     echo '<div class="alert alert-success">' . htmlspecialchars($_GET['success']) . '</div>';
@@ -68,27 +102,23 @@ if (isset($_GET['error'])) {
     echo '<div class="alert alert-danger">' . htmlspecialchars($_GET['error']) . '</div>';
 }
 ?>
-<h4>基本设置</h4>
-<br>
 <form action="index.php?plugin=ver4_rank&save" method="post">
     <table class="table table-hover">
         <tbody>
         <tr>
-            <td>
+            <td style="width:35%">
                 <b>开启助攻</b><br>
                 开启后每日会对设置的名人进行助攻
             </td>
             <td>
-                <input type="radio" name="c"
-                       value="1" <?php echo empty(option::uget('ver4_rank_check', $uid)) ? '' : 'checked' ?>> 开启
-                <input type="radio" name="c"
-                       value="0" <?php echo empty(option::uget('ver4_rank_check', $uid)) ? 'checked' : '' ?>> 关闭
+                <select name="c" class="form-control" style="width:140px">
+                    <option value="1" <?php echo $rankOn ? 'selected' : ''; ?>>开启</option>
+                    <option value="0" <?php echo $rankOn ? '' : 'selected'; ?>>关闭</option>
+                </select>
             </td>
         </tr>
         <tr>
-            <td>
-                <input type="submit" class="btn btn-primary" value="保存设置">
-            </td>
+            <td><input type="submit" class="btn btn-primary" value="保存设置"></td>
             <td></td>
         </tr>
         </tbody>
@@ -102,7 +132,11 @@ if (isset($_GET['error'])) {
     $a = 0;
     $bid = $m->query("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `uid` = {$uid}");
     ?>
-    <ul id="myTabs" class="nav nav-tabs" role="tablist">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <label style="margin:0;font-size:12px;color:var(--color-muted)">账号</label>
+        <select id="rank-acc" class="form-control" style="width:auto"></select>
+    </div>
+    <ul id="myTabs" class="nav nav-tabs" role="tablist" style="display:none">
         <?php
         while ($x = $m->fetch_array($bid)) {
             ?>
@@ -114,6 +148,21 @@ if (isset($_GET['error'])) {
         }
         ?>
     </ul>
+    <script type="text/javascript">
+    (function () {
+        var sel = document.getElementById('rank-acc');
+        var tabs = document.querySelectorAll('#myTabs a[data-toggle="tab"]');
+        tabs.forEach(function (a, i) {
+            var opt = document.createElement('option');
+            opt.value = i;
+            opt.textContent = a.textContent;
+            sel.appendChild(opt);
+        });
+        sel.addEventListener('change', function () {
+            tabs[parseInt(this.value, 10)].click();
+        });
+    })();
+    </script>
     <div id="myTabContent" class="tab-content">
         <?php
         $b = 0;
@@ -214,9 +263,6 @@ if (isset($_GET['error'])) {
         ?>
     </div>
 </div>
-<a class="btn btn-success" href="javascript:;" data-toggle="modal" data-target="#AddUser">添加名人</a>
-<a class="btn btn-danger" href="javascript:;" data-toggle="modal" data-target="#DelUser">清空列表</a>
-<a href="http://tieba.baidu.com/celebrity/rankHome" target="_blank" class="btn btn-default">贴吧名人堂</a>
 
 
 <div class="modal fade" id="AddUser" tabindex="-1" role="dialog" aria-labelledby="AddUser" aria-hidden="true">

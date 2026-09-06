@@ -19,18 +19,27 @@ function addset($name, $type, $x, $other = '', $text = '')
     }
     echo '<tr><td>' . htmlspecialchars($name, ENT_QUOTES, 'UTF-8') . '</td><td><input type="' . htmlspecialchars($type, ENT_QUOTES, 'UTF-8') . '" name="' . htmlspecialchars($x, ENT_QUOTES, 'UTF-8') . '" value="' . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . '" ' . $other . '>' . htmlspecialchars($text, ENT_QUOTES, 'UTF-8') . '</td>';
 }
-?><form action="setting.php?mod=set" method="post">
+$tokenRow0 = $m->once_fetch_array("SELECT `api_token_hash` FROM `" . DB_PREFIX . "users` WHERE `id` = " . (int) UID . " LIMIT 1");
+$hasApiTokenHero = !empty($tokenRow0['api_token_hash']);
+?>
+<section class="dashboard-hero">
+    <div class="eyebrow hero-eyebrow">Workspace · Settings</div>
+    <h1>个人设置</h1>
+    <p>基本信息、签到策略、通知报告与 API 安全设置集中在此，修改后统一提交。</p>
+    <div class="dashboard-hero-meta">
+        <span class="hero-tag">API Token：<?php echo $hasApiTokenHero ? '已启用' : '未生成'; ?></span>
+    </div>
+</section>
+<form action="setting.php?mod=set" method="post">
 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
 <?php doAction('set_1'); ?>
-<div class="table-responsive">
-<table class="cs-table">
-    <thead>
-        <tr>
-            <th style="width:40%">参数</th>
-            <th>值</th>
-        </tr>
-    </thead>
-    <tbody>
+<div style="margin:16px 1%;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;align-items:start">
+<div style="display:flex;flex-direction:column;gap:16px">
+<div class="panel panel-primary">
+    <div class="panel-heading"><span class="panel-title">① 基本信息</span></div>
+    <div class="table-responsive">
+    <table class="cs-table">
+        <tbody>
         <?php doAction('set_3'); ?>
         <tr>
             <td>头像设置<br/>使用Gravatar头像或贴吧头像</td>
@@ -52,19 +61,14 @@ function addset($name, $type, $x, $other = '', $text = '')
                 <input type="text" name="mail" value="<?php echo htmlspecialchars($i['user']['email'], ENT_QUOTES, 'UTF-8') ?>" class="form-control" required>
             </td>
         </tr>
-        <tr>
-            <td>个人 API Token<br/>用于 API 自动签到、查询健康状态、日志与签到日历。Token 只可访问当前账号数据，生成后仅展示一次。</td>
-            <td>
-                <?php
-                $tokenRow = $m->once_fetch_array("SELECT `api_token_hash` FROM `" . DB_PREFIX . "users` WHERE `id` = " . (int) UID . " LIMIT 1");
-                $hasApiToken = !empty($tokenRow['api_token_hash']);
-                ?>
-                <span class="label <?php echo $hasApiToken ? 'label-success' : 'label-default'; ?>"><?php echo $hasApiToken ? '已启用' : '未生成'; ?></span>
-                <button type="submit" class="cs-btn cs-btn-secondary btn-sm" name="api_action" value="generate" onclick="return confirm('生成新 Token 会立即使旧 Token 失效，确定继续吗？');"><?php echo $hasApiToken ? '重新生成 Token' : '生成 Token'; ?></button>
-                <?php if ($hasApiToken) { ?><button type="submit" class="cs-btn cs-btn-danger btn-sm" name="api_action" value="revoke" onclick="return confirm('确定撤销个人 API Token 吗？');">撤销 Token</button><?php } ?>
-                <div class="text-muted" style="margin-top:8px">接口：<code>api.php?action=status</code>、<code>calendar</code>、<code>logs</code>；写操作使用 POST。</div>
-            </td>
-        </tr>
+    </tbody>
+    </table></div>
+</div>
+<div class="panel panel-info">
+    <div class="panel-heading"><span class="panel-title">③ 通知与报告</span></div>
+    <div class="table-responsive">
+    <table class="cs-table">
+        <tbody>
         <tr>
             <td>签到排行榜隐私<br/>默认在「签到排行」页面公开展示你的昵称</td>
             <td>
@@ -116,6 +120,16 @@ function addset($name, $type, $x, $other = '', $text = '')
                 </div>
             </td>
         </tr>
+    </tbody>
+    </table></div>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:16px">
+<div class="panel panel-info">
+    <div class="panel-heading"><span class="panel-title">② 签到策略</span></div>
+    <div class="table-responsive">
+    <table class="cs-table">
+        <tbody>
         <?php
         // 阶段 R：签到策略配置（用户级 + 全局只读信息）
         $globalSignHour = (int) option::get('sign_hour');
@@ -126,7 +140,7 @@ function addset($name, $type, $x, $other = '', $text = '')
         $userShuffle = option::uget('sign_shuffle') == 1;
         ?>
         <tr>
-            <td>签到策略 — 自动重试<br/>签到失败后自动重试的最大次数（用户级，覆盖全局设置）</td>
+            <td>自动重试<br/>签到失败后自动重试的最大次数（用户级，覆盖全局设置）</td>
             <td>
                 <select name="sign_retry_max" class="cs-form-control" style="width:auto;display:inline-block">
                     <option value="0" <?php if ($userRetryMax == 0) echo 'selected'; ?>>跟随全局（<?php echo $globalRetryMax > 0 ? $globalRetryMax . ' 次' : '未启用'; ?>）</option>
@@ -140,7 +154,7 @@ function addset($name, $type, $x, $other = '', $text = '')
             </td>
         </tr>
         <tr>
-            <td>签到策略 — 随机延迟<br/>签到开始前随机延迟 0-N 分钟，避免同时刻集中请求被封</td>
+            <td>随机延迟<br/>签到开始前随机延迟 0-N 分钟，避免同时刻集中请求被封</td>
             <td>
                 <div style="display:flex;align-items:center;gap:6px">
                     <input type="number" name="sign_delay_minutes" min="0" max="60" value="<?php echo $userSignDelay > 0 ? $userSignDelay : 0; ?>" style="width:60px">
@@ -149,7 +163,7 @@ function addset($name, $type, $x, $other = '', $text = '')
             </td>
         </tr>
         <tr>
-            <td>签到策略 — 随机排序<br/>打乱贴吧签到顺序，避免每次以固定顺序请求</td>
+            <td>随机排序<br/>打乱贴吧签到顺序，避免每次以固定顺序请求</td>
             <td>
                 <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
                     <input type="checkbox" name="sign_shuffle" value="1" <?php if ($userShuffle) echo 'checked'; ?>>
@@ -157,38 +171,61 @@ function addset($name, $type, $x, $other = '', $text = '')
                 </label>
             </td>
         </tr>
+    </tbody>
+    </table></div>
+</div>
+<div class="panel panel-primary">
+    <div class="panel-heading"><span class="panel-title">④ API 与安全</span></div>
+    <div class="table-responsive">
+    <table class="cs-table">
+        <tbody>
+        <tr>
+            <td>个人 API Token<br/>用于 API 自动签到、查询健康状态、日志与签到日历。Token 只可访问当前账号数据，生成后仅展示一次。</td>
+            <td>
+                <?php
+                $tokenRow = $m->once_fetch_array("SELECT `api_token_hash` FROM `" . DB_PREFIX . "users` WHERE `id` = " . (int) UID . " LIMIT 1");
+                $hasApiToken = !empty($tokenRow['api_token_hash']);
+                ?>
+                <span class="label <?php echo $hasApiToken ? 'label-success' : 'label-default'; ?>"><?php echo $hasApiToken ? '已启用' : '未生成'; ?></span>
+                <button type="submit" class="cs-btn cs-btn-secondary btn-sm" name="api_action" value="generate" onclick="return confirm('生成新 Token 会立即使旧 Token 失效，确定继续吗？');"><?php echo $hasApiToken ? '重新生成 Token' : '生成 Token'; ?></button>
+                <?php if ($hasApiToken) { ?><button type="submit" class="cs-btn cs-btn-danger btn-sm" name="api_action" value="revoke" onclick="return confirm('确定撤销个人 API Token 吗？');">撤销 Token</button><?php } ?>
+                <div class="text-muted" style="margin-top:8px">接口：<code>api.php?action=status</code>、<code>calendar</code>、<code>logs</code>；写操作使用 POST。</div>
+            </td>
+        </tr>
         <?php doAction('set_2'); ?>
     </tbody>
-</table></div><input type="submit" class="cs-btn cs-btn-primary" value="提交更改">
+    </table></div>
+</div>
+</div>
+</div>
+<div style="text-align:right;margin:0 1%"><input type="submit" class="cs-btn cs-btn-primary" value="提交更改"></div>
 </form>
 
-<h3>修改密码</h3>
-<form action="setting.php?mod=set" method="post" onsubmit="return confirm('确定要修改登录密码吗？修改后需要使用新密码重新登录。');">
-<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
-<input type="hidden" name="pw_action" value="change">
-<div class="table-responsive">
-<table class="cs-table">
-    <thead>
-        <tr>
-            <th style="width:40%">参数</th>
-            <th>值</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>当前密码</td>
-            <td><input type="password" name="cur_pw" class="form-control" required autocomplete="current-password"></td>
-        </tr>
-        <tr>
-            <td>新密码<br/><span class="text-muted">长度 6-64 位</span></td>
-            <td><input type="password" name="new_pw" class="form-control" required minlength="6" maxlength="64" autocomplete="new-password"></td>
-        </tr>
-        <tr>
-            <td>确认新密码</td>
-            <td><input type="password" name="new_pw2" class="form-control" required minlength="6" maxlength="64" autocomplete="new-password"></td>
-        </tr>
-    </tbody>
-</table></div>
-<input type="submit" class="cs-btn cs-btn-primary" value="修改密码">
-</form>
+<div class="panel panel-danger" style="margin:0 1%">
+    <div class="panel-heading"><span class="panel-title">修改密码</span></div>
+    <div class="panel-body">
+    <form action="setting.php?mod=set" method="post" onsubmit="return confirm('确定要修改登录密码吗？修改后需要使用新密码重新登录。');">
+    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
+    <input type="hidden" name="pw_action" value="change">
+    <div class="table-responsive">
+    <table class="cs-table">
+        <tbody>
+            <tr>
+                <td style="width:40%">当前密码</td>
+                <td><input type="password" name="cur_pw" class="form-control" required autocomplete="current-password"></td>
+            </tr>
+            <tr>
+                <td>新密码<br/><span class="text-muted">长度 6-64 位</span></td>
+                <td><input type="password" name="new_pw" class="form-control" required minlength="6" maxlength="64" autocomplete="new-password"></td>
+            </tr>
+            <tr>
+                <td>确认新密码</td>
+                <td><input type="password" name="new_pw2" class="form-control" required minlength="6" maxlength="64" autocomplete="new-password"></td>
+            </tr>
+        </tbody>
+    </table></div>
+    <input type="submit" class="cs-btn cs-btn-primary" value="修改密码">
+    </form>
+    </div>
+</div>
 

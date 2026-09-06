@@ -6,6 +6,14 @@
 global $m,$i;
 doAction('admin_update_1');
 ?>
+<section class="dashboard-hero" style="margin-top:16px">
+    <div class="eyebrow hero-eyebrow">EXTENSIONS · 升级</div>
+    <h1>系统更新</h1>
+    <p>按 Gitee 正式 Release 检查新版本，检测到更新后会显示版本说明与升级入口。</p>
+    <div class="dashboard-hero-meta">
+        <span class="hero-tag">当前版本 V<?php echo SYSTEM_VER; ?></span>
+    </div>
+</section>
 <div class="input-group">
    <span class="input-group-addon">更新服务器</span>
    <select id="server" class="form-control">

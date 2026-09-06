@@ -81,9 +81,30 @@ $userInitial = function_exists('mb_substr') ? mb_substr($userName, 0, 1, 'UTF-8'
                             echo '<span class="nav-badge nav-badge-show">' . ($noticeUnread > 99 ? '99+' : (int) $noticeUnread) . '</span>';
                         }
                     ?></a></li>
+                </ul>
+            </nav>
+        </section>
+
+        <?php
+        // 插件用户功能页（navi_1 钩子）独立分组，紧跟核心页之后；无插件时整组隐藏
+        ob_start();
+        doAction('navi_1');
+        $pluginAppNav = trim(ob_get_clean());
+        if ($pluginAppNav !== '') { ?>
+        <section class="sidebar-section">
+            <div class="sidebar-label">Plugins</div>
+            <nav class="sidebar-nav">
+                <ul><?php echo $pluginAppNav; ?></ul>
+            </nav>
+        </section>
+        <?php } ?>
+
+        <section class="sidebar-section">
+            <div class="sidebar-label">Preferences</div>
+            <nav class="sidebar-nav">
+                <ul>
                     <li class="<?php checkIfActive('set'); ?>"><a href="index.php?mod=set"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-settings"/></svg><span>个人设置</span></a></li>
                     <li class="<?php checkIfActive('thanks'); ?>"><a href="index.php?mod=thanks"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-heart"/></svg><span>开源致谢</span></a></li>
-                    <?php doAction('navi_1'); ?>
                 </ul>
             </nav>
         </section>
@@ -105,7 +126,9 @@ $userInitial = function_exists('mb_substr') ? mb_substr($userName, 0, 1, 'UTF-8'
                 </ul>
             </nav>
         </section>
+        <?php } ?>
 
+        <?php if (ROLE == 'admin') { ?>
         <section class="sidebar-section">
             <div class="sidebar-label">Extensions</div>
             <nav class="sidebar-nav">

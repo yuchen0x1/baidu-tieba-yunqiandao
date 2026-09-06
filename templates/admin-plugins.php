@@ -58,7 +58,7 @@ foreach ($x as $key => $val) {
         }
     }
     if (isset($i['plugins']['info'][$val['plugin']['id']]['status'])) {
-        $fortc .= '<br/>加载顺序：<input required type="number" class="form-control input-sm" style="width:50%; display:inline" name="' . htmlspecialchars($val['plugin']['id'], ENT_QUOTES, 'UTF-8') . '" value="' . htmlspecialchars($val['plugin']['order'], ENT_QUOTES, 'UTF-8') . '">';
+        $fortc .= '<br/>加载顺序：<span style="cursor:grab" class="cron-drag-handle" title="拖拽调整加载顺序">⋮⋮</span> <input required type="number" class="form-control input-sm cron-order-input" style="width:35%; display:inline" name="' . htmlspecialchars($val['plugin']['id'], ENT_QUOTES, 'UTF-8') . '" value="' . htmlspecialchars($val['plugin']['order'], ENT_QUOTES, 'UTF-8') . '">';
     }
     if (in_array($val['plugin']['id'], $i['plugins']['all'])) {
         if ($i['plugins']['info'][$val['plugin']['id']]['status'] == '1') {
@@ -84,10 +84,21 @@ foreach ($x as $key => $val) {
 
 doAction('admin_plugins');
 ?>
-<div class="alert alert-info" id="tb_num">当前有 <?php echo count($i['plugins']['all']); ?> 个已安装的插件，<?php echo count($i['plugins']['actived']) ?> 个已激活的插件，总共有 <?php echo count($x) ?> 个插件
-<br/>插件手工安装方法：直接解包插件并上传到 /plugins/ 即可
-<br/><a href="javascript:;" data-toggle="modal" data-target="#InstallPlugin">上传安装插件</a> | <a href="javascript:;" data-toggle="modal" data-target="#InstallPluginOnline">从 Gitee 在线安装</a> | <a href="<?php echo htmlspecialchars(PROJECT_WIKI_URL, ENT_QUOTES, 'UTF-8'); ?>/%E8%B4%B4%E5%90%A7%E4%BA%91%E7%AD%BE%E5%88%B0%E6%8F%92%E4%BB%B6%E5%BA%93" target="_blank">插件库</a> | <a href="javascript:;" onclick="alert('请确保插件目录名和插件入口文件的文件名一致(扩展名除外)<br/>例如，插件目录名是 <i>wmzz_debug</i>，则插件入口文件的文件名应该是 <i>wmzz_debug.php</i><br/><br/>如果您是从Git上下载的插件包，请注意去掉文件夹名称-master之类的字符');" target="_blank">找不到上传的插件？</a>
-</div>
+<section class="dashboard-hero" style="margin-top:16px">
+    <div class="eyebrow hero-eyebrow">EXTENSIONS · 插件</div>
+    <h1>插件管理</h1>
+    <p>插件手工安装：解包插件并上传到 /plugins/ 目录。列表支持拖拽调整加载顺序，卸载会删除相关文件。</p>
+    <div class="dashboard-hero-meta">
+        <span class="hero-tag">已安装 <?php echo count($i['plugins']['all']); ?></span>
+        <span class="hero-tag">已激活 <?php echo count($i['plugins']['actived']); ?></span>
+        <span class="hero-tag">共 <?php echo count($x); ?> 个</span>
+    </div>
+    <div class="hero-actions">
+        <button type="button" class="cs-btn cs-btn-primary cs-btn-sm" data-toggle="modal" data-target="#InstallPlugin">上传安装插件</button>
+        <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm" data-toggle="modal" data-target="#InstallPluginOnline">从 Gitee 在线安装</button>
+        <a href="<?php echo htmlspecialchars(PROJECT_WIKI_URL, ENT_QUOTES, 'UTF-8'); ?>/%E8%B4%B4%E5%90%A7%E4%BA%91%E7%AD%BE%E5%88%B0%E6%8F%92%E4%BB%B6%E5%BA%93" target="_blank" class="cs-btn cs-btn-secondary cs-btn-sm">插件库 ↗</a>
+    </div>
+</section>
 <form action="setting.php?mod=admin:plugins&xorder" method="post">
 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
 <div class="table-responsive">
@@ -105,6 +116,36 @@ doAction('admin_plugins');
 </table>
 </div><input type="submit" class="cs-btn cs-btn-primary" value="提交更改">
 </form>
+<script>
+(function () {
+    var tbody = document.querySelector('form[action*="xorder"] table tbody');
+    if (!tbody) { return; }
+    var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+    rows.forEach(function (row) { row.setAttribute('draggable', 'true'); });
+    var dragRow = null;
+    tbody.addEventListener('dragstart', function (e) {
+        dragRow = e.target.closest('tr');
+        if (dragRow) { e.dataTransfer.effectAllowed = 'move'; }
+    });
+    tbody.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    });
+    tbody.addEventListener('drop', function (e) {
+        e.preventDefault();
+        var target = e.target.closest('tr');
+        if (!dragRow || !target || dragRow === target) { return; }
+        var rect = target.getBoundingClientRect();
+        var before = e.clientY < rect.top + rect.height / 2;
+        tbody.insertBefore(dragRow, before ? target : target.nextSibling);
+        dragRow = null;
+        Array.prototype.slice.call(tbody.querySelectorAll('tr')).forEach(function (row, i) {
+            var input = row.querySelector('input.cron-order-input');
+            if (input) { input.value = i + 1; }
+        });
+    });
+})();
+</script>
 
 <div class="modal fade" id="InstallPlugin" tabindex="-1" role="dialog" aria-labelledby="InstallPluginLabel" aria-hidden="true">
   <div class="modal-dialog">

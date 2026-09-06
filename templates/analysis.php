@@ -56,16 +56,15 @@ $fmtTime = function ($ts) {
         <span class="hero-tag">当前连签 <?php echo (int) $streak['current_streak']; ?> 天</span>
         <span class="hero-tag">最长连签 <?php echo (int) $streak['max_streak']; ?> 天</span>
     </div>
+    <div class="hero-actions" style="flex-wrap:wrap;gap:8px;align-items:center">
+        <span style="font-size:12px;color:var(--color-muted)">统计区间：</span>
+        <?php foreach (array(7, 30, 90, 365) as $d) { ?>
+        <a class="cs-btn cs-btn-ghost cs-btn-sm <?php echo $d === $days ? 'is-active' : ''; ?>" href="index.php?mod=analysis&days=<?php echo $d; ?>"><?php echo $d === 365 ? '近一年' : ('近 ' . $d . ' 天'); ?></a>
+        <?php } ?>
+        <a class="cs-btn cs-btn-secondary cs-btn-sm" href="index.php?mod=analysis&days=<?php echo $days; ?>&export=csv&type=forum" style="margin-left:auto">导出吧明细 CSV</a>
+        <a class="cs-btn cs-btn-secondary cs-btn-sm" href="index.php?mod=analysis&days=<?php echo $days; ?>&export=csv">导出报表 CSV</a>
+    </div>
 </section>
-
-<div style="margin:8px 1%;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-    <span class="text-muted" style="font-size:12px">统计区间：</span>
-    <?php foreach (array(7, 30, 90, 365) as $d) { ?>
-    <a class="cs-btn cs-btn-ghost cs-btn-sm <?php echo $d === $days ? 'is-active' : ''; ?>" href="index.php?mod=analysis&days=<?php echo $d; ?>"><?php echo $d === 365 ? '近一年' : ('近 ' . $d . ' 天'); ?></a>
-    <?php } ?>
-    <a class="cs-btn cs-btn-secondary cs-btn-sm" href="index.php?mod=analysis&days=<?php echo $days; ?>&export=csv&type=forum" style="margin-left:auto">导出吧明细 CSV</a>
-    <a class="cs-btn cs-btn-secondary cs-btn-sm" href="index.php?mod=analysis&days=<?php echo $days; ?>&export=csv">导出报表 CSV</a>
-</div>
 
 <?php if ($overview['total'] === 0) { ?>
 <div class="cs-alert cs-alert-info" style="margin:16px 1%">
@@ -107,6 +106,65 @@ $fmtTime = function ($ts) {
     <div class="cs-chart-container" id="analysis-forum-chart" style="min-height:300px"></div>
 </div>
 
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;align-items:start;margin:0 1% 24px">
+
+<?php if (!empty($failureRows)) { ?>
+<div class="cs-chart-card" style="margin:0">
+    <div class="cs-chart-card-header"><h3 class="cs-chart-card-title">失败原因 TOP</h3><span class="cs-chart-card-subtitle">按出现次数排序（Top 10）</span></div>
+    <div class="cs-chart-container" id="analysis-failure-chart" style="min-height:280px"></div>
+    <div class="panel-body">
+        <div class="cs-table-wrap"><div class="cs-table-scroll"><table class="cs-table">
+            <thead><tr><th>原因</th><th>次数</th><th>占比</th></tr></thead>
+            <tbody>
+            <?php $failureTotal = 0;
+            foreach ($failureRows as $frw) { $failureTotal += $frw['count']; }
+            foreach ($failureRows as $frw) { ?>
+                <tr>
+                    <td class="wrap"><?php echo htmlspecialchars($frw['reason'], ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo (int) $frw['count']; ?></td>
+                    <td style="font-size:12px;color:var(--color-muted)"><?php echo $failureTotal > 0 ? round($frw['count'] / $failureTotal * 100, 1) : 0; ?>%</td>
+                </tr>
+            <?php } ?>
+            </tbody>
+        </table></div></div>
+    </div>
+</div>
+<?php } ?>
+
+<div class="cs-chart-card" style="margin:0">
+    <div class="cs-chart-card-header"><h3 class="cs-chart-card-title">签到时段分布</h3><span class="cs-chart-card-subtitle">近 <?php echo $days; ?> 天按小时聚合（站点时区）</span></div>
+    <div class="cs-chart-container" id="analysis-hour-chart" style="min-height:280px"></div>
+</div>
+
+<?php if ($monitorStats['available'] && $monitorStats['total'] > 0) { ?>
+<div class="cs-chart-card" style="margin:0">
+    <div class="cs-chart-card-header"><h3 class="cs-chart-card-title">监控命中趋势</h3><span class="cs-chart-card-subtitle">帖子监控近 <?php echo $days; ?> 天每日命中数，累计 <?php echo (int) $monitorStats['total']; ?> 条</span></div>
+    <div class="cs-chart-container" id="analysis-monitor-chart" style="min-height:260px"></div>
+    <div class="panel-body">
+        <div class="cs-table-wrap"><div class="cs-table-scroll"><table class="cs-table">
+            <thead><tr><th>目标贴吧</th><th>命中数</th><th>已联动回帖</th></tr></thead>
+            <tbody>
+            <?php foreach ($monitorStats['top'] as $mt) { ?>
+                <tr>
+                    <td><?php echo htmlspecialchars($mt['forum'], ENT_QUOTES, 'UTF-8'); ?>吧</td>
+                    <td><?php echo (int) $mt['hits']; ?></td>
+                    <td><?php echo (int) $mt['replied']; ?></td>
+                </tr>
+            <?php } ?>
+            </tbody>
+        </table></div></div>
+    </div>
+</div>
+<?php } ?>
+
+<?php if ($hasHealthTrend) { ?>
+<div class="cs-chart-card" style="margin:0">
+    <div class="cs-chart-card-header"><h3 class="cs-chart-card-title">账号健康度趋势</h3><span class="cs-chart-card-subtitle">来自每日健康检查快照（一天取最后一次结果）</span></div>
+    <div class="cs-chart-container" id="analysis-health-chart" style="min-height:260px"></div>
+</div>
+<?php } ?>
+</div>
+
 <section class="panel panel-primary" style="margin:0 1% 24px">
     <div class="panel-heading"><span class="panel-title">贴吧明细（近 <?php echo $days; ?> 天）</span></div>
     <div class="panel-body">
@@ -135,62 +193,6 @@ $fmtTime = function ($ts) {
         </table></div></div>
     </div>
 </section>
-
-<?php if (!empty($failureRows)) { ?>
-<div class="cs-chart-card" style="margin:0 1% 24px">
-    <div class="cs-chart-card-header"><h3 class="cs-chart-card-title">失败原因 TOP</h3><span class="cs-chart-card-subtitle">按出现次数排序（Top 10）</span></div>
-    <div class="cs-chart-container" id="analysis-failure-chart" style="min-height:280px"></div>
-    <div class="panel-body">
-        <div class="cs-table-wrap"><div class="cs-table-scroll"><table class="cs-table">
-            <thead><tr><th>原因</th><th>次数</th><th>占比</th></tr></thead>
-            <tbody>
-            <?php $failureTotal = 0;
-            foreach ($failureRows as $frw) { $failureTotal += $frw['count']; }
-            foreach ($failureRows as $frw) { ?>
-                <tr>
-                    <td class="wrap"><?php echo htmlspecialchars($frw['reason'], ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?php echo (int) $frw['count']; ?></td>
-                    <td style="font-size:12px;color:var(--color-muted)"><?php echo $failureTotal > 0 ? round($frw['count'] / $failureTotal * 100, 1) : 0; ?>%</td>
-                </tr>
-            <?php } ?>
-            </tbody>
-        </table></div></div>
-    </div>
-</div>
-<?php } ?>
-
-<div class="cs-chart-card" style="margin:0 1% 24px">
-    <div class="cs-chart-card-header"><h3 class="cs-chart-card-title">签到时段分布</h3><span class="cs-chart-card-subtitle">近 <?php echo $days; ?> 天按小时聚合（站点时区）</span></div>
-    <div class="cs-chart-container" id="analysis-hour-chart" style="min-height:280px"></div>
-</div>
-
-<?php if ($monitorStats['available'] && $monitorStats['total'] > 0) { ?>
-<div class="cs-chart-card" style="margin:0 1% 24px">
-    <div class="cs-chart-card-header"><h3 class="cs-chart-card-title">监控命中趋势</h3><span class="cs-chart-card-subtitle">帖子监控近 <?php echo $days; ?> 天每日命中数，累计 <?php echo (int) $monitorStats['total']; ?> 条</span></div>
-    <div class="cs-chart-container" id="analysis-monitor-chart" style="min-height:260px"></div>
-    <div class="panel-body">
-        <div class="cs-table-wrap"><div class="cs-table-scroll"><table class="cs-table">
-            <thead><tr><th>目标贴吧</th><th>命中数</th><th>已联动回帖</th></tr></thead>
-            <tbody>
-            <?php foreach ($monitorStats['top'] as $mt) { ?>
-                <tr>
-                    <td><?php echo htmlspecialchars($mt['forum'], ENT_QUOTES, 'UTF-8'); ?>吧</td>
-                    <td><?php echo (int) $mt['hits']; ?></td>
-                    <td><?php echo (int) $mt['replied']; ?></td>
-                </tr>
-            <?php } ?>
-            </tbody>
-        </table></div></div>
-    </div>
-</div>
-<?php } ?>
-
-<?php if ($hasHealthTrend) { ?>
-<div class="cs-chart-card" style="margin:0 1% 24px">
-    <div class="cs-chart-card-header"><h3 class="cs-chart-card-title">账号健康度趋势</h3><span class="cs-chart-card-subtitle">来自每日健康检查快照（一天取最后一次结果）</span></div>
-    <div class="cs-chart-container" id="analysis-health-chart" style="min-height:260px"></div>
-</div>
-<?php } ?>
 
 <section class="panel panel-primary" style="margin:0 1% 24px">
     <div class="panel-heading"><span class="panel-title">账号对比与健康状态</span></div>

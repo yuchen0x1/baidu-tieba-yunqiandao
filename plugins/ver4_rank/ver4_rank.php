@@ -10,7 +10,7 @@ function ver4_rank_nav()
     if (isset($_GET['plugin']) && $_GET['plugin'] == 'ver4_rank') {
         echo 'class="active"';
     }
-    echo '><a href="index.php?plugin=ver4_rank"><span class="glyphicon glyphicon-plane"></span> 贴吧名人堂助攻</a></li>';
+    echo '><a href="index.php?plugin=ver4_rank"><svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg><span>贴吧名人堂助攻</span></a></li>';
 }
 
 addAction('navi_1', 'ver4_rank_nav');

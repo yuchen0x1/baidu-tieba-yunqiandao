@@ -38,10 +38,18 @@ if (isset($_GET['ok'])) {
     echo '<div class="alert alert-success">应用成功</div>';
 }
 ?>
+<section class="dashboard-hero" style="margin-top:16px">
+    <div class="eyebrow hero-eyebrow">OPERATIONS · 运维工具</div>
+    <h1>工具箱</h1>
+    <p>数据库维护、定时备份、数据保留清理与安全审计。危险操作均有二次确认。</p>
+</section>
 <div id="comsys"></div>
 <!--Part 1 Primary-->
+<div class="panel panel-primary" style="margin:0 1%">
+    <div class="panel-heading"><span class="panel-title">① 快速维护</span></div>
+    <div class="panel-body">
 
-<br/><br/><input type="button" onclick="location = '<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=optim'" class="cs-btn cs-btn-primary" value="优化所有的数据表" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;可清除所有数据表的多余数据
+<br/><input type="button" onclick="location = '<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=optim'" class="cs-btn cs-btn-primary" value="优化所有的数据表" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;可清除所有数据表的多余数据
 
 <br/><br/><input type="button" onclick="location = '<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=fixdoing'" class="cs-btn cs-btn-primary" value="修复计划任务状态" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;可解决运行计划任务始终提示已经有一个计划任务正在运行中的问题
 
@@ -54,10 +62,14 @@ if (isset($_GET['ok'])) {
 <br/><br/><input type="button" onclick="if(confirm('将花费较长时间，请确认此操作')) location = '<?php echo SYSTEM_URL ?>setting.php?mod=admin:tools&setting=updatefid'" class="cs-btn cs-btn-primary" value="更新未记录的 FID" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;签到时会自动将没有被缓存的 FID 缓存下来，您也可以手动更新 FID 提高签到效率
 -->
 <?php doAction('admin_tools_3'); ?>
+    </div>
+</div>
 
-<br/><br/>
+<br/>
 <!--Part 2 Warning-->
-<h4>定时数据库备份</h4>
+<div class="panel panel-info" style="margin:0 1%">
+    <div class="panel-heading"><span class="panel-title">② 定时数据库备份</span></div>
+    <div class="panel-body">
 <?php
 $bkEnabled = option::get('db_backup_enable') == '1';
 $bkCron = $m->once_fetch_array("SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "cron` WHERE `name` = 'system_dbbackup'");
@@ -99,10 +111,14 @@ $bkCount = is_array($bkFiles) ? count($bkFiles) : 0;
 <button type="submit" class="cs-btn cs-btn-secondary" onclick="return confirm('立即执行一次备份吗？');">立即备份一次</button>
 </form>
 &nbsp;&nbsp;&nbsp;&nbsp;当前已有 <b><?php echo $bkCount; ?></b> 份备份存于 data/backups 目录（Apache 已由 .htaccess 拦截直接下载，Nginx 等环境请自行屏蔽该目录）
+    </div>
+</div>
 
-<br/><br/>
+<br/>
 <!--Part 2 数据保留与自动清理-->
-<h4>数据保留与自动清理</h4>
+<div class="panel panel-info" style="margin:0 1%">
+    <div class="panel-heading"><span class="panel-title">③ 数据保留与自动清理</span></div>
+    <div class="panel-body">
 <?php
 $clEnabled = option::get('cleanup_enable') == '1';
 $clCron = $m->once_fetch_array("SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "cron` WHERE `name` = 'system_cleanup'");
@@ -156,10 +172,14 @@ $clGet = function ($key, $default) {
 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
 <button type="submit" class="cs-btn cs-btn-secondary" onclick="return confirm('立即按当前保留天数执行一次清理吗？删除不可恢复。');">立即清理一次</button>
 </form>
+    </div>
+</div>
 
-<br/><br/>
+<br/>
 <!--Part 2 签到周报-->
-<h4>签到周报</h4>
+<div class="panel panel-info" style="margin:0 1%">
+    <div class="panel-heading"><span class="panel-title">④ 签到周报</span></div>
+    <div class="panel-body">
 <?php
 $wrCron = $m->once_fetch_array("SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "cron` WHERE `name` = 'system_weekreport'");
 ?>
@@ -168,16 +188,26 @@ $wrCron = $m->once_fetch_array("SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "cron
 <button type="submit" class="cs-btn cs-btn-secondary" onclick="return confirm('确定注册签到周报计划任务吗？已注册时无副作用。');">注册签到周报任务<?php echo (int) $wrCron['c'] > 0 ? '（已注册）' : '（未注册）'; ?></button>
 </form>
 &nbsp;&nbsp;&nbsp;&nbsp;注册后，用户可在「个人设置」开启周报并选择星期几，到点通过其个人通知渠道（未配置时走站点渠道）推送近 7 天签到汇总与失败原因
+    </div>
+</div>
 
-<br/><br/>
+<br/>
 <!--Part 2 Warning-->
-<br/><br/><input type="button" data-toggle="modal" data-target="#TruncateTableLabel" class="cs-btn cs-btn-warning" value="清空指定数据表" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;请慎用此功能，一般用于清空无用的分表
+<div class="panel panel-danger" style="margin:0 1%">
+    <div class="panel-heading"><span class="panel-title">⑤ 危险操作（请慎用）</span></div>
+    <div class="panel-body">
+<br/><input type="button" data-toggle="modal" data-target="#TruncateTableLabel" class="cs-btn cs-btn-warning" value="清空指定数据表" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;请慎用此功能，一般用于清空无用的分表
 
 <br/><br/><input type="button" data-toggle="modal" data-target="#RemoveTable" class="cs-btn cs-btn-warning" value="删除指定数据表" style="width:170px">&nbsp;&nbsp;&nbsp;&nbsp;请慎用此功能，一般用于删除无用的分表
 
 <?php doAction('admin_tools_2'); ?>
+    </div>
+</div>
 
-<h3>最近登录记录（最近50条）</h3>
+<br/>
+<div class="panel panel-default" style="margin:0 1%">
+    <div class="panel-heading"><span class="panel-title">最近登录记录（最近 50 条）</span></div>
+    <div class="panel-body">
 <div class="table-responsive">
 <table class="cs-table">
     <thead><tr><th>#</th><th>账号</th><th>IP</th><th>结果</th><th>UA</th><th>时间</th></tr></thead>
@@ -197,6 +227,8 @@ if (empty($auditRows)) {
 ?>
     </tbody>
 </table>
+</div>
+    </div>
 </div>
 
 <div class="modal fade" id="BackupTable" tabindex="-1" role="dialog" aria-labelledby="BackupTableLabel" aria-hidden="true">

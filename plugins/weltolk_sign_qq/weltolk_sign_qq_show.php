@@ -564,7 +564,11 @@ if ($page == 'config') {
 ?>
 <div id="head"></div>
 
-<h2>每日签到qq推送</h2>
+<section class="dashboard-hero">
+    <div class="eyebrow hero-eyebrow">EXTENSIONS · 推送</div>
+    <h1>每日签到 QQ 推送</h1>
+    <p>配置推送地址与推送计划，每天签到完成后把结果推送到你的 QQ。新增 / 修改通过下方对应按钮弹窗操作。</p>
+</section>
 
 <br/>
 <table class="table table-striped" id="user_settings">

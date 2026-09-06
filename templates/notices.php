@@ -47,24 +47,6 @@ $unreadCount = Notice::unreadCount($viewUid);
     </div>
 </section>
 
-<section class="metric-grid" aria-label="通知总览" style="margin:16px 1%">
-    <div class="metric-card">
-        <span class="metric-label">未读通知</span>
-        <strong class="metric-value"><?php echo (int) $unreadCount; ?></strong>
-        <span class="metric-note">需要查看</span>
-    </div>
-    <div class="metric-card">
-        <span class="metric-label">全部通知</span>
-        <strong class="metric-value"><?php echo (int) $total; ?></strong>
-        <span class="metric-note">含已读</span>
-    </div>
-    <div class="metric-card">
-        <span class="metric-label">已读通知</span>
-        <strong class="metric-value"><?php echo (int) ($total - $unreadCount); ?></strong>
-        <span class="metric-note">已处理</span>
-    </div>
-</section>
-
 <div style="margin:8px 1%;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
     <a class="cs-btn cs-btn-ghost cs-btn-sm <?php echo !$unreadOnly ? 'is-active' : ''; ?>" href="index.php?mod=notices">全部通知</a>
     <a class="cs-btn cs-btn-ghost cs-btn-sm <?php echo $unreadOnly ? 'is-active' : ''; ?>" href="index.php?mod=notices&unread=1">仅未读（<?php echo (int) $unreadCount; ?>）</a>

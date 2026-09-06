@@ -666,6 +666,8 @@
   border-bottom: 1px solid var(--color-line);
 }
 .cs-list-item:last-child { border-bottom: 0; }
+/* 内容为连续行内文本（句子/分隔符/<br>）的条目用此修饰类回到普通文档流，避免被 flex 拆行 */
+.cs-list-item--inline { display: block; }
 .cs-list-item strong { color: var(--color-ink); font-weight: var(--fw-bold); font-size: var(--fs-sm); }
 .cs-list-item .text-muted { color: var(--color-muted); font-size: var(--fs-xs); }
 

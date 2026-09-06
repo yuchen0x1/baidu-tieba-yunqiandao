@@ -41,6 +41,9 @@ $week = SignManager::calendar(7, UID);
         <span class="hero-tag">出错 <?php echo (int) $summary['error']; ?> 个</span>
         <span class="hero-tag">等待 <?php echo (int) $summary['waiting']; ?> 个</span>
     </div>
+    <div class="hero-actions">
+        <a href="index.php?mod=baiduid" class="cs-btn cs-btn-primary cs-btn-sm">去绑定账号</a>
+    </div>
 </section>
 
 <section class="panel panel-primary">
@@ -80,27 +83,30 @@ $week = SignManager::calendar(7, UID);
             </tbody>
         </table>
     </div>
-    <div class="panel-body text-muted">
-        需要绑定新账号请前往 <a href="index.php?mod=baiduid">百度账号</a>；健康检查每天自动执行一次，失效账号会在达到阈值后自动停用（可在<a href="index.php?mod=admin:set:sign">签到设置</a>配置）。
-    </div>
     <?php } ?>
 </section>
 
 <section class="panel panel-info">
-    <div class="panel-heading"><span class="panel-title">近 7 天签到结果（按天）</span></div>
+    <div class="panel-heading"><span class="panel-title">近 7 天签到结果（按天）</span><a href="index.php?mod=calendar" style="float:right;font-size:12px">查看日历 →</a></div>
     <?php if (empty($week)) { ?>
     <div class="panel-body text-muted">暂无历史记录。签到历史自 V5.12 起开始积累，也可在<a href="index.php?mod=calendar">签到日历</a>查看完整视图。</div>
     <?php } else { ?>
-    <ul class="cs-list">
-        <?php foreach ($week as $w) { ?>
-        <li class="cs-list-item">
-            <?php echo htmlspecialchars($w['day'], ENT_QUOTES, 'UTF-8'); ?> ——
-            成功 <strong><?php echo (int) $w['success']; ?></strong>，
-            失败 <strong style="color:<?php echo $w['error'] > 0 ? '#e05252' : 'inherit'; ?>"><?php echo (int) $w['error']; ?></strong>，
-            共 <?php echo (int) $w['total']; ?> 次
-        </li>
-        <?php } ?>
-    </ul>
+    <div class="table-responsive">
+        <table class="cs-table">
+            <thead><tr><th style="width:130px">日期</th><th>成功</th><th>失败</th><th>总计</th></tr></thead>
+            <tbody>
+            <?php foreach ($week as $w) {
+                $errClass = $w['error'] > 0 ? ' style="color:var(--color-danger,#e05252);font-weight:600"' : '';
+                echo '<tr>'
+                    . '<td>' . htmlspecialchars($w['day'], ENT_QUOTES, 'UTF-8') . '</td>'
+                    . '<td>' . (int) $w['success'] . '</td>'
+                    . '<td' . $errClass . '>' . (int) $w['error'] . '</td>'
+                    . '<td>' . (int) $w['total'] . '</td>'
+                    . '</tr>';
+            } ?>
+            </tbody>
+        </table>
+    </div>
     <?php } ?>
 </section>
 

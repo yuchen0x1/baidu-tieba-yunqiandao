@@ -29,7 +29,7 @@ function loadhead($title = '')
     echo '<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />';
     echo '<meta name="theme-color" content="#5b3aff" />';
     echo '<script>(function(){try{var t=localStorage.getItem("tc-theme");if(t==="dark"||t==="light"){document.documentElement.setAttribute("data-theme",t);}else{var m=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)");if(m&&m.matches){document.documentElement.setAttribute("data-theme","dark");}}}catch(e){}})();</script>';
-    $uiVer = SYSTEM_VER . '-g6';
+    $uiVer = SYSTEM_VER . '-g7';
     echo '<link rel="stylesheet" href="source/css/tokens.css?v=' . $uiVer . '">';
     echo '<link rel="stylesheet" href="source/css/b3-compat.css?v=' . SYSTEM_VER . '">';
     echo '<link rel="stylesheet" href="source/css/bootstrap.min.css?v=' . SYSTEM_VER . '">';

@@ -6,6 +6,20 @@ global $m;
 $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
 ?>
 
+<?php
+$bindTotal = sizeof($i['user']['bduss']);
+$bindMax = (option::get('bduss_num') != '0' && ISVIP != true && option::get('bduss_num') != '-1') ? (int) option::get('bduss_num') : 0;
+?>
+<section class="dashboard-hero" style="margin-bottom:16px">
+    <div class="eyebrow hero-eyebrow">WORKSPACE · 账号接入</div>
+    <h1>百度账号</h1>
+    <p>管理已绑定的百度账号：健康度、分组、代理与批量签到。绑定入口在「扫码绑定 / 手动绑定」标签。</p>
+    <div class="dashboard-hero-meta">
+        <span class="hero-tag">已绑定 <?php echo $bindTotal; ?><?php echo $bindMax > 0 ? ' / ' . $bindMax : ''; ?> 个</span>
+        <?php if ($allowBind) { ?><span class="hero-tag" style="color:#c9f5d9">可继续绑定</span><?php } else { ?><span class="hero-tag" style="color:#ffd7d7">已达绑定上限</span><?php } ?>
+    </div>
+</section>
+
 <div class="cs-tabs" id="PageTab">
     <ul class="cs-tablist" role="tablist">
         <li><button type="button" class="cs-tab" role="tab" id="tab-adminid" aria-controls="adminid" aria-selected="true">管理账号</button></li>
@@ -207,19 +221,22 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
 </table>
 </div>
 <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 8px">
-    <b>统一代理</b>
-    <input type="text" class="form-control" id="proxy-input" style="width:300px" placeholder="http://host:port 或 socks5://user:pass@host:port">
-    <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm" id="proxy-apply">应用到我的全部账号</button>
-    <span class="text-muted" style="font-size:12px">留空并应用 = 全部恢复跟随全局；填 off = 全部禁用代理</span>
-</div>
-<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 16px">
     <b>聚合操作</b>
     <button type="button" class="cs-btn cs-btn-warning cs-btn-sm" id="sign-run-all">⚡ 立即签到（我的全部账号）</button>
     <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm" id="sign-run-one">立即签到（选中账号）</button>
     <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm" id="bulk-refresh-tieba">刷新贴吧列表（全部账号）</button>
     <span class="text-muted" style="font-size:12px" id="sign-summary">单次立即签到最多处理 15 个贴吧，其余由计划任务继续完成</span>
 </div>
-<div style="margin-top:18px">
+<details style="margin:4px 0 8px">
+<summary style="cursor:pointer;font-weight:600;font-size:13px">高级：统一代理 / 我的贴吧·关注与等级 —— 默认折叠</summary>
+<div style="margin-top:10px">
+<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 8px">
+    <b>统一代理</b>
+    <input type="text" class="form-control" id="proxy-input" style="width:300px" placeholder="http://host:port 或 socks5://user:pass@host:port">
+    <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm" id="proxy-apply">应用到我的全部账号</button>
+    <span class="text-muted" style="font-size:12px">留空并应用 = 全部恢复跟随全局；填 off = 全部禁用代理</span>
+</div>
+<div style="margin-top:14px">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
         <b>我的贴吧 · 关注与等级</b>
         <select id="mo-pid" class="form-control" style="width:auto">
@@ -238,6 +255,8 @@ $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
     <div id="mo-summary" class="text-muted" style="margin-bottom:8px"></div>
     <div id="mo-forums" style="display:flex;flex-wrap:wrap;gap:6px"></div>
 </div>
+</div>
+</details>
 <script type="text/javascript">
     (function () {
         var moLoading = false;

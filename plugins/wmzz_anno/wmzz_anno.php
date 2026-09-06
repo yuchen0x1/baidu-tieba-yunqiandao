@@ -30,7 +30,7 @@ function wmzz_anno_show()
 function wmzz_anno_addaction_navi()
 {
     ?>
-    <li><a href="index.php?mod=admin:setplug&plug=wmzz_anno"><span class="glyphicon glyphicon-bullhorn"></span> 公告栏管理</a></li>
+    <li><a href="index.php?mod=admin:setplug&plug=wmzz_anno"><svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l18-7v18l-18-7v-4z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg><span>公告栏管理</span></a></li>
     <?php
 }
 

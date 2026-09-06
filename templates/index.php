@@ -48,11 +48,13 @@ foreach ($trend30 as $tr) {
     $trendRate[] = $tr['rate'];
 }
 doAction('index_1');
+$dashHour = (int) date('G');
+$dashGreet = $dashHour < 6 ? '夜深了' : ($dashHour < 12 ? '早上好' : ($dashHour < 14 ? '中午好' : ($dashHour < 19 ? '下午好' : '晚上好')));
 ?>
 
 <section class="dashboard-hero">
     <div class="eyebrow hero-eyebrow">Cloud Sign Studio / <?php echo $today; ?></div>
-    <h1>把签到状态，集中在一个工作台。</h1>
+    <h1><?php echo $dashGreet; ?>，<?php echo htmlspecialchars(NAME, ENT_QUOTES, 'UTF-8'); ?></h1>
     <p><?php echo htmlspecialchars(SYSTEM_NAME, ENT_QUOTES, 'UTF-8'); ?> 正在运行。这里可以快速查看账号、贴吧数量、签到状态和系统健康情况。</p>
     <div class="dashboard-hero-meta">
         <span class="hero-tag">版本 V<?php echo SYSTEM_VER . (SYSTEM_REV != '' ? '.' . SYSTEM_REV : ''); ?></span>
@@ -93,6 +95,11 @@ doAction('index_1');
         <span class="metric-label">签到状态</span>
         <strong class="metric-value"><button type="button" class="cs-btn cs-btn-ghost cs-btn-sm" data-view-status>查看状态</button></strong>
         <span class="metric-note">读取最近一次任务结果</span>
+    </div>
+    <div class="metric-card">
+        <span class="metric-label">连续签到</span>
+        <strong class="metric-value"><?php echo (int) $streak['current_streak']; ?> 天</strong>
+        <span class="metric-note">最长 <?php echo (int) $streak['max_streak']; ?> 天</span>
     </div>
 </section>
 
@@ -273,7 +280,9 @@ doAction('index_1');
 </div>
 
 <?php if (ROLE == 'admin') { ?>
-<div class="dashboard-grid dashboard-grid--spaced">
+<details style="margin:20px 1% 0">
+<summary style="cursor:pointer;font-weight:600">管理员区域：系统健康 / 服务器信息（点击展开）</summary>
+<div class="dashboard-grid dashboard-grid--spaced" style="margin-top:16px">
     <section class="panel panel-warning">
         <div class="panel-heading"><span class="panel-title">系统健康</span></div>
         <ul class="cs-list">
@@ -290,8 +299,8 @@ doAction('index_1');
                 }
                 ?>
             </li>
-            <?php if (defined('ANTI_CSRF') && !ANTI_CSRF) { ?><li class="cs-list-item"><span class="text-danger">安全提醒：</span>站点的 CSRF 防御已关闭。</li><?php } ?>
-            <?php if (version_compare(PHP_VERSION, '5.4.0') < 0) { ?><li class="cs-list-item"><span class="text-danger">运行环境提醒：</span>当前 PHP 版本较低。</li><?php } ?>
+            <?php if (defined('ANTI_CSRF') && !ANTI_CSRF) { ?><li class="cs-list-item cs-list-item--inline"><span class="text-danger">安全提醒：</span>站点的 CSRF 防御已关闭。</li><?php } ?>
+            <?php if (version_compare(PHP_VERSION, '5.4.0') < 0) { ?><li class="cs-list-item cs-list-item--inline"><span class="text-danger">运行环境提醒：</span>当前 PHP 版本较低。</li><?php } ?>
             <?php doAction('index_p_3'); ?>
         </ul>
     </section>
@@ -306,6 +315,7 @@ doAction('index_1');
         </ul>
     </section>
 </div>
+</details>
 <?php } ?>
 
 <?php doAction('index_3'); doAction('index_2'); ?>

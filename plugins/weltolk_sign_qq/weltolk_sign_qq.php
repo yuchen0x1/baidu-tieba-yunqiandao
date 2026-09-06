@@ -32,8 +32,7 @@ function weltolk_sign_qq_set_navi()
     ?>
     <li <?php if (isset($_GET['plugin']) && $_GET['plugin'] == 'weltolk_sign_qq') {
         echo 'class="active"';
-        } ?>><a href="index.php?plugin=weltolk_sign_qq"><span
-                    class="glyphicon glyphicon-circle-arrow-up"></span> 每日签到qq推送</a></li>
+        } ?>><a href="index.php?plugin=weltolk_sign_qq"><svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span>每日签到QQ推送</span></a></li>
 
     <?php
 }
@@ -42,7 +41,7 @@ function weltolk_sign_qq_set_navi3()
 {
     ?>
     <li><a href="index.php?mod=admin:setplug&plug=weltolk_sign_qq"><span
-                    class="glyphicon glyphicon-ban-circle"></span> 每日签到qq推送管理</a>
+                    <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span>每日签到QQ推送管理</span></a>
     </li>
     <?php
 }

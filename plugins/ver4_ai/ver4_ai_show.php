@@ -17,7 +17,9 @@ $uid = UID;
 
 //管理员站点开关
 if (ver4_ai_cfg('ver4_ai_user_enable', '1') !== '1') {
-    echo '<div class="page-heading"><div><div class="eyebrow">AI ASSISTANT</div><h1>AI 发帖/回帖</h1></div></div>';
+    echo '<section class="dashboard-hero"><div class="eyebrow hero-eyebrow">AI ASSISTANT</div><h1>AI 发帖/回帖</h1>'
+        . '<p>接入你自己的大模型（OpenAI 兼容），AI 将代替你的百度账号在目标贴吧定时发主题帖、智能回帖。</p>'
+        . '<div class="dashboard-hero-meta"><span class="hero-tag" style="color:#ffd7d7">功能已关闭</span></div></section>';
     echo '<div class="alert alert-warning">管理员暂未开放 AI 发帖/回帖功能，如有需要请联系站长。</div>';
     loadfoot();
     die;
@@ -29,13 +31,21 @@ $hasShared = ver4_ai_shared_cfg() !== false;
 //未绑定百度账号时给出引导
 $bdRow = $m->once_fetch_array("SELECT COUNT(*) AS c FROM `" . DB_PREFIX . "baiduid` WHERE `uid` = {$uid}");
 if ((int) $bdRow['c'] < 1) {
-    echo '<div class="page-heading"><div><div class="eyebrow">AI ASSISTANT</div><h1>AI 发帖/回帖</h1></div></div>';
+    echo '<section class="dashboard-hero"><div class="eyebrow hero-eyebrow">AI ASSISTANT</div><h1>AI 发帖/回帖</h1>'
+        . '<p>接入你自己的大模型（OpenAI 兼容），AI 将代替你的百度账号在目标贴吧定时发主题帖、智能回帖。</p>'
+        . '<div class="dashboard-hero-meta"><span class="hero-tag" style="color:#ffd7d7">未绑定百度账号</span></div></section>';
     echo '<div class="alert alert-warning">您还没有绑定百度账号，请先前往 <a href="index.php?mod=baiduid">百度账号</a> 页绑定后使用 AI 功能。</div>';
     loadfoot();
     die;
 }
 
 //保存设置
+if (isset($_POST['uai_hero_enable'])) {
+    csrf(true, true);
+    $heroOn = $_POST['uai_hero_enable'] == '1' ? '1' : '0';
+    ver4_ai_uopt_set($uid, 'uai_enable', $heroOn);
+    redirect('index.php?plugin=ver4_ai&success=' . urlencode('AI 总开关已' . ($heroOn == '1' ? '开启' : '关闭')));
+}
 if (isset($_POST['uai_save'])) {
     csrf(true, true);
     ver4_ai_uopt_set($uid, 'uai_enable', $_POST['uai_enable'] == '1' ? '1' : '0');
@@ -228,9 +238,11 @@ if ($hasOwnKey) {
 } else {
     $sourceText = '未配置';
 }
-$statusBadge = $aiEnable == '1'
-    ? ($resolved !== false ? '<span class="cs-badge cs-badge-success">运行中</span>' : '<span class="cs-badge cs-badge-danger">已启用但配置不可用</span>')
-    : '<span class="cs-badge cs-badge-neutral">未开启</span>';
+if ($aiEnable == '1') {
+    $statusText = $resolved !== false ? '运行中' : '已启用但配置不可用';
+} else {
+    $statusText = '未开启';
+}
 
 //我的百度账号列表
 $myAccounts = array();
@@ -249,15 +261,27 @@ while ($r = $m->fetch_array($logRs)) {
     $recentRows[] = $r;
 }
 ?>
-<div class="page-heading"><div><div class="eyebrow">AI ASSISTANT</div><h1>AI 发帖/回帖</h1></div></div>
-
-<div class="cs-alert cs-alert-info" role="alert" style="margin:0 1%">
-    <svg class="cs-alert-icon" aria-hidden="true"><use href="#i-info"/></svg>
-    <div class="cs-alert-body">
-        当前状态：<?php echo $statusBadge; ?>　·　配置来源：<?php echo $sourceText; ?>　·　我的账号：<?php echo count($myAccounts); ?> 个
-        <br/>接入你自己的大模型（OpenAI 兼容），AI 将代替你的百度账号在目标贴吧定时发主题帖、智能回帖。
+<section class="dashboard-hero">
+    <div class="eyebrow hero-eyebrow">AI ASSISTANT</div>
+    <h1>AI 发帖/回帖</h1>
+    <p>接入你自己的大模型（OpenAI 兼容），AI 将代替你的百度账号在目标贴吧定时发主题帖、智能回帖。</p>
+    <div class="dashboard-hero-meta">
+        <span class="hero-tag"<?php echo $statusText === '已启用但配置不可用' ? ' style="color:#ffb3b3"' : ''; ?>>状态：<?php echo $statusText; ?></span>
+        <span class="hero-tag">来源：<?php echo $sourceText; ?></span>
+        <span class="hero-tag">我的账号 <?php echo count($myAccounts); ?> 个</span>
     </div>
-</div>
+    <div class="hero-actions">
+        <form method="post" action="index.php?plugin=ver4_ai" style="display:inline-flex;align-items:center;gap:8px;margin:0">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
+            <label style="margin:0;font-size:12px;color:inherit">AI 总开关</label>
+            <select name="uai_hero_enable" class="form-control" style="width:auto;height:30px" onchange="this.form.submit()">
+                <option value="1" <?php echo $aiEnable == '1' ? 'selected' : ''; ?>>开启</option>
+                <option value="0" <?php echo $aiEnable == '1' ? '' : 'selected'; ?>>关闭</option>
+            </select>
+            <noscript><button type="submit" class="cs-btn cs-btn-secondary cs-btn-sm">保存</button></noscript>
+        </form>
+    </div>
+</section>
 
 <?php if (isset($_GET['success'])): ?>
 <div class="alert alert-success" style="margin:10px 1% 0"><?php echo htmlspecialchars((string) $_GET['success'], ENT_QUOTES, 'UTF-8'); ?></div>

@@ -53,11 +53,26 @@ $todaySuccess = (int) ($todayRow['s'] ?? 0);
 $todayError   = (int) ($todayRow['e'] ?? 0);
 $todayTotal   = (int) ($todayRow['t'] ?? 0);
 $todayRate    = $todayTotal > 0 ? round($todaySuccess / $todayTotal * 100, 1) : 0;
+
+// 我的排名（未上榜则不显示）
+$myRank = 0;
+foreach ($rankRows as $idx => $r) {
+    if ($r['uid'] == UID) {
+        $myRank = $idx + 1;
+        break;
+    }
+}
+$rankMedals = array(1 => '🥇', 2 => '🥈', 3 => '🥉');
 ?>
 <section class="dashboard-hero" style="margin:16px 1%">
     <div class="eyebrow hero-eyebrow">User Ranking / <?php echo date('Y-m-d'); ?></div>
     <h1>签到排行榜</h1>
     <p>近 30 天签到活跃度排名。默认显示用户昵称，可在「个人设置」中隐藏。仅统计有签到记录的用户。</p>
+    <div class="dashboard-hero-meta">
+        <?php if ($myRank > 0) { ?><span class="hero-tag">我的排名 #<?php echo $myRank; ?></span><?php } ?>
+        <span class="hero-tag">上榜 <?php echo $totalUsers; ?> 人</span>
+        <span class="hero-tag">今日已签 <?php echo $todaySuccess; ?></span>
+    </div>
 </section>
 
 <section class="metric-grid" aria-label="排行统计" style="margin:16px 1%">
@@ -86,16 +101,6 @@ $todayRate    = $todayTotal > 0 ? round($todaySuccess / $todayTotal * 100, 1) : 
 </div>
 <?php } else { ?>
 
-<div class="cs-chart-card" style="margin:16px 1%">
-    <div class="cs-chart-card-header">
-        <div>
-            <h3 class="cs-chart-card-title">Top <?php echo count($rankRows); ?> 用户签到次数</h3>
-            <span class="cs-chart-card-subtitle">基于近 30 天成功签到数</span>
-        </div>
-    </div>
-    <div class="cs-chart-container" id="chart-ranking-bar" style="min-height:360px"></div>
-</div>
-
 <div style="margin:16px 1%;overflow-x:auto">
     <table class="cs-table cs-ranking-table">
         <thead>
@@ -112,9 +117,10 @@ $todayRate    = $todayTotal > 0 ? round($todaySuccess / $todayTotal * 100, 1) : 
         <?php foreach ($rankRows as $idx => $r) {
             $rank = $idx + 1;
             $positionClass = $rank <= 3 ? 'rank-' . $rank : '';
+            $medal = isset($rankMedals[$rank]) ? $rankMedals[$rank] . ' ' : '';
         ?>
             <tr>
-                <td><span class="cs-rank-position <?php echo $positionClass; ?>"><?php echo $rank; ?></span></td>
+                <td><span class="cs-rank-position <?php echo $positionClass; ?>"><?php echo $medal . $rank; ?></span></td>
                 <td><?php echo htmlspecialchars($r['name'], ENT_QUOTES, 'UTF-8'); ?><?php if ($r['is_hidden']) { ?> <span class="cs-badge cs-badge-neutral" style="margin-left:6px">已隐藏</span><?php } ?></td>
                 <td><?php echo (int) $r['success_count']; ?></td>
                 <td><?php echo (int) $r['total_count']; ?></td>
@@ -130,6 +136,16 @@ $todayRate    = $todayTotal > 0 ? round($todaySuccess / $todayTotal * 100, 1) : 
         <?php } ?>
         </tbody>
     </table>
+</div>
+
+<div class="cs-chart-card" style="margin:16px 1%">
+    <div class="cs-chart-card-header">
+        <div>
+            <h3 class="cs-chart-card-title">Top <?php echo count($rankRows); ?> 用户签到次数</h3>
+            <span class="cs-chart-card-subtitle">基于近 30 天成功签到数</span>
+        </div>
+    </div>
+    <div class="cs-chart-container" id="chart-ranking-bar" style="min-height:360px"></div>
 </div>
 <?php } ?>
 

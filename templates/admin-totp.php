@@ -3,6 +3,14 @@
 }
 global $i;
 ?>
+<section class="dashboard-hero" style="margin-top:16px">
+    <div class="eyebrow hero-eyebrow">OPERATIONS · 安全</div>
+    <h1>双因素认证</h1>
+    <p>为管理员登录增加 TOTP 动态码验证，密钥仅首次明文展示，请妥善备份。</p>
+    <div class="dashboard-hero-meta">
+        <span class="hero-tag"><?php echo !empty($i['totp_enabled']) ? '已开启' : '未开启'; ?></span>
+    </div>
+</section>
 <?php if (!empty($i['totp_msg'])) {
     echo '<div class="alert alert-info">' . htmlspecialchars((string) $i['totp_msg'], ENT_QUOTES, 'UTF-8') . '</div>';
 } ?>

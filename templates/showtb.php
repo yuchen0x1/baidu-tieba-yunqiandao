@@ -94,12 +94,17 @@ if (!empty($i['user']['bduss'])) {
     echo ' | <a href="setting.php?mod=showtb&reset" onclick="return confirm(\'要把所有出错的贴吧重置为待签到状态吗？今天已签到成功的不会受影响。\');" style="cursor:pointer">重签出错吧</a>';
     echo ' | <a href="javascript:;" onclick="go(\'submit_button\');" style="cursor:pointer">前往底部</a></div></div>';
     if (!empty($f)) {
-        echo '<div class="cs-tabs"><ul class="cs-tablist" role="tablist">';
-        foreach ($i['user']['baidu'] as $pkey => $pval) {
-            echo '<li><button type="button" class="cs-tab pidlist" role="tab" onclick="showtbpanel(\'' . htmlspecialchars($pkey, ENT_QUOTES, 'UTF-8') . '\');">' . htmlspecialchars(($pval ?: $i['user']['baidu_portrait'][$pkey]), ENT_QUOTES, 'UTF-8') . '</button></li>';
+        echo '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:14px 1% 0">';
+        echo '<label style="margin:0;font-size:12px;color:var(--color-muted)">账号</label>';
+        echo '<select id="showtb-acc" class="form-control" style="width:auto" onchange="showtbpanel(this.value);">';
+        foreach ($i['user']['baidu_portrait'] as $pkey => $pval) {
+            echo '<option value="' . htmlspecialchars($pkey, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars(($pval ?: $i['user']['baidu_portrait'][$pkey]), ENT_QUOTES, 'UTF-8') . '</option>';
         }
-        echo '</ul></div>';
-        echo '<form action="setting.php?mod=showtb&set" method="post">';
+        echo '</select>';
+        echo '<input id="showtb-search" class="form-control" placeholder="搜索当前账号的贴吧…" style="width:220px;height:30px">';
+        echo '<span id="showtb-pager" style="display:inline-flex;gap:4px;align-items:center;font-size:12px"></span>';
+        echo '</div>';
+        echo '<form action="setting.php?mod=showtb&set" method="post" id="showtb-form">';
         echo '<input type="hidden" name="csrf_token" value="' . htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') . '">';
         foreach ($i['user']['baidu_portrait'] as $pkey => $pval) {
             if (isset($f[$pkey])) {
@@ -117,11 +122,80 @@ if (!empty($i['user']['bduss'])) {
                 echo '<div id="tbpidpanel_' . $pkey . '" class="tbpanel cs-alert cs-alert-warning" style="display:none;margin-top:16px"><svg class="cs-alert-icon" aria-hidden="true"><use href="#i-alert"/></svg><div class="cs-alert-body">还没有添加任何贴吧，点击上方的按钮扫描贴吧。<br/>扫描不到贴吧？请检查百度账号BDUSS是否已经失效（尝试重新绑定）</div></div>';
             }
         }
-        echo '<div style="margin-top:16px"><button type="submit" id="submit_button" class="cs-btn cs-btn-primary cs-btn-lg cs-btn-block"><svg class="cs-icon" style="width:16px;height:16px" aria-hidden="true"><use href="#i-check"/></svg> 提交更改</button></div></form>';
+        echo '<div id="showtb-savebar" style="position:sticky;bottom:0;z-index:20;margin-top:16px;padding:10px 14px;background:var(--color-surface,#fff);border:1px solid var(--color-line);border-radius:8px;box-shadow:0 -4px 12px rgba(0,0,0,.08);display:flex;justify-content:flex-end"><button type="submit" id="submit_button" class="cs-btn cs-btn-primary"><svg class="cs-icon" style="width:16px;height:16px" aria-hidden="true"><use href="#i-check"/></svg> 提交更改</button></div></form>';
     } else {
         echo '<div class="cs-alert cs-alert-warning" role="alert"><svg class="cs-alert-icon" aria-hidden="true"><use href="#i-alert"/></svg><div class="cs-alert-body">你已经成功绑定了一个贴吧账号，但是还没有添加任何贴吧，点击上方的按钮扫描贴吧。<br/>扫描不到贴吧？请检查百度账号BDUSS是否已经失效（尝试重新绑定）</div></div>';
     }
     echo '<div style="text-align:center;margin-top:16px"><a href="javascript:scroll(0,0)" style="color:var(--color-muted);font-size:12px">返回顶部</a></div>';
+    ?>
+    <script>
+    (function () {
+        var PAGE_SIZE = 50;
+        var panels = document.querySelectorAll('.tbpanel');
+        var search = document.getElementById('showtb-search');
+        var pager = document.getElementById('showtb-pager');
+        var currentPid = null;
+
+        function rowsOf(panel) {
+            return Array.prototype.slice.call(panel.querySelectorAll('tbody tr'));
+        }
+        function renderPage(panel, page, keyword) {
+            var rows = rowsOf(panel);
+            var visible = rows.filter(function (r) {
+                return !keyword || r.textContent.toLowerCase().indexOf(keyword) >= 0;
+            });
+            var pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+            if (page > pages) { page = pages; }
+            rows.forEach(function (r) { r.style.display = 'none'; });
+            visible.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).forEach(function (r) { r.style.display = ''; });
+            if (pager) {
+                var html = '';
+                if (pages > 1 || keyword) {
+                    html += '共 ' + visible.length + ' 条';
+                    if (pages > 1) {
+                        html += '　';
+                        for (var p = 1; p <= pages; p++) {
+                            html += '<a href="javascript:;" data-page="' + p + '" style="' + (p === page ? 'font-weight:700;color:var(--color-brand,#6d5ae0)' : 'color:inherit') + ';text-decoration:none">' + p + '</a>';
+                        }
+                    }
+                }
+                pager.innerHTML = html;
+                pager.querySelectorAll('a[data-page]').forEach(function (a) {
+                    a.addEventListener('click', function () {
+                        renderPage(panel, parseInt(a.getAttribute('data-page'), 10), keyword);
+                    });
+                });
+            }
+        }
+        window.showtbSearchApply = function () {
+            var panel = document.getElementById('tbpidpanel_' + currentPid);
+            if (!panel) { return; }
+            renderPage(panel, 1, search && search.value ? search.value.trim().toLowerCase() : '');
+        };
+        var oldShowtbpanel = null;
+        window.addEventListener('load', function () {
+            oldShowtbpanel = window.showtbpanel;
+            window.showtbpanel = function (pid) {
+                currentPid = pid;
+                if (oldShowtbpanel) { oldShowtbpanel(pid); }
+                var sel = document.getElementById('showtb-acc');
+                if (sel && sel.value !== pid) { sel.value = pid; }
+                window.showtbSearchApply();
+            };
+        });
+        if (search) { search.addEventListener('input', window.showtbSearchApply); }
+        //初始化：默认展示第一个账号
+        var first = document.querySelector('.tbpanel');
+        if (first) {
+            var pid = first.id.replace('tbpidpanel_', '');
+            var sel = document.getElementById('showtb-acc');
+            if (sel) { sel.value = pid; }
+            currentPid = pid;
+            window.showtbSearchApply();
+        }
+    })();
+    </script>
+<?php
 } else {
     echo '<div class="cs-alert cs-alert-danger"><svg class="cs-alert-icon" aria-hidden="true"><use href="#i-alert"/></svg><div class="cs-alert-body">无法列出贴吧列表，因为当前没有绑定百度账号（请在「百度账号管理」页面绑定）</div></div>';
 }
