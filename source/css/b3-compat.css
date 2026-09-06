@@ -275,3 +275,16 @@
 .btn:focus-visible { outline: var(--focus-outline); outline-offset: var(--focus-outline-offset); }
 .btn[disabled], .btn.disabled { opacity: .55; cursor: not-allowed; pointer-events: none; }
 .form-control::placeholder { color: var(--color-muted-light); opacity: 1; }
+
+/* BS3 .close 在 BS5 样式表中不存在，补齐右浮关闭钮 */
+.modal-header .close {
+  float: right;
+  font-size: 24px;
+  font-weight: var(--fw-regular);
+  line-height: 1;
+  margin: -6px 0 0;
+  color: var(--color-muted);
+  background: transparent;
+  border: 0;
+}
+.modal-header .close:hover { color: var(--color-text); }

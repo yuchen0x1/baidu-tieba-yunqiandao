@@ -808,52 +808,46 @@ if ($page == 'config') {
     <h1>每日数据库备份 QQ 推送</h1>
     <p>每日定时备份数据库并把备份文件推送到你的 QQ。新增 / 修改通过下方对应按钮弹窗操作。</p>
 </section>
-<b>立即备份之前先保存设定</b>
-<br/>
-<br/>
-<table class="table table-striped" id="user_settings">
+<div class="panel panel-info" style="margin:16px 1% 0">
+<div class="panel-heading"><span class="panel-title">备份设置</span><span style="float:right;font-size:12px;color:var(--color-muted)">最新日志：<?php echo htmlspecialchars($log, ENT_QUOTES, 'UTF-8') ?></span></div>
+<div class="panel-body">
+<p class="u-muted-sm" style="margin:0 0 8px">立即备份之前先保存设定；请将计划任务顺序设置为 0，以防止计划任务卡住导致没有备份。使用立即备份功能请确保已经设置了接收邮箱并保存。</p>
+<table class="table table-striped" id="user_settings" style="margin-bottom:0">
     <tr id="weltolk_backup_qq_enable">
-        <td>是否开启每日数据库备份qq推送</td>
+        <td style="width:45%">是否开启每日数据库备份 qq 推送</td>
         <td id="values">
-            <input type="radio" name="weltolk_backup_qq_enable"
-                   value="on" <?php echo $enable == "on" ? 'checked' : ''; ?> >开启<br/>
-            <input type="radio" name="weltolk_backup_qq_enable"
-                   value="off" <?php echo $enable == "off" ? 'checked' : ''; ?> >关闭
-
+            <label style="display:inline-flex;align-items:center;gap:6px;margin:0 16px 0 0;cursor:pointer"><input type="radio" name="weltolk_backup_qq_enable"
+                   value="on" <?php echo $enable == "on" ? 'checked' : ''; ?>>开启</label>
+            <label style="display:inline-flex;align-items:center;gap:6px;margin:0;cursor:pointer"><input type="radio" name="weltolk_backup_qq_enable"
+                   value="off" <?php echo $enable == "off" ? 'checked' : ''; ?>>关闭</label>
         </td>
     </tr>
     <tr id="weltolk_backup_qq_limit">
         <td>单次计划任务连续推送次数<br/>越小效率越低，但太大也可能导致超时</td>
         <td id="values">
             <input type="number" min="1" step="1" name="limit" value="<?php echo htmlspecialchars($limit, ENT_QUOTES, 'UTF-8') ?>"
-                   class="form-control" required>
+                   class="form-control" style="width:120px" required>
         </td>
     </tr>
     <tr>
-        <td>
+        <td colspan="2">
             <a id="save_button"
                onclick="save_event('user_settings','save_button')"
-               href="javascript:void(0)" class="btn btn-primary">
+               href="javascript:void(0)" class="btn btn-primary btn-sm">
                 保存设定
             </a>
-        </td>
-        <td>
             <button type="button"
                     onclick="backup_now()"
-                    class="btn btn-danger">立即备份
+                    class="btn btn-danger btn-sm">立即备份
             </button>
         </td>
     </tr>
 </table>
-
-<b>最新日志：<?php echo htmlspecialchars($log, ENT_QUOTES, 'UTF-8') ?></b>
-</br>
-<b>注：请将计划任务顺序设置为0，以防止计划任务卡住导致没有备份！使用立即备份功能请确保已经设置了接收邮箱并保存！</b>
-<br/>
-<br/>
+</div>
+</div>
 
 <!-- NAVI -->
-<ul class="nav nav-tabs" id="PageTab">
+<ul class="nav nav-tabs" id="PageTab" style="margin:16px 1% 0">
     <li class="active"><a href="#page_list" data-toggle="tab"
                           onclick="$('#page_list').css('display','');$('#page_config').css('display','none');">推送列表</a>
     </li>
@@ -867,17 +861,19 @@ if ($page == 'config') {
 <div class="tab-pane fade in active" id="page_list">
     <a name="#page_list"></a>
 
-    <br/>
-    <br/>
-    <input type="button" data-toggle="modal" data-target="#addqq"
-           class="btn btn-info btn-lg" value="+ 增加推送目标"
-           style="float:right;">
-    <input type="button" data-toggle="modal" data-target="#batchqqedit"
-           onclick="batch_qq_values()"
-           class="btn btn-info btn-lg" value="* 批量/搜索 修改"
-           style="float:right;">
-
-    <table class="table table-striped" id="qqtable">
+    <div class="panel panel-info" style="margin:16px 1% 0">
+    <div class="panel-heading">
+        <span class="panel-title">推送列表</span>
+        <span class="u-chip-row" style="float:right">
+            <input type="button" data-toggle="modal" data-target="#addqq"
+                   class="btn btn-info btn-sm" value="+ 增加推送目标">
+            <input type="button" data-toggle="modal" data-target="#batchqqedit"
+                   onclick="batch_qq_values()"
+                   class="btn btn-default btn-sm" value="批量 / 搜索 修改">
+        </span>
+    </div>
+    <div class="cs-table-wrap"><div class="cs-table-scroll">
+    <table class="table table-striped" id="qqtable" style="margin-bottom:0">
         <thead>
         <tr>
             <th id="id">ID</th>
@@ -887,7 +883,6 @@ if ($page == 'config') {
             <th id="type_id">号</th>
             <th id="path">群文件路径</th>
             <th id="debug"></th>
-            <th id="func"></th>
             <th id="nextdo">下次推送日期</th>
             <th id="editqq_button">修改</th>
             <th id="delqq_button">删除</th>
@@ -908,21 +903,22 @@ if ($page == 'config') {
                 <td>
                     <a id="debug_btn<?php echo (int) $v['id'] ?>"
                        onclick="debug_event('addedqq<?php echo (int) $v['id'] ?>', '<?php echo (int) $v['id'] ?>')"
-                       href="javascript:void(0)" class="btn btn-warning">
+                       href="javascript:void(0)" class="btn btn-warning btn-sm">
                         测试推送</a>
                 </td>
-                <td><a href="javascript:scroll(0,0)">返回顶部</a></td>
                 <td id="use"><?php echo date('Y-m-d', (int) $v['nextdo']) ?></td>
-                <td><a class="btn btn-default" data-toggle="modal" data-target="#editqq"
+                <td><a class="btn btn-default btn-sm" data-toggle="modal" data-target="#editqq"
                        onclick="edit_qq_values('addedqq<?php echo (int) $v['id'] ?>')"
-                       title="修改"><span class="glyphicon glyphicon-edit"></span> </a></td>
-                <td><a class="btn btn-default"
+                       title="修改"><svg class="icon-inline" aria-hidden="true" style="width:13px;height:13px;vertical-align:-2px"><use href="#i-edit"/></svg></a></td>
+                <td><a class="btn btn-default btn-sm cs-text-danger"
                        href="index.php?mod=admin:setplug&plug=weltolk_backup_qq&page=list&act=del&id=<?php echo (int) $v['id'] ?>&anchor=page_list"
-                       title="删除"><span class="glyphicon glyphicon-remove"></span> </a></td>
+                       title="删除"><svg class="icon-inline" aria-hidden="true" style="width:13px;height:13px;vertical-align:-2px"><use href="#i-trash"/></svg></a></td>
             </tr>
         <?php } ?>
         </tbody>
     </table>
+    </div></div>
+    </div>
 </div>
 
 <!-- END PAGE1 -->
@@ -931,16 +927,19 @@ if ($page == 'config') {
 <div class="tab-pane fade" id="page_config" style="display:none">
     <a name="#page_config"></a>
 
-    <br/><br/>
-    <input type="button" data-toggle="modal" data-target="#addconnect"
-           class="btn btn-info btn-lg" value="+ 增加推送地址"
-           style="float:right;">
-    <input type="button" data-toggle="modal" data-target="#batchedit"
-           onclick="batch_values()"
-           class="btn btn-info btn-lg" value="* 批量/搜索 修改"
-           style="float:right;">
-
-    <table class="table table-striped" id="connecttable">
+    <div class="panel panel-info" style="margin:16px 1% 0">
+    <div class="panel-heading">
+        <span class="panel-title">推送地址</span>
+        <span class="u-chip-row" style="float:right">
+            <input type="button" data-toggle="modal" data-target="#addconnect"
+                   class="btn btn-info btn-sm" value="+ 增加推送地址">
+            <input type="button" data-toggle="modal" data-target="#batchedit"
+                   onclick="batch_values()"
+                   class="btn btn-default btn-sm" value="批量 / 搜索 修改">
+        </span>
+    </div>
+    <div class="cs-table-wrap"><div class="cs-table-scroll">
+    <table class="table table-striped" id="connecttable" style="margin-bottom:0">
         <thead>
         <tr>
             <th id="id">ID</th>
@@ -962,21 +961,21 @@ if ($page == 'config') {
                 <td id="use"><?php echo htmlspecialchars($v['client'], ENT_QUOTES, 'UTF-8') ?></td>
                 <td id="use"><?php echo htmlspecialchars($v['connect_type'], ENT_QUOTES, 'UTF-8') ?></td>
                 <td id="use"><?php echo htmlspecialchars($v['address'], ENT_QUOTES, 'UTF-8') ?></td>
-                <td id="use">******<br/>
-                    <a href="javascript:scroll(0,0)">返回顶部</a>
-                </td>
+                <td id="use">******</td>
                 <input id="addedconnect<?php echo (int) $v['id'] ?>_access_token_hidden" type="hidden"
                        value="<?php echo htmlspecialchars($v['access_token'], ENT_QUOTES, 'UTF-8') ?>">
-                <td><a class="btn btn-default" data-toggle="modal" data-target="#editconnect"
+                <td><a class="btn btn-default btn-sm" data-toggle="modal" data-target="#editconnect"
                        onclick="edit_values('addedconnect<?php echo (int) $v['id'] ?>')"
-                       title="修改"><span class="glyphicon glyphicon-edit"></span> </a></td>
-                <td><a class="btn btn-default"
+                       title="修改"><svg class="icon-inline" aria-hidden="true" style="width:13px;height:13px;vertical-align:-2px"><use href="#i-edit"/></svg></a></td>
+                <td><a class="btn btn-default btn-sm cs-text-danger"
                        href="index.php?mod=admin:setplug&plug=weltolk_backup_qq&page=config&act=del&id=<?php echo (int) $v['id'] ?>&anchor=page_config"
-                       title="删除"><span class="glyphicon glyphicon-remove"></span> </a></td>
+                       title="删除"><svg class="icon-inline" aria-hidden="true" style="width:13px;height:13px;vertical-align:-2px"><use href="#i-trash"/></svg></a></td>
             </tr>
         <?php } ?>
         </tbody>
     </table>
+    </div></div>
+    </div>
 
 </div>
 
@@ -993,7 +992,7 @@ if ($page == 'config') {
             </div>
             <form id="addconnect_form"
                   action="index.php?mod=admin:setplug&plug=weltolk_backup_qq&page=config&act=addconnect"
-                  method="post">
+                  method="post"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
                 <div class="modal-body">
                     <div class="input-group">
                         <span class="input-group-addon">qq客户端</span>
@@ -1050,7 +1049,7 @@ if ($page == 'config') {
                 <h4 class="modal-title" id="addqq_title">添加推送目标</h4>
             </div>
             <form id="addqq_form" action="index.php?mod=admin:setplug&plug=weltolk_backup_qq&page=list&act=addqq"
-                  method="post">
+                  method="post"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
                 <div class="modal-body">
                     <div class="input-group">
                         <span class="input-group-addon">使用的推送地址</span>
@@ -1122,7 +1121,7 @@ if ($page == 'config') {
             </div>
             <form id="editconnect_form"
                   action="index.php?mod=admin:setplug&plug=weltolk_backup_qq&page=config&act=update"
-                  method="post">
+                  method="post"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
                 <div class="modal-body">
                     <div class="input-group">
                         <span class="input-group-addon">ID</span>
@@ -1177,7 +1176,7 @@ if ($page == 'config') {
                 <h4 class="modal-title" id="editqq_title">修改推送目标</h4>
             </div>
             <form id="editqq_form" action="index.php?mod=admin:setplug&plug=weltolk_backup_qq&page=list&act=update"
-                  method="post">
+                  method="post"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
                 <div class="modal-body">
                     <b>日期格式为yyyy-mm-dd</b>
                     <br/>
@@ -1247,7 +1246,7 @@ if ($page == 'config') {
             </div>
             <form id="batchedit_form"
                   action="index.php?mod=admin:setplug&plug=weltolk_backup_qq&page=config&act=batchedit"
-                  method="post">
+                  method="post"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
                 <div class="modal-body">
                     <b>填了多个选项的情况下是判断条件都满足（条件和）</b>
                     <br/>
@@ -1312,7 +1311,7 @@ if ($page == 'config') {
             </div>
             <form id="batchqqedit_form"
                   action="index.php?mod=admin:setplug&plug=weltolk_backup_qq&page=list&act=batchqqedit"
-                  method="post">
+                  method="post"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
                 <div class="modal-body">
                     <b>填了多个选项的情况下是判断条件都满足（条件和）</b>
                     <br/>
