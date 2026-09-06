@@ -13,25 +13,21 @@ $bindMax = (option::get('bduss_num') != '0' && ISVIP != true && option::get('bdu
 <section class="dashboard-hero" style="margin-bottom:16px">
     <div class="eyebrow hero-eyebrow">WORKSPACE · 账号接入</div>
     <h1>百度账号</h1>
-    <p>管理已绑定的百度账号：健康度、分组、代理与批量签到。绑定入口在「扫码绑定 / 手动绑定」标签。</p>
+    <p>管理已绑定的百度账号：健康度、分组、代理与批量签到。<?php if ($allowBind) { ?>需要新增账号时，点击右上角「扫码绑定」或「手动绑定」。<?php } ?></p>
     <div class="dashboard-hero-meta">
         <span class="hero-tag">已绑定 <?php echo $bindTotal; ?><?php echo $bindMax > 0 ? ' / ' . $bindMax : ''; ?> 个</span>
         <?php if ($allowBind) { ?><span class="hero-tag" style="color:#c9f5d9">可继续绑定</span><?php } else { ?><span class="hero-tag" style="color:#ffd7d7">已达绑定上限</span><?php } ?>
     </div>
+    <?php if ($allowBind) { ?>
+    <div class="hero-actions">
+        <button type="button" class="cs-btn cs-btn-primary cs-btn-sm" id="bind-scan-btn"><svg class="cs-icon" style="width:14px;height:14px" aria-hidden="true"><use href="#i-user-plus"/></svg> 扫码绑定</button>
+        <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm" id="bind-manual-btn"><svg class="cs-icon" style="width:14px;height:14px" aria-hidden="true"><use href="#i-link"/></svg> 手动绑定</button>
+    </div>
+    <?php } ?>
 </section>
 
-<div class="cs-tabs" id="PageTab">
-    <ul class="cs-tablist" role="tablist">
-        <li><button type="button" class="cs-tab" role="tab" id="tab-adminid" aria-controls="adminid" aria-selected="true">管理账号</button></li>
-        <?php if ($allowBind) { ?>
-            <li><button type="button" class="cs-tab" role="tab" id="tab-newid" aria-controls="newid" aria-selected="false">扫码绑定</button></li>
-            <li><button type="button" class="cs-tab" role="tab" id="tab-newid2" aria-controls="newid2" aria-selected="false">手动绑定</button></li>
-        <?php } ?>
-    </ul>
-</div>
-
 <!-- PAGE1: ADMINID -->
-<div class="cs-tabpanel" id="adminid" role="tabpanel" aria-labelledby="tab-adminid">
+<div id="adminid">
 <?php if (option::get('bduss_num') == '-1' && ISVIP != true) {
     ?>
 <div class="cs-alert cs-alert-danger" role="alert">
@@ -44,7 +40,7 @@ $bindMax = (option::get('bduss_num') != '0' && ISVIP != true && option::get('bdu
 <div class="cs-alert cs-alert-warning">
     <svg class="cs-alert-icon" aria-hidden="true"><use href="#i-alert"/></svg>
     <div class="cs-alert-body">
-        无法显示列表，因为当前还没有绑定任何百度账号<br/>若要绑定账号，请点击「扫码绑定」或「手动绑定」标签
+        无法显示列表，因为当前还没有绑定任何百度账号<br/>若要绑定账号，请点击右上角「扫码绑定」或「手动绑定」按钮
         <?php if (option::get('bduss_num') != '0' && ISVIP != true) {
             echo '，您最多能够绑定 ' . option::get('bduss_num') . ' 个账号';
         } ?>
@@ -436,7 +432,7 @@ $bindMax = (option::get('bduss_num') != '0' && ISVIP != true && option::get('bdu
 </div>
 
 <!-- PAGE2: NEWID -->
-<div class="cs-tabpanel" id="newid" role="tabpanel" aria-labelledby="tab-newid" hidden>
+<div id="newid" hidden>
   <script type="text/javascript">
       $(document).ready(function(){
           $("#addbdid_form").submit(function(e){
@@ -527,7 +523,7 @@ $bindMax = (option::get('bduss_num') != '0' && ISVIP != true && option::get('bdu
 </div>
 
 <!-- PAGE3: NEWID2 -->
-<div class="cs-tabpanel" id="newid2" role="tabpanel" aria-labelledby="tab-newid2" hidden>
+<div id="newid2" hidden>
 <form action="setting.php" method="post">
 <input type="hidden" name="mod" value="baiduid">
 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
@@ -575,7 +571,28 @@ $bindMax = (option::get('bduss_num') != '0' && ISVIP != true && option::get('bdu
 </div>
 
 <?php doAction('baiduid'); ?>
+<div id="bind-wizard-holder" hidden></div>
 <script type="text/javascript">
-// v4: 初始化 baiduid tabs（CS.tabs 自动初始化 .cs-tabs，此处兜底）
-if (window.CS && CS.tabs) { CS.tabs.init(document.getElementById('PageTab')); }
+// 绑定向导：把对应面板移入 CS.modal；关闭时面板自动归位（保留节点与其事件绑定，可重复打开）
+(function () {
+    function openBindWizard(panelId, title) {
+        var panel = document.getElementById(panelId);
+        var holder = document.getElementById('bind-wizard-holder');
+        if (!panel || !holder) { return; }
+        var modal = CS.modal.open({ title: title, body: panel, size: 'lg' });
+        panel.hidden = false;
+        var observer = new MutationObserver(function () {
+            if (!document.body.contains(modal)) {
+                holder.appendChild(panel);
+                panel.hidden = true;
+                observer.disconnect();
+            }
+        });
+        observer.observe(document.body, { childList: true });
+    }
+    var scan = document.getElementById('bind-scan-btn');
+    if (scan) { scan.addEventListener('click', function () { openBindWizard('newid', '扫码绑定百度账号'); }); }
+    var manual = document.getElementById('bind-manual-btn');
+    if (manual) { manual.addEventListener('click', function () { openBindWizard('newid2', '手动绑定百度账号'); }); }
+})();
 </script>
