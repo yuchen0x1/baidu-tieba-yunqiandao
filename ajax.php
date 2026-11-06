@@ -146,6 +146,14 @@ switch (SYSTEM_PAGE) {
             } catch (Throwable $e) {
                 error_log('获取历史更新日志失败：' . $e->getMessage());
             }
+        } catch (ProjectUpdaterRateLimitException $e) {
+            error_log('在线更新检查失败（限流）：' . $e->getMessage());
+            $retryAt = $e->getResetAt() > time() ? $e->getResetAt() : time() + max(60, $e->getRetryAfter());
+            echo '<div class="alert alert-warning"><b>检查更新失败：GitHub 接口达到匿名请求限额。</b><br/>'
+                . 'GitHub 对匿名请求按 IP 限流，服务器出口 IP 当日额度已用尽。建议：'
+                . '<ul><li>稍后重试（额度预计 ' . htmlspecialchars(date('H:i', $retryAt), ENT_QUOTES, 'UTF-8') . ' 前后恢复）；</li>'
+                . '<li>在部署环境中配置环境变量 <code>UPDATE_GITHUB_TOKEN</code>（GitHub 个人访问令牌，只发送给 api.github.com）可提升限额；</li>'
+                . '<li><a href="' . htmlspecialchars(PROJECT_RELEASES_URL, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener">打开项目 Release 页面手动更新</a>。</li></ul></div>';
         } catch (Throwable $e) {
             error_log('在线更新检查失败：' . $e->getMessage());
             echo '<div class="alert alert-danger"><b>检查更新失败：</b>暂时无法连接更新服务器，请稍后重试或打开项目 Release 页面手动更新。</div>';
@@ -166,6 +174,10 @@ switch (SYSTEM_PAGE) {
             ProjectUpdater::installSourceRelease($release);
             //文件已覆盖：跳转根目录一键升级入口（新请求加载新代码，自动备份+迁移+清缓存），实现点一次「立即更新」全自动完成
             msg('文件已更新到 V' . htmlspecialchars($release['version'], ENT_QUOTES, 'UTF-8') . '，正在跳转完成升级……', SYSTEM_URL . 'upgrade.php?autostart=1');
+        } catch (ProjectUpdaterRateLimitException $e) {
+            error_log('在线更新失败（限流）：' . $e->getMessage());
+            msg('更新失败：GitHub 接口达到匿名请求限额，请稍后重试；'
+                . '也可配置环境变量 UPDATE_GITHUB_TOKEN 提升限额，或到 <a href="' . htmlspecialchars(PROJECT_RELEASES_URL, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener">Release 页面</a>手动下载更新包。');
         } catch (Throwable $e) {
             error_log('在线更新失败：' . $e->getMessage());
             msg('更新失败：' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'));

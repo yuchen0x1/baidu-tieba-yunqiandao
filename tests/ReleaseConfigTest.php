@@ -66,6 +66,30 @@ final class ReleaseConfigTest extends TestCase
         }
     }
 
+    public function testLoopGracefulReloadIsOptInAndDisabledByDefault(): void
+    {
+        // do.php --loop 优雅重载必须默认关闭：只有部署方显式设置 LOOP_RELOAD_FILE 才启用
+        $compose = $this->read('docker/docker-compose.yml');
+        $this->assertStringContainsString('LOOP_RELOAD_FILE', $compose);
+        $this->assertStringContainsString('LOOP_RELOAD_FILE:-}', $compose, 'compose 默认值必须为空（默认关闭）');
+        $env = $this->read('docker/.env.example');
+        $this->assertStringContainsString('# LOOP_RELOAD_FILE=', $env, '.env 示例中应注释掉（默认关闭）');
+        $loop = $this->read('do.php');
+        $this->assertStringContainsString("getenv('LOOP_RELOAD_FILE')", $loop);
+        $this->assertStringContainsString('exit(75)', $loop, '常驻进程收到标记后应优雅退出（75）');
+        $upgrade = $this->read('upgrade.php');
+        $this->assertStringContainsString("getenv('LOOP_RELOAD_FILE')", $upgrade, '升级入口应支持写入重载标记');
+    }
+
+    public function testUpdaterKeepsPageFallbackWithinTrustedHosts(): void
+    {
+        // 匿名限流回退只允许读取官方仓库 Release 页面，不得放宽域名白名单
+        $updater = $this->read('lib/class.updater.php');
+        $this->assertStringContainsString('GITHUB_RELEASES_PAGE_URL', $updater);
+        $this->assertStringContainsString('releases/latest', $updater);
+        $this->assertStringContainsString('ProjectUpdaterRateLimitException', $updater);
+    }
+
     public function testUpdaterIsConfiguredForGitHubReleaseEndpoints(): void
     {
         $updater = $this->read('lib/class.updater.php');

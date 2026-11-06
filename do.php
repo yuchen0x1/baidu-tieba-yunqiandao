@@ -33,6 +33,17 @@ if ($isCli && is_array($cmd_pw) && array_key_exists('loop', $cmd_pw)) {
     while (ob_get_level() > 0) {
         @ob_end_clean();
     }
+    // V7.3 可选优雅重载（默认关闭）：部署方设置环境变量 LOOP_RELOAD_FILE 指向一个本地
+    // 可写标记文件后，升级完成时 Web 侧会写入标记；常驻进程在本轮调度结束后主动退出
+    // （退出码 75），由 s6/systemd/任务计划等进程管理器自动拉起以加载新代码。
+    // 未设置该环境变量时行为与旧版完全一致，仍需手动重启。
+    $loopReloadFile = getenv('LOOP_RELOAD_FILE');
+    if ($loopReloadFile === false || trim((string) $loopReloadFile) === '') {
+        $loopReloadFile = '';
+    } else {
+        $loopReloadFile = trim((string) $loopReloadFile);
+    }
+    $loopStartedAt = time();
     echo '[' . date('H:i:s') . '] 常驻模式已启动，调度间隔 ' . $loopInterval . ' 秒，Ctrl+C 退出' . PHP_EOL;
     while (true) {
         try {
@@ -44,6 +55,15 @@ if ($isCli && is_array($cmd_pw) && array_key_exists('loop', $cmd_pw)) {
             cron::runall();
         } catch (Throwable $loopError) {
             error_log('do.php loop 调度异常：' . $loopError->getMessage());
+        }
+        if ($loopReloadFile !== '' && is_file($loopReloadFile)) {
+            // 仅响应进程启动之后写入的标记，避免消费历史遗留文件导致误退出
+            $reloadRequestedAt = @filemtime($loopReloadFile);
+            if ($reloadRequestedAt !== false && $reloadRequestedAt >= $loopStartedAt) {
+                @unlink($loopReloadFile);
+                echo '[' . date('H:i:s') . '] 收到升级重载请求，本轮调度已完成，进程优雅退出（退出码 75），等待进程管理器重新拉起…' . PHP_EOL;
+                exit(75);
+            }
         }
         sleep($loopInterval);
     }

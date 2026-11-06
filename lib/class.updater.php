@@ -1,6 +1,54 @@
 <?php
 
 /**
+ * GitHub API 达到匿名额度或上游明确返回 429 时抛出；不携带响应正文，避免把
+ * 上游内容、认证信息或请求细节泄露到页面和日志。
+ */
+class ProjectUpdaterRateLimitException extends RuntimeException
+{
+    private $retryAfter;
+    private $resetAt;
+    private $limit;
+    private $remaining;
+    private $status;
+
+    public function __construct($status, $retryAfter = 0, $resetAt = 0, $limit = null, $remaining = null)
+    {
+        $this->status = (int) $status;
+        $this->retryAfter = max(0, min(604800, (int) $retryAfter));
+        $this->resetAt = max(0, (int) $resetAt);
+        $this->limit = $limit === null ? null : max(0, (int) $limit);
+        $this->remaining = $remaining === null ? null : max(0, (int) $remaining);
+        parent::__construct('GitHub 更新接口暂时限流（HTTP ' . $this->status . '）');
+    }
+
+    public function getRetryAfter()
+    {
+        return $this->retryAfter;
+    }
+
+    public function getResetAt()
+    {
+        return $this->resetAt;
+    }
+
+    public function getLimit()
+    {
+        return $this->limit;
+    }
+
+    public function getRemaining()
+    {
+        return $this->remaining;
+    }
+
+    public function getStatusCode()
+    {
+        return $this->status;
+    }
+}
+
+/**
  * Release 在线更新仅支持 GitHub 正式 Release。
  * 版本检查只读取正式 latest Release；真正更新只由管理员主动触发。
  */
@@ -10,6 +58,7 @@ class ProjectUpdater
     const GEO_TIMEOUT_MS = 3000;
     const REMOTE_HOST_WHITELIST = array('api.github.com', 'github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com');
     const GITHUB_RELEASES_API_URL = 'https://api.github.com/repos/yuchen0x1/baidu-tieba-yunqiandao/releases/latest';
+    const GITHUB_RELEASES_PAGE_URL = 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/latest';
     const GITHUB_RELEASES_HISTORY_API_URL = 'https://api.github.com/repos/yuchen0x1/baidu-tieba-yunqiandao/releases?per_page=10';
     const GITHUB_REPOSITORY_API_URL = 'https://api.github.com/repos/yuchen0x1/baidu-tieba-yunqiandao';
     const HISTORY_CACHE_OPTION = 'update_release_history_cache';
@@ -84,7 +133,90 @@ class ProjectUpdater
         if ($releaseUrl === null || $releaseUrl === '') {
             $releaseUrl = self::GITHUB_RELEASES_API_URL;
         }
-        return self::requestRelease($releaseUrl, 'github');
+        try {
+            return self::requestRelease($releaseUrl, 'github');
+        } catch (ProjectUpdaterRateLimitException $e) {
+            // The public GitHub API is shared by many installations. Its official
+            // Releases page is a safe discovery fallback and needs no API quota.
+            if (strcasecmp(rtrim($releaseUrl, '/'), rtrim(self::GITHUB_RELEASES_API_URL, '/')) !== 0) {
+                throw $e;
+            }
+            try {
+                return self::fetchLatestReleaseFromPage();
+            } catch (Throwable $fallbackError) {
+                // Keep the typed rate-limit error so callers can show a useful,
+                // non-sensitive retry message instead of exposing page details.
+                throw $e;
+            }
+        }
+    }
+
+    /**
+     * Discover the latest tag from GitHub's official Releases page when the API
+     * quota is exhausted. Asset URLs follow the fixed names emitted by the
+     * release publisher; the checksum is still downloaded and verified at install.
+     */
+    private static function fetchLatestReleaseFromPage()
+    {
+        $response = self::requestSafeUrl(
+            self::GITHUB_RELEASES_PAGE_URL,
+            array('Accept: text/html'),
+            self::DEFAULT_TIMEOUT_MS,
+            false
+        );
+        if ($response['body'] === false || $response['error'] !== '' || $response['status'] < 200 || $response['status'] >= 300) {
+            throw new RuntimeException('GitHub Release 页面暂时不可用');
+        }
+        $tag = self::extractReleaseTag($response);
+        if ($tag === '') {
+            throw new RuntimeException('GitHub Release 页面未找到有效版本标签');
+        }
+        $version = self::normalizeVersion($tag);
+        $tagPath = rawurlencode($tag);
+        $assetName = 'tieba-cloud-sign-windows-' . $tag . '.zip';
+        $assetUrl = 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/' . $tagPath . '/' . rawurlencode($assetName);
+        $checksumUrl = $assetUrl . '.sha256';
+        return self::parseRelease(array(
+            'tag_name' => $tag,
+            'name' => '百度贴吧云签到 V' . $version,
+            'body' => 'GitHub API 当前达到匿名请求限额，已通过官方 Release 页面发现此版本。请打开 Release 页面查看完整版本说明。',
+            'html_url' => 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/tag/' . $tagPath,
+            'zipball_url' => 'https://api.github.com/repos/yuchen0x1/baidu-tieba-yunqiandao/zipball/' . $tagPath,
+            'published_at' => '',
+            'prerelease' => false,
+            'assets' => array(
+                array('name' => $assetName, 'browser_download_url' => $assetUrl, 'size' => 0, 'digest' => ''),
+                array('name' => $assetName . '.sha256', 'browser_download_url' => $checksumUrl, 'size' => 0, 'digest' => '')
+            )
+        ));
+    }
+
+    private static function extractReleaseTag(array $response)
+    {
+        $candidates = array();
+        // 重定向结束后的最终地址通常就是 /releases/tag/<tag>
+        if (!empty($response['url'])) {
+            $path = parse_url((string) $response['url'], PHP_URL_PATH);
+            if (is_string($path)) {
+                $candidates[] = $path;
+            }
+        }
+        $body = (string) $response['body'];
+        // 锚定本仓库路径，避免把其他仓库的 tag 带进候选
+        if (preg_match('~yuchen0x1/baidu-tieba-yunqiandao/releases/tag/([A-Za-z0-9._+-]+)~i', $body, $match)) {
+            $candidates[] = '/yuchen0x1/baidu-tieba-yunqiandao/releases/tag/' . $match[1];
+        }
+        $prefix = '/yuchen0x1/baidu-tieba-yunqiandao/releases/tag/';
+        foreach ($candidates as $path) {
+            if (strpos($path, $prefix) !== 0) {
+                continue;
+            }
+            $tag = rawurldecode(substr($path, strlen($prefix)));
+            if (preg_match('/^[vV]?\\d+(?:\\.\\d+){1,3}$/', $tag) === 1) {
+                return $tag;
+            }
+        }
+        return '';
     }
 
     public static function primaryChannel()
@@ -131,6 +263,9 @@ class ProjectUpdater
         $error = $response['error'];
         $status = $response['status'];
         if ($body === false || $error !== '' || $status < 200 || $status >= 300) {
+            if (self::isRateLimitedResponse($response, true)) {
+                throw self::createRateLimitException($response);
+            }
             throw new RuntimeException('无法获取历史 Release 列表（HTTP ' . $status . '）' . ($error !== '' ? '：' . $error : ''));
         }
         $payload = json_decode($body, true);
@@ -189,6 +324,9 @@ class ProjectUpdater
         $error = $response['error'];
         $status = $response['status'];
         if ($body === false || $error !== '' || $status < 200 || $status >= 300) {
+            if (self::isRateLimitedResponse($response, $channel === 'github')) {
+                throw self::createRateLimitException($response);
+            }
             throw new RuntimeException('无法连接 ' . self::channelLabel($channel) . ' 更新服务器' . ($error !== '' ? '：' . $error : '（HTTP ' . $status . '）'));
         }
         $payload = json_decode($body, true);
@@ -237,10 +375,11 @@ class ProjectUpdater
         $initialHost = strtolower((string) parse_url($currentUrl, PHP_URL_HOST));
         for ($redirects = 0; $redirects <= 5; $redirects++) {
             if (!self::isAllowedUrl($currentUrl) || !self::isSafeRemoteEndpoint($currentUrl)) {
-                return array('body' => false, 'error' => '更新服务器地址不受信任', 'status' => 0);
+                return array('body' => false, 'error' => '更新服务器地址不受信任', 'status' => 0, 'headers' => array(), 'url' => $currentUrl);
             }
             $parts = parse_url($currentUrl);
             $host = strtolower((string) $parts['host']);
+            $responseHeaders = array();
             $requestHeaders = array_merge(array(
                 'User-Agent: Tieba-Cloud-Sign-Updater/' . (defined('SYSTEM_VER') ? SYSTEM_VER : 'unknown')
             ), $headers);
@@ -249,7 +388,7 @@ class ProjectUpdater
             }
             $curl = curl_init($currentUrl);
             if ($curl === false) {
-                return array('body' => false, 'error' => '无法初始化更新连接', 'status' => 0);
+                return array('body' => false, 'error' => '无法初始化更新连接', 'status' => 0, 'headers' => array(), 'url' => $currentUrl);
             }
             $port = isset($parts['port']) ? (int) $parts['port'] : 443;
             $ip = self::resolveSafeIp($host);
@@ -262,7 +401,19 @@ class ProjectUpdater
                 CURLOPT_CONNECTTIMEOUT_MS => 5000,
                 CURLOPT_TIMEOUT_MS => (int) $timeoutMs,
                 CURLOPT_RESOLVE => array($host . ':' . $port . ':' . $resolveAddress),
-                CURLOPT_HTTPHEADER => $requestHeaders
+                CURLOPT_HTTPHEADER => $requestHeaders,
+                CURLOPT_HEADERFUNCTION => function ($handle, $line) use (&$responseHeaders) {
+                    $line = trim((string) $line);
+                    if ($line === '' || strpos($line, ':') === false) {
+                        return strlen((string) $line) + 2;
+                    }
+                    list($name, $value) = explode(':', $line, 2);
+                    $name = strtolower(trim($name));
+                    if (in_array($name, array('retry-after', 'x-ratelimit-limit', 'x-ratelimit-remaining', 'x-ratelimit-reset', 'location'), true)) {
+                        $responseHeaders[$name] = trim($value);
+                    }
+                    return strlen((string) $line) + 2;
+                }
             ));
             $caInfo = self::findCaInfo();
             if ($caInfo !== false) {
@@ -273,16 +424,84 @@ class ProjectUpdater
             $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
             $redirectUrl = curl_getinfo($curl, CURLINFO_REDIRECT_URL);
             curl_close($curl);
+            if ((!is_string($redirectUrl) || $redirectUrl === '') && isset($responseHeaders['location'])) {
+                $redirectUrl = $responseHeaders['location'];
+            }
             if ($status >= 300 && $status < 400) {
                 if ($redirects === 5 || !is_string($redirectUrl) || $redirectUrl === '') {
-                    return array('body' => false, 'error' => '更新服务器重定向无效或次数过多', 'status' => $status);
+                    return array('body' => false, 'error' => '更新服务器重定向无效或次数过多', 'status' => $status, 'headers' => $responseHeaders, 'url' => $currentUrl);
                 }
-                $currentUrl = $redirectUrl;
+                $currentUrl = self::resolveRedirectUrl($currentUrl, $redirectUrl);
+                if ($currentUrl === false) {
+                    return array('body' => false, 'error' => '更新服务器重定向地址无效', 'status' => $status, 'headers' => $responseHeaders, 'url' => (string) $url);
+                }
                 continue;
             }
-            return array('body' => $body, 'error' => $error, 'status' => $status);
+            return array('body' => $body, 'error' => $error, 'status' => $status, 'headers' => $responseHeaders, 'url' => $currentUrl);
         }
-        return array('body' => false, 'error' => '更新服务器重定向次数过多', 'status' => 0);
+        return array('body' => false, 'error' => '更新服务器重定向次数过多', 'status' => 0, 'headers' => array(), 'url' => $currentUrl);
+    }
+
+    private static function resolveRedirectUrl($baseUrl, $redirectUrl)
+    {
+        $redirectUrl = trim((string) $redirectUrl);
+        if ($redirectUrl === '') {
+            return false;
+        }
+        if (parse_url($redirectUrl, PHP_URL_SCHEME) !== '') {
+            return $redirectUrl;
+        }
+        $base = parse_url((string) $baseUrl);
+        if (!$base || empty($base['scheme']) || empty($base['host'])) {
+            return false;
+        }
+        if (strpos($redirectUrl, '/') === 0) {
+            return $base['scheme'] . '://' . $base['host'] . (isset($base['port']) ? ':' . (int) $base['port'] : '') . $redirectUrl;
+        }
+        $basePath = isset($base['path']) ? (string) $base['path'] : '/';
+        $directory = rtrim(str_replace('\\', '/', dirname($basePath)), '/');
+        return $base['scheme'] . '://' . $base['host'] . (isset($base['port']) ? ':' . (int) $base['port'] : '') . ($directory === '' ? '/' : $directory . '/') . $redirectUrl;
+    }
+
+    private static function isRateLimitedResponse(array $response, $isGithub)
+    {
+        $status = isset($response['status']) ? (int) $response['status'] : 0;
+        if ($status === 429) {
+            return true;
+        }
+        if (!$isGithub || $status !== 403) {
+            return false;
+        }
+        $headers = isset($response['headers']) && is_array($response['headers']) ? $response['headers'] : array();
+        if (isset($headers['x-ratelimit-remaining']) && trim((string) $headers['x-ratelimit-remaining']) === '0') {
+            return true;
+        }
+        $body = strtolower((string) (isset($response['body']) ? $response['body'] : ''));
+        return strpos($body, 'api rate limit exceeded') !== false || strpos($body, 'rate limit exceeded') !== false;
+    }
+
+    private static function createRateLimitException(array $response)
+    {
+        $headers = isset($response['headers']) && is_array($response['headers']) ? $response['headers'] : array();
+        $resetAt = isset($headers['x-ratelimit-reset']) && ctype_digit((string) $headers['x-ratelimit-reset']) ? (int) $headers['x-ratelimit-reset'] : 0;
+        $retryAfter = 0;
+        if (isset($headers['retry-after'])) {
+            $retryValue = trim((string) $headers['retry-after']);
+            if (ctype_digit($retryValue)) {
+                $retryAfter = (int) $retryValue;
+            } else {
+                $retryTimestamp = strtotime($retryValue);
+                if ($retryTimestamp !== false) {
+                    $retryAfter = max(0, $retryTimestamp - time());
+                }
+            }
+        }
+        if ($retryAfter <= 0 && $resetAt > time()) {
+            $retryAfter = $resetAt - time();
+        }
+        $limit = isset($headers['x-ratelimit-limit']) && ctype_digit((string) $headers['x-ratelimit-limit']) ? (int) $headers['x-ratelimit-limit'] : null;
+        $remaining = isset($headers['x-ratelimit-remaining']) && ctype_digit((string) $headers['x-ratelimit-remaining']) ? (int) $headers['x-ratelimit-remaining'] : null;
+        return new ProjectUpdaterRateLimitException(isset($response['status']) ? $response['status'] : 0, $retryAfter, $resetAt, $limit, $remaining);
     }
 
     /**

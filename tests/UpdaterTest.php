@@ -233,4 +233,111 @@ final class UpdaterTest extends TestCase
             @unlink($path);
         }
     }
+
+    // ---------- GitHub 匿名限流的分类与安全回退（V7.3） ----------
+
+    private static function method(string $name): ReflectionMethod
+    {
+        $method = new ReflectionMethod('ProjectUpdater', $name);
+        $method->setAccessible(true);
+        return $method;
+    }
+
+    public function testRateLimitResponseIsClassifiedFromHeaders(): void
+    {
+        $check = self::method('isRateLimitedResponse');
+        $github429 = array('status' => 429, 'headers' => array(), 'body' => '');
+        $this->assertTrue($check->invoke(null, $github429, true));
+        $this->assertTrue($check->invoke(null, $github429, false));
+        // GitHub 403 只有带限流特征才算限流，普通 403 保持通用错误
+        $plain403 = array('status' => 403, 'headers' => array(), 'body' => 'forbidden');
+        $this->assertFalse($check->invoke(null, $plain403, true));
+        $quota403 = array('status' => 403, 'headers' => array('x-ratelimit-remaining' => '0'), 'body' => '');
+        $this->assertTrue($check->invoke(null, $quota403, true));
+        $body403 = array('status' => 403, 'headers' => array(), 'body' => '{"message":"API rate limit exceeded for 1.2.3.4"}');
+        $this->assertTrue($check->invoke(null, $body403, true));
+        $this->assertFalse($check->invoke(null, $body403, false));
+    }
+
+    public function testRateLimitExceptionCarriesSanitizedMetadataOnly(): void
+    {
+        $create = self::method('createRateLimitException');
+        $exception = $create->invoke(null, array(
+            'status' => 403,
+            'headers' => array(
+                'x-ratelimit-limit' => '60',
+                'x-ratelimit-remaining' => '0',
+                'x-ratelimit-reset' => (string) (time() + 600),
+                'retry-after' => '120'
+            ),
+            'body' => '{"message":"API rate limit exceeded for 1.2.3.4"}'
+        ));
+        $this->assertInstanceOf(ProjectUpdaterRateLimitException::class, $exception);
+        $this->assertSame(403, $exception->getStatusCode());
+        $this->assertSame(120, $exception->getRetryAfter());
+        $this->assertSame(60, $exception->getLimit());
+        $this->assertSame(0, $exception->getRemaining());
+        $this->assertTrue($exception->getResetAt() > time());
+        // 异常消息绝不携带上游响应正文，避免把限流 IP 等信息带进页面与日志
+        $this->assertStringNotContainsString('rate limit exceeded', $exception->getMessage());
+        $this->assertStringNotContainsString('1.2.3.4', $exception->getMessage());
+    }
+
+    public function testRetryAfterHttpDateIsParsedAndBounded(): void
+    {
+        $create = self::method('createRateLimitException');
+        $exception = $create->invoke(null, array(
+            'status' => 429,
+            'headers' => array('retry-after' => gmdate('D, d M Y H:i:s', time() + 90) . ' GMT'),
+            'body' => ''
+        ));
+        $this->assertGreaterThan(0, $exception->getRetryAfter());
+        $this->assertLessThanOrEqual(604800, $exception->getRetryAfter());
+    }
+
+    public function testReleasePageTagExtraction(): void
+    {
+        $extract = self::method('extractReleaseTag');
+        $this->assertSame('v7.4.0', $extract->invoke(null, array(
+            'url' => 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/tag/v7.4.0',
+            'body' => '<html>anything</html>'
+        )));
+        $this->assertSame('v7.4.0', $extract->invoke(null, array(
+            'url' => '',
+            'body' => '<a href="/yuchen0x1/baidu-tieba-yunqiandao/releases/tag/v7.4.0">V7.4.0</a>'
+        )));
+        $this->assertSame('', $extract->invoke(null, array(
+            'url' => '',
+            'body' => '<a href="/attacker/other-repo/releases/tag/v9.9.9">bad</a>'
+        )));
+        $this->assertSame('', $extract->invoke(null, array(
+            'url' => '',
+            'body' => '<a href="/yuchen0x1/baidu-tieba-yunqiandao/releases/tag/not-a-version">bad</a>'
+        )));
+    }
+
+    public function testPageFallbackReleaseUsesFixedAssetNamesWithChecksum(): void
+    {
+        // 回退通道按发布脚本固定资产命名构造 Release；安装前仍强制校验 .sha256
+        $release = ProjectUpdater::parseRelease(array(
+            'tag_name' => 'v7.4.0',
+            'name' => '百度贴吧云签到 V7.4.0',
+            'body' => 'GitHub API 当前达到匿名请求限额，已通过官方 Release 页面发现此版本。',
+            'html_url' => 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/tag/v7.4.0',
+            'zipball_url' => 'https://api.github.com/repos/yuchen0x1/baidu-tieba-yunqiandao/zipball/v7.4.0',
+            'published_at' => '',
+            'prerelease' => false,
+            'assets' => array(
+                array('name' => 'tieba-cloud-sign-windows-v7.4.0.zip', 'browser_download_url' => 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/v7.4.0/tieba-cloud-sign-windows-v7.4.0.zip'),
+                array('name' => 'tieba-cloud-sign-windows-v7.4.0.zip.sha256', 'browser_download_url' => 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/v7.4.0/tieba-cloud-sign-windows-v7.4.0.zip.sha256')
+            )
+        ));
+        $this->assertSame('tieba-cloud-sign-windows-v7.4.0.zip', $release['asset_name']);
+        $this->assertSame(
+            'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/v7.4.0/tieba-cloud-sign-windows-v7.4.0.zip.sha256',
+            $release['asset_checksum_url']
+        );
+        // 回退通道没有 API digest 字段，只能依赖 .sha256 附件；安装前仍强制校验
+        $this->assertSame('', $release['asset_digest']);
+    }
 }

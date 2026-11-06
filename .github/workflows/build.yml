@@ -18,32 +18,53 @@ jobs:
     runs-on: ubuntu-latest
     name: 构建镜像
     steps:
-      - 
+      -
         name: Checkout
         uses: actions/checkout@v4
 
-      - 
+      -
+        # SYSTEM_VER 的唯一来源是 version.php（V7.0 起不再写在 init.php）
         name: Get version
         run: |
-          version=$(sed -n "s/define('SYSTEM_VER', '\([^']*\)');/\1/p" init.php)
+          version=$(sed -n "s/define('SYSTEM_VER', '\([^']*\)');/\1/p" version.php)
+          if [ -z "$version" ]; then
+            echo "无法从 version.php 解析 SYSTEM_VER" >&2
+            exit 1
+          fi
           echo "version=${version}" >> "$GITHUB_ENV"
 
-      - 
+      -
+        # 未配置 Docker Hub 凭据时只构建不推送，避免 login 失败把 CI 打红
+        name: Check DockerHub credentials
+        id: dockerhub
+        run: |
+          if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_PASSWORD" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "未配置 DOCKERHUB_USERNAME / DOCKERHUB_PASSWORD，本次仅构建镜像不推送"
+          fi
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      -
         name: Set Up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - 
+      -
         name: Set Up Buildx
         uses: docker/setup-buildx-action@v3
 
-      - 
+      -
         name: Login DockerHub
+        if: steps.dockerhub.outputs.available == 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      - 
+      -
         name: Set Up Cache
         uses: actions/cache@v4
         id: buildx-cache
@@ -51,12 +72,12 @@ jobs:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-buildx
 
-      - 
+      -
         name: Buildx
         uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/Dockerfile
           platforms: linux/amd64,linux/arm64,linux/arm,linux/s390x
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest,${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.version }}
+          push: ${{ steps.dockerhub.outputs.available == 'true' }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME || 'local' }}/${{ env.IMAGE_NAME }}:latest,${{ secrets.DOCKERHUB_USERNAME || 'local' }}/${{ env.IMAGE_NAME }}:${{ env.version }}

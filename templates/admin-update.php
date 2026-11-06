@@ -104,11 +104,12 @@ if(<?php echo $writable; ?>==1){
      $("#upd_prog").css({'width':'100%'});
       $("#comsys2").delay(1000).slideUp(500);
      },
-      error: function(error){
-      console.log(error);
+      error: function(xhr){
+      console.log(xhr);
          $("#upd_info").html('检查更新失败！');
         $("#upd_prog").css({'width':'0%'});
-        $("#comsys").html('<div class="alert alert-danger">检查更新失败：无法连接到更新服务器<br/>错误已经记录到控制台，打开控制台查看详细<br/>你可以尝试手动更新</div><br/>');
+      var detail = xhr && xhr.responseText ? xhr.responseText : '<div class="alert alert-danger">检查更新失败：无法连接到更新服务器<br/>错误已经记录到控制台，打开控制台查看详细<br/>你可以尝试手动更新</div><br/>';
+      $("#comsys").html(detail);
    }
     });
 }

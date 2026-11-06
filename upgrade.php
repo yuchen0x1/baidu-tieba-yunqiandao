@@ -77,6 +77,26 @@ function upgrade_auto_backup()
     return '已自动备份：' . basename($file) . '（' . count($tables) . ' 张表，' . round(strlen($dump) / 1024, 1) . ' KB）';
 }
 
+/**
+ * do.php --loop 常驻进程的优雅重载通知（V7.3，默认关闭）：
+ * 仅当部署方显式设置环境变量 LOOP_RELOAD_FILE（指向本地可写标记文件）时，
+ * 升级成功后写入标记，常驻进程在本轮调度结束后退出（退出码 75），交给
+ * s6/systemd/任务计划等进程管理器自动拉起。未配置或不可写时退回手动提示，
+ * 绝不从 Web 请求执行任意命令或强杀进程。
+ */
+function upgrade_loop_reload_note()
+{
+    $loopReloadFile = getenv('LOOP_RELOAD_FILE');
+    if ($loopReloadFile === false || trim((string) $loopReloadFile) === '') {
+        return '若你的部署使用了 do.php --loop 常驻进程，请重启该进程以加载新代码；普通计划任务部署无需任何操作。';
+    }
+    $loopReloadFile = trim((string) $loopReloadFile);
+    if (@file_put_contents($loopReloadFile, (string) time()) === false) {
+        return '检测到 LOOP_RELOAD_FILE 配置，但标记文件不可写，未能通知 do.php --loop 优雅重载，请手动重启该进程。';
+    }
+    return '已通知 do.php --loop 常驻进程优雅重载：进程将在本轮调度结束后退出（退出码 75），由进程管理器自动拉起加载新代码；若未配置进程管理器自动重启，请手动重启该进程。';
+}
+
 $dbVersion = (string) option::get('core_version');
 upgrade_page_head($dbVersion);
 
@@ -84,7 +104,8 @@ if ($dbVersion === SYSTEM_VER) {
     if (function_exists('opcache_reset')) {
         @opcache_reset(); //文件刚被更新器覆盖时，确保加载的是新代码
     }
-    echo '<div class="alert alert-success">数据库已经是 V' . htmlspecialchars(SYSTEM_VER, ENT_QUOTES, 'UTF-8') . '，无需升级，即将返回首页…</div>';
+    echo '<div class="alert alert-success">数据库已经是 V' . htmlspecialchars(SYSTEM_VER, ENT_QUOTES, 'UTF-8') . '，无需升级，即将返回首页…<br/>'
+        . '<span class="text-muted">' . htmlspecialchars(upgrade_loop_reload_note(), ENT_QUOTES, 'UTF-8') . '</span></div>';
     echo '<script>setTimeout(function(){location.href="index.php";},1500);</script>';
     upgrade_page_foot();
     exit;
@@ -127,7 +148,7 @@ try {
     }
     echo '</pre><div class="alert alert-success"><b>升级完成</b>，已同步 core_version=V' . htmlspecialchars(SYSTEM_VER, ENT_QUOTES, 'UTF-8') . '，3 秒后自动进入首页…'
         . '<a class="btn btn-success" href="index.php">立即进入 V' . htmlspecialchars(SYSTEM_VER, ENT_QUOTES, 'UTF-8') . '</a><br/>'
-        . '<span class="text-muted">若你的部署使用了 do.php --loop 常驻进程，请重启该进程以加载新代码；普通计划任务部署无需任何操作。</span></div>';
+        . '<span class="text-muted">' . htmlspecialchars(upgrade_loop_reload_note(), ENT_QUOTES, 'UTF-8') . '</span></div>';
     echo '<script>setTimeout(function(){location.href="index.php";},3000);</script>';
 } catch (Throwable $e) {
     echo '</pre><div class="alert alert-danger">升级失败：' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8') . '<br/>失败状态已记录到 schema_migrations，修复问题后刷新本页可继续；也可以在服务器上运行 <code>php tools/migrate.php up</code>。</div>';

@@ -130,6 +130,9 @@ jobs:
 
       - name: Teardown
         if: always()
+        env:
+          # teardown 也要解析 compose 配置，DB_PASSWD 必须仍然存在
+          DB_PASSWD: ci-only
         run: docker compose -f docker/docker-compose.yml down -v
 
   release-packaging:
@@ -140,12 +143,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Create temporary release tag
-        run: git tag v0.0.0-ci
+        run: git tag v0.0.0
 
       - name: Generate local package and checksum
         shell: pwsh
         run: |
-          tools/publish-github.ps1 -Tag v0.0.0-ci -OutputDirectory "$env:RUNNER_TEMP\pkg"
+          tools/publish-github.ps1 -Tag v0.0.0 -OutputDirectory "$env:RUNNER_TEMP\pkg"
 
       - name: Verify package integrity
         shell: pwsh

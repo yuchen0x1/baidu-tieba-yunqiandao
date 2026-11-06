@@ -32,7 +32,8 @@ function lib_class_map()
 /**
  * 历史命名别名：逻辑类名小写 => 文件键。
  * - wmysql：class.mysql.php 与 class.mysqli.php 都声明 wmysql，运行时经 mysql_autoload.php 显式加载，别名仅作兜底；
- * - projectupdater：class.updater.php 声明 ProjectUpdater（文件键 updater）。
+ * - projectupdater / projectupdaterratelimitexception：class.updater.php 声明
+ *   ProjectUpdater 与 ProjectUpdaterRateLimitException（文件键 updater）。
  * 新增偏差文件时必须在此登记，tests/AutoloadCaseTest.php 会强制校验。
  */
 function lib_class_aliases()
@@ -40,6 +41,7 @@ function lib_class_aliases()
     return array(
         'wmysql'        => 'mysqli',
         'projectupdater' => 'updater',
+        'projectupdaterratelimitexception' => 'updater',
     );
 }
 

@@ -89,12 +89,26 @@ try {
         if ($existingRelease) {
             Invoke-Gh -Arguments @('release', 'upload', $Tag, $package, $checksum, '--repo', $githubRepository, '--clobber') | Out-Null
         } else {
-            $createArgs = @('release', 'create', $Tag, $package, $checksum, '--repo', $githubRepository, '--verify-tag', '--title', "V$($Tag.TrimStart('v', 'V'))：签到成长指标与安全可靠性加固")
+            # 标题取发布说明首个一级标题并从正文剔除，避免 Release 页标题与目录重复；
+            # 说明文件未带一级标题时回退为通用标题。
+            $notesContent = $null
             if (-not [string]::IsNullOrWhiteSpace($ReleaseNotesFile)) {
                 if (-not (Test-Path -LiteralPath $ReleaseNotesFile)) {
                     throw "ReleaseNotesFile not found: $ReleaseNotesFile"
                 }
                 $notesPath = (Resolve-Path -LiteralPath $ReleaseNotesFile).Path
+                $notesContent = [IO.File]::ReadAllText($notesPath, [Text.UTF8Encoding]::new($false))
+            }
+            $releaseTitle = "V$($Tag.TrimStart('v', 'V'))：百度贴吧云签到更新发布"
+            if ($null -ne $notesContent -and $notesContent -match '(?m)^#\s+(.+?)\s*$') {
+                $releaseTitle = $Matches[1]
+                $notesContent = ($notesContent -replace '(?m)^#\s+.+?\s*\r?\n', '') -replace '^(\r?\n)+', ''
+                $trimmedNotes = Join-Path ([IO.Path]::GetTempPath()) ("release-notes-{0}.md" -f $Tag)
+                [IO.File]::WriteAllText($trimmedNotes, $notesContent, [Text.UTF8Encoding]::new($false))
+                $notesPath = $trimmedNotes
+            }
+            $createArgs = @('release', 'create', $Tag, $package, $checksum, '--repo', $githubRepository, '--verify-tag', '--title', $releaseTitle)
+            if ($null -ne $notesPath) {
                 $createArgs += @('--notes-file', $notesPath)
             } else {
                 $createArgs += '--generate-notes'
