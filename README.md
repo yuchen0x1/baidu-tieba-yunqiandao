@@ -1,354 +1,236 @@
 <div align="center">
 
-# 百度贴吧云签到（Tieba Cloud Sign）
+<img src="docs/screenshots/login.png" alt="贴吧云签到登录页" width="920"/>
+
+# 贴吧云签到 · Signing Control Studio
+
+**把「每天打开贴吧逐个签到」这件事，交给一台你自己掌控的服务器。**
 
 [![PHP](https://img.shields.io/badge/PHP-%3E%3D8.2-777BB4?logo=php&logoColor=white)](https://www.php.net/)
 [![MariaDB](https://img.shields.io/badge/MariaDB-11.4-003545?logo=mariadb&logoColor=white)](https://mariadb.org/)
 [![Docker](https://img.shields.io/badge/Docker-Compose%20V2-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Release](https://img.shields.io/badge/动态-查看最新Release-8A5CFF?logo=github)](https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/latest)
+[![License](https://img.shields.io/badge/License-AGPL--3.0-blue)](license.html)
+
+[下载 Windows 部署包](https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/latest) · [快速开始](#-快速开始) · [在线更新](#-在线更新) · [开放 API](#-开放-api) · [问题反馈](https://github.com/yuchen0x1/baidu-tieba-yunqiandao/issues)
 
 </div>
 
-> 把「每天打开贴吧逐个签到」这件事，交给一台你自己掌控的服务器。
-
-这是一个可自托管的百度贴吧自动签到站点。登录后台绑定百度账号并刷新关注贴吧后，系统会按计划任务自动完成签到、对失败项自动复签、定期检查账号凭据健康状态，并把每一批结果写入日志——从此告别漏签和忘签。
-
-本仓库持续正常更新，维护范围包括现代 PHP / Docker 运行环境、开放 API、通知推送、健康检查以及安全与兼容性修复。
-
-**项目速览**
-
-- 技术栈：PHP 8.2 及以上（推荐 8.4）· MySQL/MariaDB · Docker Compose V2
-- 部署形态：Docker Compose 一键起站，或任意传统 PHP 环境
-- 授权协议：AGPL-3.0
-- 用户交流：QQ 群 `1016190748`
-
 ---
 
-## 一、功能一览
+贴吧云签到是一个可自托管的百度贴吧自动签到站点：登录后台绑定百度账号并刷新关注贴吧后，系统按计划任务自动完成签到、对失败项智能复签、定期检查账号凭据健康度，并把每一批结果写入日志与统计——从此告别漏签和忘签。深色侧栏 + 双主题的现代控制台界面，所有操作都在浏览器里完成，无需 SSH 也能一键升级。
 
-**自动签到引擎**
+- **技术栈**：PHP 8.2 及以上（推荐 8.4）· MySQL/MariaDB · Docker Compose V2
+- **部署形态**：Docker Compose 一键起站 / 传统 PHP 环境 / Windows 免安装包
+- **授权协议**：AGPL-3.0
+- **交流**：QQ 群 `1016190748` · Telegram <https://t.me/lenmoC>
 
-- `do.php` 调度内置计划任务：签到调用 `misc::DoSign()`，失败复签调用 `misc::DoSign_retry()`。
-- 签到看板与统计：记录签到、复签、健康检查批次，并汇总成功、失败和等待数量。
+## ✨ 功能特性
 
-**账号与数据管理**
+### 自动签到引擎
+- 计划任务 / 常驻循环（`do.php --loop`）双调度模式，复用同一套防重入锁与失败退避机制。
+- 四种签到方式可组合：客户端签到、一键签到、手机网页签到、网页签到；支持客户端指纹轮换。
+- 失败智能复签：按错误码白名单指数退避重试，连续失败自动通知，不轰炸渠道。
 
-- 多用户、多百度账号、多贴吧，全部通过 Web 后台维护，覆盖账号、贴吧、计划任务和插件。
-- BDUSS/STOKEN 健康检查：检查百度账号凭据状态，结果保存到 `baiduid_health`。
+### 工作台与数据
+- 一屏总览：绑定账号、已同步贴吧、签到状态、今日完成度、近 30 天趋势与成功率、失败原因 Top 5、成就进度。
+- 签到成长指标：记录每次签到获得的经验、今日排名与贴吧等级；"经验未知"不再伪装成固定值。
+- 签到记录、日历、数据分析、排行榜、成就勋章、站内通知一应俱全。
+- BDUSS/STOKEN 健康检查：凭据失效自动检测、可选自动停用并推送提醒。
 
-**扩展能力**
+### 多账号与安全
+- 多用户 + 多百度账号 + 分组管理，账号级代理（HTTP/SOCKS5）与统一代理批量下发。
+- 敏感凭据（BDUSS/STOKEN）AES-256-GCM 加密落库；CSRF、2FA、登录审计、邀请码注册一应俱全。
 
-- 通知中心：支持 Server 酱、Telegram Bot、通用 Webhook、Bark、PushPlus 和邮件。
-- 开放 API：`api.php` 提供 Bearer Token 认证的状态、健康、签到、复签、健康检查和日志接口。
-- 插件体系：仓库内置灌水、点赞、封禁、删帖、审查、QQ 推送、备份等插件。
+### 扩展生态
+- 通知渠道：Server 酱、Telegram Bot、通用 Webhook、Bark、PushPlus、邮件；每日签到日报优先走个人渠道，未送达回退邮箱。
+- 开放 API：`api.php` 提供 Bearer Token 认证的状态/签到/日志/日历/排行等 17 个接口，权限矩阵自动生成文档。
+- 插件体系：内置 AI 发帖/回帖、灌水、点赞、封禁、删帖、审查、帖子监控、QQ 推送、云回帖等 16 个插件，支持在线安装。
 
-**部署与运维**
+<div align="center">
 
-- Docker 部署：本地构建 PHP 8.4 + Caddy Web 镜像，配套 MariaDB 11.4、健康检查和命名卷。
-- 在线更新：管理员可在后台「系统更新」页面通过 GitHub Releases 检查并安装新版本（见 5.4 节）。
-- 健康检查：`/healthz.php?mode=live` 检查 PHP 存活，`/healthz.php?mode=ready` 同时检查安装锁、数据库和核心表。
+<img src="docs/screenshots/plugins.png" alt="插件管理" width="920"/>
 
-## 二、先选部署方式：环境要求对照
+*插件管理：统一安装、启用与卸载*
 
-| 部署方式 | 适合谁 | 环境要求 |
-| --- | --- | --- |
-| Docker Compose（推荐） | 想少折腾环境、快速起站的用户 | Docker Engine；Docker Compose V2（使用 `docker compose` 命令）；能够访问百度贴吧及所选通知服务的网络环境 |
-| 传统 PHP | 已有 PHP 主机，想并入现有站点的用户 | PHP `>= 8.2`（`composer.json` 的平台要求；推荐仍在安全支持期内的 PHP 8.4）；MySQL/MariaDB 和可创建数据库表的账号；Nginx、Caddy、Apache 等 Web 服务器；PHP 扩展 `curl`、`json`、`mysqli`，按功能可能还需要 `gd`、`mbstring`、`openssl`、`session`、`zip`；计划任务执行环境（Linux `cron`、Windows 任务计划程序或等效服务） |
+</div>
 
-## 三、上手 A：Docker Compose 起站
+## 🚀 快速开始
 
-**第 1 步 · 拉取代码**
+### 方式一：Docker Compose（推荐）
 
 ```bash
 git clone https://github.com/yuchen0x1/baidu-tieba-yunqiandao.git
-cd baidu-tieba-yunqiandao
-```
-
-**第 2 步 · 准备配置文件**
-
-```bash
-cd docker
-cp .env.example .env
-```
-
-**第 3 步 · 编辑 `docker/.env`**，至少修改数据库密码：
-
-```dotenv
-DB_PASSWD=change-me-please
-WEB_PORT=8080
-CSRF=true
-TC_AUTO_CREATE_INSTALL_LOCK=false
-```
-
-`DB_PASSWD` 不能留空；不要把真实密码提交到 Git。
-
-**第 4 步 · 在仓库根目录启动**
-
-```bash
+cd baidu-tieba-yunqiandao/docker
+cp .env.example .env          # 编辑 .env，至少修改 DB_PASSWD
+cd ..
 docker compose -f docker/docker-compose.yml up -d --build
 ```
 
-**第 5 步 · 完成安装**：访问 <http://127.0.0.1:8080>，按安装向导导入数据库并创建管理员。
-
-Docker Compose 默认连接参数：
+访问 <http://127.0.0.1:8080>，按安装向导导入数据库并创建管理员即可。Compose 默认参数：
 
 | 配置项 | 默认值 |
 | --- | --- |
-| 数据库主机 | `db` |
-| 数据库用户 | `root` |
-| 数据库密码 | `docker/.env` 中的 `DB_PASSWD` |
-| 数据库名 | `tiebacloud` |
-| 表前缀 | `tc_` |
+| 数据库主机 / 用户 / 密码 | `db` / `root` / `.env` 中的 `DB_PASSWD` |
+| 数据库名 / 表前缀 | `tiebacloud` / `tc_` |
 | Web 端口 | `8080` |
 
-安装完成后确认 `setup/install.lock` 存在。`TC_AUTO_CREATE_INSTALL_LOCK=true` 可在容器启动时自动创建安装锁；首次安装阶段应保持为 `false`，安装完成后再按部署策略决定是否启用。
+### 方式二：传统 PHP 环境
 
-日常查看状态或日志：
+PHP `>= 8.2`（扩展 `curl`、`json`、`mysqli`，按需 `gd`、`mbstring`、`openssl`、`session`、`zip`）+ MySQL/MariaDB + 任意 Web 服务器：
 
-```bash
-docker compose -f docker/docker-compose.yml ps
-docker compose -f docker/docker-compose.yml logs -f web
-docker compose -f docker/docker-compose.yml logs -f db
-```
+1. 部署仓库文件到 Web 根目录（可选 `composer install`）。
+2. 访问 `/setup/install.php`，按向导完成安装。
+3. 确认 `setup/install.lock` 存在，然后进入后台配置站点地址、计划任务密码与通知渠道。
 
-## 四、上手 B：传统 PHP 环境
+### 方式三：Windows 免安装包
 
-1. 安装 PHP、所需扩展、MySQL/MariaDB 和 Web 服务器。
-2. 获取代码并将仓库文件部署到 Web 根目录（克隆地址：<https://github.com/yuchen0x1/baidu-tieba-yunqiandao.git>），确保 Web 进程可写入安装需要的目录。
-3. 可选：安装 Composer 依赖（开发或运行测试需要）：
-
-   ```bash
-   composer install
-   ```
-
-4. 如需通过环境变量配置数据库和安全选项，设置 `config.php` 支持的变量（见第五章）；否则直接编辑 `config.php`。
-5. 访问 `/setup/install.php`，按向导导入 `setup/install.template.sql` 并创建管理员。
-6. 安装完成后确认 `setup/install.lock` 存在，防止安装程序重复运行。
-7. 在后台设置计划任务密码、站点地址、通知和 API Token，然后配置计划任务。
-
-Windows 部署包可双击 `windows/start-web.bat`，它会检查 PHP 版本、必需扩展和端口后打开安装页或站点首页。指定其他端口可运行：
+从 [Releases](https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/latest) 下载 `tieba-cloud-sign-windows-*.zip`（发布页附 SHA-256 校验文件），解压后双击 `windows/start-web.bat` 即自动检查环境并打开站点；指定端口可运行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File windows/start-web.ps1 -Port 8081
 ```
 
-## 五、配置参考
+<div align="center">
 
-### 5.1 环境变量：数据库连接
+<img src="docs/screenshots/dashboard.png" alt="签到工作台" width="920"/>
 
-`config.php` 与 Docker 均支持以下变量：
+*工作台：账号、贴吧、签到状态与趋势一屏总览*
 
-| 变量 | 默认值 | 说明 |
-| --- | --- | --- |
-| `DB_HOST` | `127.0.0.1`（Compose 为 `db`） | 数据库主机 |
-| `DB_USER` | `root` | 数据库用户 |
-| `DB_PASSWD` | 空（Docker 必填） | 数据库密码 |
-| `DB_NAME` | `tiebacloud` | 数据库名 |
-| `DB_SSL` | `0` | 设为 `1` 启用 MySQL SSL 连接 |
-| `DB_PREFIX` | `tc_` | 数据表前缀 |
+</div>
 
-### 5.2 环境变量：安全与运行
+## ⏰ 计划任务
 
-| 变量 | 默认值 | 说明 |
-| --- | --- | --- |
-| `ANTI_CSRF` | `true` | 是否启用 CSRF 防御；`CSRF` 是兼容用别名 |
-| `CSRF` | `true` | Compose 中传给应用的 CSRF 兼容变量 |
-| `SYSTEM_SALT` | 空 | 加密和 CSRF 密钥材料；生产环境建议设置高强度随机值 |
-| `WEB_PORT` | `8080` | Compose 对外 Web 端口 |
-| `PUID` / `PGID` | `1000` / `1000` | Compose 保留的容器用户配置变量 |
-| `TC_AUTO_CREATE_INSTALL_LOCK` | `false` | 容器启动时是否自动创建安装锁 |
-| `SSL_CERT_FILE` / `CURL_CA_BUNDLE` | 空 | Windows PHP 未配置 CA 根证书时，指向可信 CA bundle 文件；不要关闭 HTTPS 证书校验 |
-| `UPDATE_GITHUB_TOKEN` | 空 | GitHub Releases API 受限或限流时可选的只读 Token，仅发送给 `api.github.com`；不要提交到 Git |
-
-### 5.3 后台配置项
-
-以下选项由安装向导或 Web 后台写入数据库，不是系统环境变量：
-
-| 配置项 | 作用 |
-| --- | --- |
-| `system_url` | 站点公开 URL，计划任务并发回调会使用它 |
-| `cron_pw` | `do.php` 的计划任务密码 |
-| `api_token` | 开放 API 的 Bearer Token；为空时 API 返回 503 并视为未启用 |
-| `notify_enable`、`notify_channel`、`notify_on_fail`、`notify_on_health` 及各通知渠道凭据 | 通知开关、触发条件与各渠道配置 |
-| 邮件 SMTP 配置 | 主机、端口、认证、加密方式、账号和密码 |
-
-### 5.4 在线更新机制
-
-- 管理员打开「系统更新」页面时，程序通过 HTTPS 请求当前仓库的 GitHub `latest` 正式 Release，并比较 Release tag 与当前程序版本；检测到更高版本后，页面会显示版本说明、Release 页面、Windows 部署包下载地址和「立即更新」按钮，没有更高版本时会明确显示当前已是最新版本。
-- 在线覆盖安装只接受带可信 SHA-256 摘要的 GitHub Release 资产：更新器会优先使用 Release API 提供的 `digest`，否则读取同一 Release 的 `.sha256` 资产，并在校验通过后才覆盖程序。缺少可信摘要、摘要不一致或下载的是源码归档时，更新器会拒绝在线覆盖安装并保留原程序；源码归档需从 Release 页面手动下载安装。
-- 校验通过后的更新不会覆盖当前站点的 `config.php`、`key.php`、`.env`、`docker/.env` 或 `setup/install.lock`，也不会修改数据库。
-- 若 GitHub API 返回 `403` 或 `429`，请在部署环境设置只读 `UPDATE_GITHUB_TOKEN`；令牌不会写入配置文件，也不会发送到其他域名。
-- 更新前会再次获取最新 Release，避免使用过期页面提交；网络不可用或服务器不可写时会保留原程序并提示手动更新。
-- 项目源码与 Windows 部署包发布在 [GitHub Releases](https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases)。推送经确认的 `v*` 版本 tag 会触发 GitHub Actions 发布流程；完整发布、打包与验证说明见 [`docs/RELEASE.md`](docs/RELEASE.md)。
-
-## 六、计划任务：让签到按时跑起来
-
-`do.php` 会执行到期的系统计划任务，建议每分钟调用一次，由应用内部判断任务是否到点。两种调用方式任选：
+`do.php` 执行到期的系统计划任务，建议每分钟触发一次，由应用内部判断是否到点：
 
 | 调用方式 | 写法 |
 | --- | --- |
 | Web | `https://你的域名/do.php?pw=你的计划任务密码` |
 | CLI | `php /var/www/do.php --pw=你的计划任务密码` |
 
-Linux `crontab` 示例：
-
 ```cron
 * * * * * php /var/www/do.php --pw='your-password' >/dev/null 2>&1
 ```
 
-密码注意事项：如果没有设置 `cron_pw`，Web 方式会拒绝执行；CLI 方式可以不带密码，但生产环境仍建议设置密码。计划任务密码会出现在 URL 或进程参数中，请使用强随机值并限制日志、历史记录和进程信息的访问权限。
-
-**常驻模式（可选）**：无 crond 的环境（如 Windows）可用常驻循环替代计划任务——
+无 crond 的环境（如 Windows）可用常驻循环替代，与 cron 共享同一套调度与退避机制：
 
 ```bash
 php /var/www/do.php --pw=你的密码 --loop        # 默认每 30 秒调度一轮
 php /var/www/do.php --pw=你的密码 --loop=60     # 自定义间隔（秒，上限 600）
 ```
 
-常驻模式复用与 cron 完全相同的调度、防重入锁与失败退避机制，二者不会重复执行任务；`Ctrl+C` 或停止进程即可退出。调度架构的演进评估（常驻 Worker/队列/分表合并）见 [`docs/architecture-evolution.md`](docs/architecture-evolution.md)。
+可选的优雅重载（默认关闭）：部署方设置环境变量 `LOOP_RELOAD_FILE` 指向本地可写文件后，升级完成会通知常驻进程在本轮调度结束后退出（退出码 75），交给 s6/systemd/任务计划等进程管理器自动拉起加载新代码。
 
-## 七、常见问题排查
+## 🔄 在线更新
 
-**问：页面提示数据库连接失败？**
+管理员在后台「系统更新」页一键检查并升级：
 
-答：确认数据库服务已启动、`DB_HOST` 在 Compose 中为 `db`、`DB_PASSWD` 与 MariaDB 初始化密码一致，并查看 `docker compose ... logs db`。首次修改 MariaDB 密码后，已有命名卷中的旧密码不会自动更新；需要按数据库迁移策略处理，不要直接删除生产卷。
+- 通过 GitHub 正式 Release 检查新版本；GitHub API 匿名限流（403/429）时自动回退官方 Release 页面发现版本，普通服务器无需任何 Token 也能完成检查。
+- 「立即更新」全自动：下载 Release 部署包 → 强制 SHA-256 校验（无可信摘要绝不覆盖）→ 保护站点配置文件 → 自动备份数据库 → 运行迁移器 → 清理 opcache → 自动返回首页。
+- 更新不会覆盖 `config.php`、`key.php`、`.env`、`docker/.env` 与 `setup/install.lock`，也不改动数据库内容。
+- 网络受限环境可选设置只读 `UPDATE_GITHUB_TOKEN`（仅发送给 `api.github.com`，不落盘、不随资产下载发送）。
 
-**问：Docker 容器健康检查失败？**
+项目源码与 Windows 部署包发布在 [GitHub Releases](https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases)；发布流程细节见 [`docs/RELEASE.md`](docs/RELEASE.md)。
 
-答：先查看 `docker compose ... ps` 和 `logs web`。容器存活检查访问 `/healthz.php?mode=live`；安装完成后再访问 `/healthz.php?mode=ready`，确认数据库和核心表均已就绪。
+## ⚙️ 配置参考
 
-Windows 可运行：
+### 数据库连接（环境变量）
 
-```powershell
-powershell -ExecutionPolicy Bypass -File windows/check-health.ps1 -Mode ready
-```
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `DB_HOST` | `127.0.0.1`（Compose 为 `db`） | 数据库主机 |
+| `DB_USER` / `DB_PASSWD` | `root` / 空 | 数据库凭据；Compose 中密码必填 |
+| `DB_NAME` / `DB_PREFIX` | `tiebacloud` / `tc_` | 数据库名与表前缀 |
+| `DB_SSL` | `0` | 设为 `1` 启用 MySQL SSL 连接 |
 
-**问：`do.php` 提示密码错误或未设置密码？**
+### 安全与运行
 
-答：在后台设置 `cron_pw`，Web 请求使用 `?pw=...`，CLI 使用 `--pw=...`。确认计划任务调用的是项目中的绝对路径。
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `ANTI_CSRF`（别名 `CSRF`） | `true` | CSRF 防御开关 |
+| `SYSTEM_SALT` | 空 | 加密与 CSRF 密钥材料；生产建议设置强随机值 |
+| `WEB_PORT` | `8080` | Compose 对外 Web 端口 |
+| `PUID` / `PGID` | `1000` | 容器运行用户 |
+| `TC_AUTO_CREATE_INSTALL_LOCK` | `false` | 容器启动时自动创建安装锁（首次安装保持 false） |
+| `SSL_CERT_FILE` / `CURL_CA_BUNDLE` | 空 | Windows PHP 指向可信 CA bundle，勿关闭证书校验 |
+| `UPDATE_GITHUB_TOKEN` | 空 | 可选只读 Token，仅发送给 `api.github.com` |
+| `LOOP_RELOAD_FILE` | 空（关闭） | `do.php --loop` 优雅重载标记文件路径 |
 
-**问：API 返回 401 或 503？**
+### 后台配置项（数据库选项）
 
-答：503 表示后台尚未配置 `api_token`；401 表示 `Authorization: Bearer ...` 缺失、格式错误或 Token 不匹配。
+`system_url` 站点地址、`cron_pw` 计划任务密码、`api_token` 开放 API Token、通知开关与各渠道凭据、SMTP 邮件配置等均在 Web 后台维护。
 
-**问：贴吧签到失败或账号不健康？**
+## 🔌 开放 API
 
-答：先在后台重新检查/更新百度账号凭据，确认服务器可访问百度 HTTPS 接口，再查看签到日志和健康检查结果。不要在公开渠道粘贴 BDUSS/STOKEN。
-
-## 八、开放 API
-
-先在后台设置中心配置 `api_token`，然后在请求头中携带：
-
-```http
-Authorization: Bearer <api-token>
-```
-
-接口均位于 `/api.php`，所有 JSON 响应携带 `api_version`（当前 `v1`）；权限矩阵与 openapi 文档（`action=openapi`）由同一份定义（`lib/api-contract.php`）驱动：
+后台设置中心配置 `api_token` 后，请求头携带 `Authorization: Bearer <api-token>` 调用 `/api.php`；所有响应携带 `api_version`，权限矩阵与文档（`action=openapi`）由同一份定义驱动：
 
 | 接口 | 方法 | 访问 | 用途 |
 | --- | --- | --- | --- |
-| `/api.php?action=status` | `GET` | 任意 | 签到状态汇总 |
-| `/api.php?action=health` | `GET` | 任意 | 百度账号健康状态 |
-| `/api.php?action=sign` | `POST` | 任意 | 立即执行全部签到 |
-| `/api.php?action=retry` | `POST` | 任意 | 执行失败复签 |
-| `/api.php?action=health_check` | `POST` | 仅全局 | 执行账号健康检查 |
-| `/api.php?action=logs&limit=50` | `GET` | 任意 | 获取最近日志；`limit` 范围为 1–200 |
-| `/api.php?action=calendar&days=90` | `GET` | 任意 | 个人签到日历 |
-| `/api.php?action=streak` | `GET` | 任意 | 连续签到统计 |
-| `/api.php?action=ranking&limit=20` | `GET` | 任意 | 用户签到排行榜 |
-| `/api.php?action=failures&limit=10` | `GET` | 任意 | 失败原因分布 |
-| `/api.php?action=monitor&limit=20` | `GET` | 仅个人 | 帖子监控命中记录 |
-| `/api.php?action=trend&days=30` | `GET` | 任意 | 签到趋势（每日成功/失败） |
-| `/api.php?action=tieba_health&days=30` | `GET` | 任意 | 每个贴吧的健康度统计 |
-| `/api.php?action=export` | `GET` | 任意 | 导出签到日志 CSV（用户 Token 仅本人） |
-| `/api.php?action=update` | `GET` | 仅全局 | 获取 GitHub 最新正式 Release 并判断是否需要更新 |
-| `/api.php?action=webhook_test` | `GET` | 仅全局 | 测试 Webhook 推送 |
-| `/api.php?action=openapi` | `GET` | 任意 | 接口文档（由权限矩阵自动生成） |
+| `?action=status` | GET | 任意 | 签到状态汇总 |
+| `?action=health` | GET | 任意 | 百度账号健康状态 |
+| `?action=sign` / `retry` | POST | 任意 | 立即签到 / 失败复签 |
+| `?action=health_check` | POST | 仅全局 | 执行账号健康检查 |
+| `?action=logs&limit=50` | GET | 任意 | 最近日志（1–200） |
+| `?action=calendar&days=90` / `streak` | GET | 任意 | 签到日历 / 连续签到 |
+| `?action=ranking` / `failures` / `trend` / `tieba_health` | GET | 任意 | 排行 / 失败分布 / 趋势 / 贴吧健康度 |
+| `?action=export` | GET | 任意 | 导出签到日志 CSV |
+| `?action=update` | GET | 仅全局 | GitHub 最新 Release 与更新判断 |
+| `?action=webhook_test` | GET | 仅全局 | 测试 Webhook 推送 |
+| `?action=openapi` | GET | 任意 | 接口文档（自动生成） |
 
-「任意」指全局 Token（全站视角）与用户 Token（仅本人数据）皆可调用。方法与权限由统一矩阵强制：方法不符返回 HTTP 405（`method_not_allowed`），权限不符返回 HTTP 403（`forbidden_user_token` / `forbidden_global_token`）。错误响应统一为 `{"error": "人类可读信息", "code": "稳定错误码", "api_version": "v1"}`，常见错误码：`missing_token`、`auth_failed`、`rate_limited`、`method_not_allowed`、`forbidden_user_token`、`forbidden_global_token`、`unknown_action`、`upstream_unavailable`。API 未启用返回 HTTP 503，未知 action 返回 HTTP 400。
-
-调用示例：
+「任意」= 全局 Token 与用户 Token（仅本人数据）皆可。方法不符返回 405（`method_not_allowed`），权限不符返回 403（`forbidden_user_token` / `forbidden_global_token`）；错误统一为 `{"error": "...", "code": "稳定错误码", "api_version": "v1"}`。未启用返回 503，未知 action 返回 400。
 
 ```bash
-curl -H @auth-header.txt \
-  "http://127.0.0.1:8080/api.php?action=status"
-
-curl -X POST -H @auth-header.txt \
-  "http://127.0.0.1:8080/api.php?action=sign"
+curl -H "Authorization: Bearer your-api-token" "http://127.0.0.1:8080/api.php?action=status"
 ```
 
-其中 `auth-header.txt` 内容为：
+## 🛡️ 安全建议
 
-```text
-Authorization: Bearer your-api-token
-```
+- 安装完成后保留 `setup/install.lock`，限制安装、调试与管理入口的公网暴露。
+- 使用 HTTPS、强数据库密码、强计划任务密码与高强度 `SYSTEM_SALT`。
+- BDUSS/STOKEN 属敏感凭据：不要提交到 Git、日志、Issue 或聊天记录。
+- 发现漏洞请按 [`SECURITY.md`](SECURITY.md) 的私密流程报告，勿公开利用细节。
 
-请通过 HTTPS 暴露生产 API，不要在命令历史、Issue 或日志中泄露 Token、BDUSS、STOKEN 或通知凭据。
-
-## 九、安全清单
-
-- 安装完成后保留 `setup/install.lock`，并限制安装、调试和管理入口的公网暴露。
-- 使用 HTTPS、强数据库密码、强计划任务密码和高强度 `SYSTEM_SALT`。
-- BDUSS/STOKEN 属于敏感凭据；不要提交到 Git、日志、Issue 或聊天记录。
-- 生产环境关闭调试类插件，及时更新 PHP、MariaDB、Docker 和依赖。
-- 发现漏洞请按 [`SECURITY.md`](SECURITY.md) 的私密报告流程提交，不要直接公开利用细节。
-
-## 十、开发者指南：测试、CI 与目录结构
-
-**本地开发与测试**
-
-安装开发依赖后可运行：
+## 🧑‍💻 开发者指南
 
 ```bash
 composer install
-composer test
-composer lint
-composer check
-composer integration
+composer test        # PHPUnit 冒烟测试
+composer lint        # 全仓 PHP 语法与安全检查
+composer check       # lint + test
+composer integration # 迁移/调度/API/备份恢复集成测试（需可连 MariaDB）
+composer gate        # 一键发布门禁，发布前必须全绿
 ```
 
-- `composer test`：运行 `tests/` 下的 PHPUnit 冒烟测试。
-- `composer lint`：检查仓库内全部非依赖 PHP 文件的语法。
-- `composer check`：依次运行全仓语法检查和 PHPUnit 测试。
-- `composer integration`：数据库集成测试（迁移/调度/API/备份恢复四条链路）。需要可连接的 MySQL/MariaDB（用 `TCS_IT_DB_HOST/PORT/USER/PASS` 指定，默认 `127.0.0.1:3306 root`）；数据库不可达时自动跳过。测试只在系统临时目录与自建的 `tcs_it_*` 临时数据库中工作：`tools/migrate-integration-test.php` 完整演练 6.6 → 7.0 升级、失败恢复、幂等重跑、checksum 漂移阻断、迁移锁与全新安装基线；`tools/scheduler-integration-test.php` 完整演练任务执行排程、锁冲突跳过、过期锁恢复、失败退避、通知去重与 `do.php` 调度边界；`tools/api-integration-test.php` 以内置服务器端到端验证 API 合同（认证/错误码/方法与权限门禁/限流）；`tools/backup-restore-drill.php` 用应用自身备份逻辑做一次完整备份恢复演练。
-- `composer gate`：一键发布门禁（`tools/release-gate.php`），聚合语法扫描、单元测试、版本元数据一致性、迁移规范、SQL 注入面守卫与全部数据库集成链路，发布前必须全绿。
-- CI 会在 PHP 8.2 与 8.4 上执行 Composer 校验、依赖审计、全仓语法检查和 PHPUnit 测试，在 MariaDB 11.4 服务容器上运行迁移/调度/备份恢复集成测试，构建 Docker 镜像并验证容器启动后的存活健康检查与应用路由（安装向导/首页），以内置服务器端到端验证 API 合同，并对临时 tag 执行发布脚本打包演练（ZIP + SHA-256 校验），同时校验 PowerShell 脚本与 Docker Compose 配置。
-- 冒烟测试不连接真实数据库或百度网络；迁移集成测试不代表完整生产环境验收。
-
-**持续集成与镜像发布**
-
-- `.github/workflows/ci.yml`：PHP 语法检查、Compose 校验和 Windows ZIP + SHA-256 本地打包演练。
-- `.github/workflows/release.yml`：推送经确认的 `v*` tag 后，构建 Windows 包并创建 GitHub Release；需要仓库默认 `GITHUB_TOKEN` 的 `contents: write` 权限。
-- `.github/workflows/build.yml`：推送到 `main` 或手动触发多架构 Docker 镜像构建并推送到 Docker Hub，需要配置 `DOCKERHUB_USERNAME` 和 `DOCKERHUB_PASSWORD` Secrets。
+- 集成测试只在系统临时目录与自建 `tcs_it_*` 临时数据库工作（用 `TCS_IT_DB_HOST/PORT/USER/PASS` 指定连接），数据库不可达时自动跳过。
+- CI 在 PHP 8.2/8.4 上执行 Composer 校验、依赖审计、语法检查与 PHPUnit，在 MariaDB 11.4 服务容器上运行四条集成链路，构建 Docker 镜像验证健康检查与应用路由，并对临时 tag 做发布脚本打包演练。
+- 工作流：`ci.yml`（质量门禁）、`release.yml`（`v*` tag 触发发布）、`build.yml`（多架构 Docker 镜像，未配置 Docker Hub 凭据时仅构建不推送）。
 
 **项目结构**
 
 ```text
 .
 ├── api.php                 # Bearer Token API
-├── do.php                  # 计划任务入口
+├── do.php                  # 计划任务入口（支持 --loop 常驻）
 ├── index.php / ajax.php    # Web 入口与异步请求
-├── config.php / init.php   # 配置与初始化
 ├── setting.php             # 后台设置及管理操作
-├── lib/                    # 核心类、计划任务、通知和数据库封装
+├── lib/                    # 核心类、调度、通知、更新器与数据库封装
 ├── templates/              # Web 页面模板
 ├── plugins/                # 插件及插件说明
-├── setup/                  # 安装、升级、检查和 SQL 模板
-├── lib/class.updater.php   # GitHub Release 在线检查和安全更新
+├── setup/                  # 安装、升级、迁移与 SQL 模板
 ├── docker/                 # Dockerfile、Compose 和环境变量示例
 ├── source/                 # CSS、JavaScript、字体和文档素材
+├── docs/                   # 发布流程、架构文档与界面截图
 ├── tests/                  # PHPUnit 测试
-├── SECURITY.md             # 漏洞报告与部署安全建议
+├── tools/                  # 发布脚本、集成测试与门禁
 ├── CHANGELOG.md            # 更新记录
 └── composer.json           # PHP 版本、扩展、脚本和开发依赖
 ```
 
-## 十一、致谢与相关资源
+## 🤝 致谢与社区
 
-本项目使用 AGPL-3.0 授权，详见仓库中的 [`license.html`](license.html)。
-
+- 原项目：[shirakun/Tieba-Cloud-Sign](https://github.com/shirakun/Tieba-Cloud-Sign)
 - 本仓库与 Releases：<https://github.com/yuchen0x1/baidu-tieba-yunqiandao>
-- 原项目：shirakun/Tieba-Cloud-Sign
-- QQ 交流群：`1016190748`
-- Telegram：<https://t.me/lenmoC>
+- QQ 交流群：`1016190748` · Telegram：<https://t.me/lenmoC>
 
-反馈问题时，请提供部署方式、PHP/Docker/MariaDB 版本、错误信息、相关日志，以及是否修改过插件或模板。
+本项目使用 AGPL-3.0 授权，详见 [`license.html`](license.html)。反馈问题时请提供部署方式、PHP/Docker/MariaDB 版本、错误信息与相关日志，以及是否修改过插件或模板。
