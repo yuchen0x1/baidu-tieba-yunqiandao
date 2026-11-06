@@ -166,17 +166,23 @@ php /var/www/do.php --pw=你的密码 --loop=60     # 自定义间隔（秒，�
 
 | 接口 | 方法 | 访问 | 用途 |
 | --- | --- | --- | --- |
-| `?action=status` | GET | 任意 | 签到状态汇总 |
-| `?action=health` | GET | 任意 | 百度账号健康状态 |
-| `?action=sign` / `retry` | POST | 任意 | 立即签到 / 失败复签 |
-| `?action=health_check` | POST | 仅全局 | 执行账号健康检查 |
-| `?action=logs&limit=50` | GET | 任意 | 最近日志（1–200） |
-| `?action=calendar&days=90` / `streak` | GET | 任意 | 签到日历 / 连续签到 |
-| `?action=ranking` / `failures` / `trend` / `tieba_health` | GET | 任意 | 排行 / 失败分布 / 趋势 / 贴吧健康度 |
-| `?action=export` | GET | 任意 | 导出签到日志 CSV |
-| `?action=update` | GET | 仅全局 | GitHub 最新 Release 与更新判断 |
-| `?action=webhook_test` | GET | 仅全局 | 测试 Webhook 推送 |
-| `?action=openapi` | GET | 任意 | 接口文档（自动生成） |
+| `/api.php?action=status` | `GET` | 任意 | 签到状态汇总 |
+| `/api.php?action=health` | `GET` | 任意 | 百度账号健康状态 |
+| `/api.php?action=sign` | `POST` | 任意 | 立即执行全部签到 |
+| `/api.php?action=retry` | `POST` | 任意 | 执行失败复签 |
+| `/api.php?action=health_check` | `POST` | 仅全局 | 执行账号健康检查 |
+| `/api.php?action=logs&limit=50` | `GET` | 任意 | 最近日志（limit 1–200） |
+| `/api.php?action=calendar&days=90` | `GET` | 任意 | 个人签到日历 |
+| `/api.php?action=streak` | `GET` | 任意 | 连续签到统计 |
+| `/api.php?action=ranking&limit=20` | `GET` | 任意 | 用户签到排行榜 |
+| `/api.php?action=failures&limit=10` | `GET` | 任意 | 失败原因分布 |
+| `/api.php?action=trend&days=30` | `GET` | 任意 | 签到趋势（每日成功/失败） |
+| `/api.php?action=tieba_health&days=30` | `GET` | 任意 | 每个贴吧的健康度统计 |
+| `/api.php?action=export` | `GET` | 任意 | 导出签到日志 CSV |
+| `/api.php?action=monitor&limit=20` | `GET` | 仅个人 | 帖子监控命中记录 |
+| `/api.php?action=update` | `GET` | 仅全局 | GitHub 最新 Release 与更新判断 |
+| `/api.php?action=webhook_test` | `GET` | 仅全局 | 测试 Webhook 推送 |
+| `/api.php?action=openapi` | `GET` | 任意 | 接口文档（由权限矩阵自动生成） |
 
 「任意」= 全局 Token 与用户 Token（仅本人数据）皆可。方法不符返回 405（`method_not_allowed`），权限不符返回 403（`forbidden_user_token` / `forbidden_global_token`）；错误统一为 `{"error": "...", "code": "稳定错误码", "api_version": "v1"}`。未启用返回 503，未知 action 返回 400。
 
