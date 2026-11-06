@@ -51,22 +51,34 @@ if (!empty($i['user']['bduss'])) {
             $seq = 0;
         }
         $seq++;
-        $f[$x['pid']] .= '<tr><td>' . $seq . '</td>';
+        $rowStatusClass = '';
+        if ($x['status'] != 0) {
+            $rowStatusClass = 'status-error';
+            $count2++;
+            $statusCell = '<span class="cs-badge cs-badge-danger">异常</span> <span class="text-muted">#' . $x['status'] . '</span>';
+            $tiebaDesc = '<br/><b>错误:</b>' . htmlspecialchars($x['last_error'], ENT_QUOTES, 'UTF-8');
+        } elseif ($x['latest'] != $day) {
+            $rowStatusClass = 'status-pending';
+            $count2++;
+            $statusCell = '<span class="cs-badge cs-badge-warning">待签</span>';
+            $tiebaDesc = '';
+        } else {
+            $rowStatusClass = 'status-success';
+            $count1++;
+            $statusCell = '<span class="cs-badge cs-badge-success">已签</span>';
+            $tiebaDesc = '';
+        }
+        if ($x['no'] != '0') {
+            $rowStatusClass .= ' status-ignored';
+        }
+
+        $f[$x['pid']] .= '<tr class="' . $rowStatusClass . '"><td>' . $seq . '</td>';
         $tieba = htmlspecialchars($x['tieba'], ENT_QUOTES, 'UTF-8');
         $tieba_url = rawurlencode($x['tieba']);
-        $f[$x['pid']] .= '<td class="wrap"><a title="' . $tieba . '" href="https://tieba.baidu.com/f?ie=utf-8&kw=' . $tieba_url . '" target="_blank">' . htmlspecialchars(mb_substr($x['tieba'], 0, 30, 'UTF-8'), ENT_QUOTES, 'UTF-8') . '</a>';
-        if ($x['status'] != 0) {
-            $count2++;
-            $f[$x['pid']] .= '<br/><b>错误:</b>' . htmlspecialchars($x['last_error'], ENT_QUOTES, 'UTF-8') . '</td>';
-            $f[$x['pid']] .= '<td><span class="cs-badge cs-badge-danger">异常</span> <span class="text-muted">#' . $x['status'] . '</span>';
-        } elseif ($x['latest'] != $day) {
-            $count2++;
-            $f[$x['pid']] .= '</td><td><span class="cs-badge cs-badge-warning">待签</span>';
-        } else {
-            $count1++;
-            $f[$x['pid']] .= '</td><td><span class="cs-badge cs-badge-success">正常</span>';
-        }
-        // 阶段 P：健康度列（近 30 天成功率）
+        $f[$x['pid']] .= '<td class="wrap"><a title="' . $tieba . '" href="https://tieba.baidu.com/f?ie=utf-8&kw=' . $tieba_url . '" target="_blank">' . htmlspecialchars(mb_substr($x['tieba'], 0, 30, 'UTF-8'), ENT_QUOTES, 'UTF-8') . '</a>' . $tiebaDesc . '</td>';
+        $f[$x['pid']] .= '<td>' . $statusCell . '</td>';
+
+        // 阶段 P：健康度与签到成长信息（成长经验 / 排名 / 成功率）
         $hInfo = isset($healthMap[$x['tieba']]) ? $healthMap[$x['tieba']] : null;
         if ($hInfo && $hInfo['total'] > 0) {
             $hr = (int) $hInfo['rate'];
@@ -77,11 +89,19 @@ if (!empty($i['user']['bduss'])) {
             elseif ($hr >= 70) { $hBadge = 'cs-badge-info'; $hLabel = '良好'; }
             elseif ($hr >= 50) { $hBadge = 'cs-badge-warning'; $hLabel = '一般'; }
             else { $hBadge = 'cs-badge-danger'; $hLabel = '较差'; }
-            $f[$x['pid']] .= '</td><td><span class="cs-badge ' . $hBadge . '">' . $hr . '%</span> <span class="text-muted" style="font-size:11px">' . $hSuccess . '/' . $hTotal . '（失败 ' . $hError . '）</span>';
+
+            $extraMetrics = '';
+            if (!empty($hInfo['last_exp'])) {
+                $extraMetrics .= ' <span class="cs-badge cs-badge-brand" style="margin-left:4px">+' . (int) $hInfo['last_exp'] . '经验</span>';
+            }
+            if (!empty($hInfo['last_rank'])) {
+                $extraMetrics .= ' <span class="text-muted" style="font-size:11px;margin-left:4px">第' . (int) $hInfo['last_rank'] . '签</span>';
+            }
+            $f[$x['pid']] .= '<td><span class="cs-badge ' . $hBadge . '">' . $hr . '%</span>' . $extraMetrics . ' <span class="text-muted" style="font-size:11px">' . $hSuccess . '/' . $hTotal . '</span></td>';
         } else {
-            $f[$x['pid']] .= '</td><td><span class="text-muted">暂无数据</span>';
+            $f[$x['pid']] .= '<td><span class="text-muted">暂无数据</span></td>';
         }
-        $f[$x['pid']] .= '</td><td>' . $no . '</td></tr>';
+        $f[$x['pid']] .= '<td>' . $no . '</td></tr>';
     }
     echo '<div class="cs-alert cs-alert-info" id="tb_num"><svg class="cs-alert-icon" aria-hidden="true"><use href="#i-info"/></svg><div class="cs-alert-body">当前已列出 <strong>' . $num . '</strong> 个贴吧。已签到 <strong>' . $count1 . '</strong> 个，还有 <strong>' . $count2 . '</strong> 个等待签到<br/>PID 即为 账号ID';
     if (!ISVIP) {
@@ -101,7 +121,14 @@ if (!empty($i['user']['bduss'])) {
             echo '<option value="' . htmlspecialchars($pkey, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars(($pval ?: $i['user']['baidu_portrait'][$pkey]), ENT_QUOTES, 'UTF-8') . '</option>';
         }
         echo '</select>';
-        echo '<input id="showtb-search" class="form-control" placeholder="搜索当前账号的贴吧…" style="width:220px;height:30px">';
+        echo '<input id="showtb-search" class="form-control" placeholder="搜索当前账号的贴吧…" style="width:200px;height:30px">';
+        echo '<div id="showtb-filters" class="cs-filter-group" style="display:inline-flex;gap:4px">';
+        echo '<button type="button" class="cs-btn cs-btn-xs cs-btn-primary" data-status-filter="">全部</button>';
+        echo '<button type="button" class="cs-btn cs-btn-xs cs-btn-ghost" data-status-filter="status-success">已签</button>';
+        echo '<button type="button" class="cs-btn cs-btn-xs cs-btn-ghost" data-status-filter="status-pending">待签</button>';
+        echo '<button type="button" class="cs-btn cs-btn-xs cs-btn-ghost" data-status-filter="status-error">异常</button>';
+        echo '<button type="button" class="cs-btn cs-btn-xs cs-btn-ghost" data-status-filter="status-ignored">已忽略</button>';
+        echo '</div>';
         echo '<span id="showtb-pager" style="display:inline-flex;gap:4px;align-items:center;font-size:12px"></span>';
         echo '</div>';
         echo '<form action="setting.php?mod=showtb&set" method="post" id="showtb-form">';
@@ -135,6 +162,7 @@ if (!empty($i['user']['bduss'])) {
         var search = document.getElementById('showtb-search');
         var pager = document.getElementById('showtb-pager');
         var currentPid = null;
+        var currentStatusFilter = '';
 
         function rowsOf(panel) {
             return Array.prototype.slice.call(panel.querySelectorAll('tbody tr'));
@@ -142,7 +170,9 @@ if (!empty($i['user']['bduss'])) {
         function renderPage(panel, page, keyword) {
             var rows = rowsOf(panel);
             var visible = rows.filter(function (r) {
-                return !keyword || r.textContent.toLowerCase().indexOf(keyword) >= 0;
+                var matchKw = !keyword || r.textContent.toLowerCase().indexOf(keyword) >= 0;
+                var matchStatus = !currentStatusFilter || r.classList.contains(currentStatusFilter);
+                return matchKw && matchStatus;
             });
             var pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
             if (page > pages) { page = pages; }
@@ -150,7 +180,7 @@ if (!empty($i['user']['bduss'])) {
             visible.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).forEach(function (r) { r.style.display = ''; });
             if (pager) {
                 var html = '';
-                if (pages > 1 || keyword) {
+                if (pages > 1 || keyword || currentStatusFilter) {
                     html += '共 ' + visible.length + ' 条';
                     if (pages > 1) {
                         html += '　';
@@ -172,6 +202,21 @@ if (!empty($i['user']['bduss'])) {
             if (!panel) { return; }
             renderPage(panel, 1, search && search.value ? search.value.trim().toLowerCase() : '');
         };
+
+        // 绑定状态标签筛选
+        var filterBtns = document.querySelectorAll('[data-status-filter]');
+        filterBtns.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                filterBtns.forEach(function (b) {
+                    b.classList.remove('cs-btn-primary');
+                    b.classList.add('cs-btn-ghost');
+                });
+                btn.classList.remove('cs-btn-ghost');
+                btn.classList.add('cs-btn-primary');
+                currentStatusFilter = btn.getAttribute('data-status-filter') || '';
+                window.showtbSearchApply();
+            });
+        });
         var oldShowtbpanel = null;
         window.addEventListener('load', function () {
             oldShowtbpanel = window.showtbpanel;

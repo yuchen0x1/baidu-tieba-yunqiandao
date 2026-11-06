@@ -5,7 +5,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * 版本元数据与发布配置回归测试（V7.0）
  * 防止再次出现安装模板、Docker、Windows 脚本与运行版本漂移：
- * 全部版本与令牌命名只有一个来源（version.php / UPDATE_GITEE_TOKEN）。
+ * 全部版本与令牌命名只有一个来源（version.php / UPDATE_GITHUB_TOKEN）。
  */
 final class ReleaseConfigTest extends TestCase
 {
@@ -57,13 +57,23 @@ final class ReleaseConfigTest extends TestCase
         $this->assertStringNotContainsString("'5.12'", $sql);
     }
 
-    public function testDockerUsesGiteeUpdateToken(): void
+    public function testDockerUsesOptionalGitHubUpdateToken(): void
     {
         foreach (array('docker/docker-compose.yml', 'docker/.env.example') as $file) {
             $content = $this->read($file);
-            $this->assertStringContainsString('UPDATE_GITEE_TOKEN', $content, $file . ' 应使用 Gitee 令牌');
-            $this->assertStringNotContainsString('UPDATE_GITHUB_TOKEN', $content, $file . ' 不得残留 GitHub 令牌命名');
+            $this->assertStringContainsString('UPDATE_GITHUB_TOKEN', $content, $file . ' 应使用 GitHub 令牌');
+            $this->assertStringNotContainsString('UPDATE_GITEE_TOKEN', $content, $file . ' 不得残留 Gitee 令牌命名');
         }
+    }
+
+    public function testUpdaterIsConfiguredForGitHubReleaseEndpoints(): void
+    {
+        $updater = $this->read('lib/class.updater.php');
+        $this->assertStringContainsString('https://api.github.com/repos/yuchen0x1/baidu-tieba-yunqiandao/releases/latest', $updater);
+        $this->assertStringContainsString('https://api.github.com/repos/yuchen0x1/baidu-tieba-yunqiandao/releases?per_page=10', $updater);
+        $this->assertStringContainsString("getenv('UPDATE_GITHUB_TOKEN')", $updater);
+        $this->assertStringContainsString('release-assets.githubusercontent.com', $updater);
+        $this->assertStringNotContainsString('gitee.com', strtolower($updater));
     }
 
     public function testWindowsUpdateCheckDefaultsToCurrentVersion(): void

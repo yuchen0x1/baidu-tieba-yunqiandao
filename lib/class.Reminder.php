@@ -92,6 +92,7 @@ class Reminder
         $sql = "SELECT `uid`,
             SUM(`status` = 'success') AS ok_count,
             SUM(`status` = 'error') AS fail_count,
+            SUM(`exp_gained`) AS total_exp,
             COUNT(*) AS total
             FROM `" . DB_PREFIX . SignManager::HISTORY_TABLE . "`
             WHERE `created_at` >= {$todayStart} AND `uid` > 0
@@ -109,18 +110,57 @@ class Reminder
             $ok = (int) $row['ok_count'];
             $fail = (int) $row['fail_count'];
             $total = (int) $row['total'];
+            $totalExp = (int) ($row['total_exp'] ?? 0);
             $rate = $total > 0 ? round($ok / $total * 100, 1) : 0;
-            $title = SYSTEM_FN . ' 每日签到摘要';
-            $content = sprintf(
-                "今日签到汇总：成功 %d 次，失败 %d 次，共 %d 次，成功率 %.1f%%。",
-                $ok,
-                $fail,
-                $total,
-                $rate
-            );
-            $detail = self::sendToUser($uid, $title, $content);
-            self::markSent($uid, 'daily_summary');
-            $reports[] = array('uid' => $uid, 'ok' => $detail['ok'], 'detail' => $detail['detail']);
+            $todayStr = date('Y-m-d');
+            $title = '📋 贴吧云签到 · 每日签到日报 (' . $todayStr . ')';
+
+            // 构建精美结构化报告
+            $lines = array();
+            $lines[] = "【" . SYSTEM_FN . " · 每日签到晨报】";
+            $lines[] = "📅 日期：" . $todayStr;
+            $lines[] = "📊 汇总：共签到 " . $total . " 个贴吧 | 成功 " . $ok . " | 失败 " . $fail;
+            $lines[] = "📈 今日累计成长经验：+" . $totalExp . " 经验";
+            $lines[] = "🎯 总体成功率：" . $rate . "%";
+
+            // 补充失败明细（如果有）
+            if ($fail > 0) {
+                $failRows = $m->query("SELECT `tieba`, `message` FROM `" . DB_PREFIX . SignManager::HISTORY_TABLE . "` WHERE `uid` = {$uid} AND `status` = 'error' AND `created_at` >= {$todayStart} LIMIT 5");
+                $failList = array();
+                while ($fr = $m->fetch_array($failRows)) {
+                    $failList[] = "  • " . $fr['tieba'] . "（" . ($fr['message'] ?: '未知错误') . "）";
+                }
+                if (!empty($failList)) {
+                    $lines[] = "\n⚠️ 今日失败贴吧 (前5项)：\n" . implode("\n", $failList);
+                }
+            } else {
+                $lines[] = "✨ 太棒了！今日所有贴吧全部签到成功！";
+            }
+            $lines[] = "\n🔗 登录工作台查看详情：" . SYSTEM_URL;
+
+            $content = implode("\n", $lines);
+
+            // 优先通过用户自定义多渠道发送（支持 Telegram, Server酱, 飞书, 钉钉, Bark, ntfy 等），回退到邮件
+            if (class_exists('Notify')) {
+                require_once SYSTEM_ROOT . '/lib/class.notify.php';
+                $detail = Notify::sendForUser($uid, $title, $content, 'daily_summary');
+            } else {
+                $detail = self::sendToUser($uid, $title, $content);
+            }
+
+            $delivered = !empty($detail['ok']) && $detail['detail'] !== '通知未启用';
+            if (!$delivered) {
+                // 站点通知未启用或个人渠道不可用时，回退到用户邮箱，避免未送达却记为已发送。
+                $emailDetail = self::sendToUser($uid, $title, $content);
+                if (!empty($emailDetail['ok'])) {
+                    $detail = $emailDetail;
+                    $delivered = true;
+                }
+            }
+            if ($delivered) {
+                self::markSent($uid, 'daily_summary');
+            }
+            $reports[] = array('uid' => $uid, 'ok' => $delivered, 'detail' => $detail['detail']);
         }
         return $reports;
     }

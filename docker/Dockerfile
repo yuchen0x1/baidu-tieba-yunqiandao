@@ -16,6 +16,7 @@ RUN apk add --no-cache \
        caddy \
        git \
        php84 \
+       php84-ctype \
        php84-curl \
        php84-fpm \
        php84-gd \
@@ -39,6 +40,7 @@ RUN apk add --no-cache \
     && git config --global pull.ff only \
     && mkdir /etc/cont-init.d \
     && mkdir /etc/services.d \
+    && sed -i 's/\r$//' $WORKDIR/docker/s6-overlay/etc/cont-init.d/* $WORKDIR/docker/s6-overlay/etc/services.d/*/run \
     && cp -r $WORKDIR/docker/s6-overlay/etc/* /etc/ \
     && chmod +x /etc/cont-init.d/* /etc/services.d/*/run
 

@@ -8,8 +8,8 @@ if (!defined('SYSTEM_FN')) {
     define('SYSTEM_FN', '百度贴吧云签到');
 }
 if (!defined('SYSTEM_VER')) {
-    define('SYSTEM_VER', '7.2.3');
+    define('SYSTEM_VER', '7.3.0');
 }
 if (!defined('SYSTEM_VER_NOTE')) {
-    define('SYSTEM_VER_NOTE', 'V7.2.3：升级完成后自动返回首页，无需手动确认');
+    define('SYSTEM_VER_NOTE', 'V7.3.0：新增签到成长指标，并强化外发请求与解压安全');
 }

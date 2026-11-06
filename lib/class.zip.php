@@ -44,10 +44,47 @@ class zip
         return $this->z;
     }
 
-    //解压缩
+    //解压缩 (防 Zip Slip 路径穿越)
     public function extract($path)
     {
-        $this->z->extractTo($path);
+        $realDest = realpath($path);
+        if ($realDest === false) {
+            @mkdir($path, 0755, true);
+            $realDest = realpath($path);
+        }
+        if ($realDest === false) {
+            return false;
+        }
+        $realDest = rtrim(str_replace('\\', '/', $realDest), '/');
+        for ($i = 0; $i < $this->z->numFiles; $i++) {
+            $name = $this->z->getNameIndex($i);
+            if ($name === false) {
+                continue;
+            }
+            $name = str_replace('\\', '/', $name);
+            if (strpos($name, '../') !== false || strpos($name, "\0") !== false || (isset($name[0]) && $name[0] === '/')) {
+                continue; // 拒绝恶意穿越路径
+            }
+            $targetPath = $realDest . '/' . $name;
+            if (strpos($targetPath, $realDest . '/') !== 0) {
+                continue;
+            }
+            if (substr($name, -1) === '/') {
+                if (!is_dir($targetPath)) {
+                    @mkdir($targetPath, 0755, true);
+                }
+            } else {
+                $dir = dirname($targetPath);
+                if (!is_dir($dir)) {
+                    @mkdir($dir, 0755, true);
+                }
+                $content = $this->z->getFromIndex($i);
+                if ($content !== false) {
+                    @file_put_contents($targetPath, $content);
+                }
+            }
+        }
+        return true;
     }
 
     //添加路径下所有目录、文件到压缩包。$path=. 则表示当前目录

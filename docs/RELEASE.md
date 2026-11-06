@@ -1,54 +1,66 @@
-# 发布手册（V7.0 起）
+# 发布手册
 
-> 发布仓库为 Gitee（`yuchen0x1/baidu-tieba-yunqiandao`）。发布必须从**真实 git clone** 中执行
-> （打包基于 tag 指向的已提交树，要求工作区已提交干净）；本仓库的开发工作区如未初始化 git，请先在正式 clone 中操作。
+> GitHub 是本项目的源码与发布仓库：<https://github.com/yuchen0x1/baidu-tieba-yunqiandao>。
+> 发布操作应在真实且干净的 git clone 中执行。发布包取自现有版本 tag 指向的已提交树；工作区有已跟踪文件改动时会阻止打包。
 
 ## 一、发布前检查
 
-在 clone 目录执行一键门禁（有条件时配置 `TCS_IT_DB_*` 指向可用的 MySQL/MariaDB，让四条集成链路真实运行）：
+在 clone 目录执行发布门禁（有条件时配置 `TCS_IT_DB_*` 指向可用的 MySQL/MariaDB，让集成链路真实运行而不是跳过）：
 
 ```bash
 php tools/release-gate.php
 ```
 
-9 项检查（语法扫描、单元测试、版本一致性、迁移规范、SQL 注入面守卫、迁移/调度/API/备份恢复集成）全部 PASS 才允许发布。
+所有检查通过后再发布。选定 tag 前，请核实 `version.php`、`composer.json`、迁移文件和对应发布说明中的版本信息。本手册不替项目选择版本，也不创建发布说明。
 
-## 二、发布步骤
+## 二、发布流程
 
-```powershell
-# 1. 打版本标签并推送
-git tag v7.0
-git push origin v7.0
+确认项目元数据和发布说明无误后，创建并推送版本 tag：
 
-# 2. 配置 Gitee 私人令牌（需要该仓库的管理权限）
-$env:GITEE_ACCESS_TOKEN = "<你的 Gitee 私人令牌>"
-
-# 3. 发布（上传 ZIP + SHA-256），随后只保留最近 3 个 Release 并删除更旧版本的远端标签
-tools/publish-gitee.ps1 -Tag v7.0 `
-  -ReleaseNotesFile release-notes/v7.0.md `
-  -Publish -CleanOldReleases 3 -DeleteOldTags -Confirm:$false
+```bash
+tag="v<版本号>"
+git tag "$tag"
+git push origin "$tag"
 ```
 
-说明：
+推送 `v*` tag 会触发 `.github/workflows/release.yml`：先运行语法/安全扫描、Secret 扫描、PHPUnit 以及基于 MariaDB 的迁移、调度、API 与备份恢复集成检查；全部通过后，再将 tag 中的源码打包为 Windows ZIP、生成 SHA-256 校验文件，并创建 GitHub Release。工作流使用仓库 `GITHUB_TOKEN` 及 `contents: write` 权限，无需个人访问令牌或仓库变量。
 
-- `-CleanOldReleases <N>`：发布成功后按创建时间倒序仅保留最近 N 个 Release（刚发布的版本永远保留），其余删除。
-  不传该参数则不删除任何历史版本。
-- `-DeleteOldTags`：删除被清理 Release 对应的**远端标签**。标签删除后旧版本的源码归档地址将失效——
-  在线更新器只读取 `releases/latest`，不受影响；但如有人依赖旧 tag 的源码地址请慎用。删除 Release 不会自动删标签，
-  因此清理标签必须显式传此开关。
-- 不带 `-Publish` 时仅本地打包（ZIP + SHA-256），不做任何远端变更，可用于演练。
-- 脚本在发布与清理全程要求 `GITEE_ACCESS_TOKEN`；令牌只发送给 gitee.com。
+如需本地打包或手动发布，请安装并登录有目标仓库 Release 写权限的 [GitHub CLI](https://cli.github.com/)，然后运行：
+
+```powershell
+$tag = "v<版本号>"
+$arguments = @{
+  Tag = $tag
+  Publish = $true
+  Confirm = $false
+}
+# 仅当该 tag 对应的发布说明文件已审核并存在时才传入。
+$notes = "release-notes/$tag.md"
+if (Test-Path -LiteralPath $notes) {
+  $arguments.ReleaseNotesFile = $notes
+}
+tools/publish-github.ps1 @arguments
+```
+
+省略 `ReleaseNotesFile` 时由 GitHub 自动生成发布说明。不带 `-Publish` 时，脚本只在本地生成 ZIP 和 `.sha256` 文件，不执行远端操作。脚本要求数字版本 tag 已存在，且工作区没有已跟踪文件改动。
+
+以下清理参数不属于常规发布步骤，使用前应先审核保留策略：
+
+- `-CleanOldReleases <N>`：发布成功后删除最新 N 个以外的 Release；刚发布的 Release 会保留。
+- `-DeleteOldTags`：同时删除成功清理的 Release 对应远端 tag。tag 删除后，其源码归档将不再可用。
+
+发布脚本通过 `gh` 使用 `github.com` 的登录凭据，不读取其他平台的发布凭据。
 
 ## 三、发布后验证
 
-1. 打开 `https://gitee.com/yuchen0x1/baidu-tieba-yunqiandao/releases/latest`，确认新版本、附件（ZIP + `.sha256`）与说明正确。
-2. 在一台测试环境用旧版本触发「系统更新」，确认能检测到新版本、下载校验通过并完成升级（`core_version` 变为 7.0）。
-3. 抽查 `UPDATE_GITEE_TOKEN` 与 Docker Compose 部署的更新检查是否正常。
+1. 打开 <https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases>，核对 tag、发布说明、Windows ZIP 和 `.sha256` 附件。
+2. 下载 ZIP 与校验文件，验证 SHA-256，并在临时测试环境验证 Windows 部署包。
+3. 在测试环境运行旧版本，从后台「系统更新」确认能检测到 GitHub `latest` Release。执行在线更新后，更新器应下载 Release 资产，校验 GitHub Release API 的 `digest` 或同一 Release 的 `.sha256` 摘要，校验通过后完成覆盖安装，并保留站点配置。
+4. 确认缺少可信 SHA-256 摘要、摘要不一致或只有源码归档时，更新器会拒绝在线覆盖安装，原程序保持不变；此时应从 Release 页面手动下载安装。
+5. 在需要提高 GitHub API 限额的环境中，可设置只读 `UPDATE_GITHUB_TOKEN` 后重试。令牌仅发送给 `api.github.com`，不要写入配置文件或提交到 Git。
 
-## 四、常见问题
+## 四、常见问题与回滚
 
-- **发布脚本报"工作区存在未提交改动"**：脚本只打包已提交内容，请先提交或还原。
-- **清理时某条 Release 删除失败**：脚本会跳过该项并告警（对应标签也不会删除），修复权限后重跑清理即可——
-  重复执行安全：已删除的不会匹配，保留数量内的不会被动。
-- **回滚**：发布后发现问题，删除新 Release 附件并将上一个版本重新设为 latest（Gitee 网页操作）；
-  代码回滚到上一 tag 重新发布为更新版本号（例如 v7.0.1），不要复用已发布的版本号。
+- **打包脚本提示存在已跟踪文件改动**：提交或还原这些改动，然后从 tag 对应的干净 clone 打包。未跟踪文件不会进入包，脚本使用 `git archive` 从 tag 树取文件。
+- **GitHub CLI 未登录或权限不足**：运行 `gh auth status --hostname github.com`，并确认本地账户或工作流令牌对目标仓库具有 Release 写权限。
+- **回滚**：发现问题后，将有问题的 GitHub Release 删除或标记为预发布；修正并审核项目元数据后，使用新的版本 tag 重新发布。不要复用已发布的版本号。

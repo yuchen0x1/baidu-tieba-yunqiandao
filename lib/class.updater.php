@@ -1,14 +1,17 @@
 <?php
 
 /**
- * Release 在线更新仅支持 Gitee 国内通道。
+ * Release 在线更新仅支持 GitHub 正式 Release。
  * 版本检查只读取正式 latest Release；真正更新只由管理员主动触发。
  */
 class ProjectUpdater
 {
     const DEFAULT_TIMEOUT_MS = 8000;
-    const GITEE_RELEASES_API_URL = 'https://gitee.com/api/v5/repos/yuchen0x1/baidu-tieba-yunqiandao/releases/latest';
-    const GITEE_RELEASES_HISTORY_API_URL = 'https://gitee.com/api/v5/repos/yuchen0x1/baidu-tieba-yunqiandao/releases?per_page=10&page=1';
+    const GEO_TIMEOUT_MS = 3000;
+    const REMOTE_HOST_WHITELIST = array('api.github.com', 'github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com');
+    const GITHUB_RELEASES_API_URL = 'https://api.github.com/repos/yuchen0x1/baidu-tieba-yunqiandao/releases/latest';
+    const GITHUB_RELEASES_HISTORY_API_URL = 'https://api.github.com/repos/yuchen0x1/baidu-tieba-yunqiandao/releases?per_page=10';
+    const GITHUB_REPOSITORY_API_URL = 'https://api.github.com/repos/yuchen0x1/baidu-tieba-yunqiandao';
     const HISTORY_CACHE_OPTION = 'update_release_history_cache';
     const HISTORY_CACHE_TTL = 1800;
 
@@ -28,7 +31,13 @@ class ProjectUpdater
         }
         $version = self::normalizeVersion($payload['tag_name']);
         $releaseUrl = isset($payload['html_url']) ? trim((string) $payload['html_url']) : '';
+        if ($releaseUrl === '') {
+            $releaseUrl = 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/tag/' . rawurlencode((string) $payload['tag_name']);
+        }
         $sourceUrl = isset($payload['zipball_url']) ? trim((string) $payload['zipball_url']) : '';
+        if ($sourceUrl === '') {
+            $sourceUrl = 'https://api.github.com/repos/yuchen0x1/baidu-tieba-yunqiandao/zipball/' . rawurlencode((string) $payload['tag_name']);
+        }
         if (!self::isAllowedUrl($releaseUrl) || !self::isAllowedUrl($sourceUrl)) {
             throw new InvalidArgumentException('Release 下载地址不受信任');
         }
@@ -68,28 +77,24 @@ class ProjectUpdater
 
     public static function fetchLatestRelease($apiUrl = null)
     {
-        $overrideUrl = $apiUrl;
-        if ($overrideUrl === null && defined('PROJECT_RELEASES_API_URL')) {
-            $configured = trim((string) PROJECT_RELEASES_API_URL);
-            // 仅允许显式的 Gitee 自定义地址，默认地址仍使用国内正式 Release。
-            if ($configured !== '' && $configured !== self::GITEE_RELEASES_API_URL) {
-                $overrideUrl = $configured;
-            }
+        $releaseUrl = $apiUrl;
+        if ($releaseUrl === null && defined('PROJECT_RELEASES_API_URL')) {
+            $releaseUrl = trim((string) PROJECT_RELEASES_API_URL);
         }
-        if ($overrideUrl !== null) {
-            return self::requestRelease($overrideUrl, 'custom');
+        if ($releaseUrl === null || $releaseUrl === '') {
+            $releaseUrl = self::GITHUB_RELEASES_API_URL;
         }
-        return self::requestRelease(self::GITEE_RELEASES_API_URL, 'gitee');
+        return self::requestRelease($releaseUrl, 'github');
     }
 
     public static function primaryChannel()
     {
-        return 'gitee';
+        return 'github';
     }
 
     /**
      * 获取历史 Release 列表（用于更新页“历史更新日志”）。
-     * 结果缓存到 options 表以减少对 Gitee API 的请求；检测到更新的 latest tag 时自动失效。
+     * 结果缓存到 options 表以减少对 GitHub API 的请求；检测到更新的 latest tag 时自动失效。
      * @param string|null $latestTag 当前 latest Release 的 tag（用于缓存失效判断）
      * @return array 简化后的 Release 列表，按发布时间倒序
      * @throws RuntimeException 网络或数据不可用时抛出，调用方可静默降级
@@ -107,7 +112,7 @@ class ProjectUpdater
                 }
             }
         }
-        $items = self::requestReleaseList(self::GITEE_RELEASES_HISTORY_API_URL);
+        $items = self::requestReleaseList(self::GITHUB_RELEASES_HISTORY_API_URL);
         option::set(self::HISTORY_CACHE_OPTION, json_encode(array(
             'time' => time(),
             'latest_tag' => (string) $latestTag,
@@ -121,24 +126,10 @@ class ProjectUpdater
         if (!self::isAllowedUrl($apiUrl)) {
             throw new RuntimeException('更新服务器地址不受信任');
         }
-        $curl = self::createReleaseCurl($apiUrl, true);
-        if ($curl === false) {
-            throw new RuntimeException('无法初始化更新连接');
-        }
-        $body = curl_exec($curl);
-        $error = curl_error($curl);
-        $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        curl_close($curl);
-        //与 requestRelease 相同的降级策略：凭据被拒时匿名重试
-        if (in_array($status, array(401, 403, 404), true) && self::hasCredentialForUrl($apiUrl)) {
-            $curl = self::createReleaseCurl($apiUrl, false);
-            if ($curl !== false) {
-                $body = curl_exec($curl);
-                $error = curl_error($curl);
-                $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
-                curl_close($curl);
-            }
-        }
+        $response = self::requestSafeUrl($apiUrl, array('Accept: application/json'), self::DEFAULT_TIMEOUT_MS, true);
+        $body = $response['body'];
+        $error = $response['error'];
+        $status = $response['status'];
         if ($body === false || $error !== '' || $status < 200 || $status >= 300) {
             throw new RuntimeException('无法获取历史 Release 列表（HTTP ' . $status . '）' . ($error !== '' ? '：' . $error : ''));
         }
@@ -153,7 +144,7 @@ class ProjectUpdater
             }
             //单条数据异常时跳过该条，不影响其余历史展示
             try {
-                $release = self::parseRelease(self::normalizeGiteePayload($entry, $apiUrl));
+                $release = self::parseRelease($entry);
             } catch (Throwable $e) {
                 continue;
             }
@@ -171,8 +162,8 @@ class ProjectUpdater
         if (empty($items)) {
             throw new RuntimeException('历史 Release 列表为空');
         }
-        //Gitee 列表端点按最旧在前返回，统一反转为最新在前
-        return array_reverse($items);
+        // GitHub Releases API returns newest releases first.
+        return $items;
     }
 
     public static function foreignFallbackEnabled()
@@ -181,7 +172,7 @@ class ProjectUpdater
     }
 
     /**
-     * 保留旧接口名，兼容插件调用；返回固定的国内更新通道。
+     * 保留旧接口名，兼容插件调用；返回固定的 GitHub 更新通道。
      */
     public static function determineChannel()
     {
@@ -193,23 +184,10 @@ class ProjectUpdater
         if (!self::isAllowedUrl($apiUrl)) {
             throw new RuntimeException('更新服务器地址不受信任');
         }
-        $curl = self::createReleaseCurl($apiUrl, true);
-        if ($curl === false) {
-            throw new RuntimeException('无法初始化更新连接');
-        }
-        $body = curl_exec($curl);
-        $error = curl_error($curl);
-        $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        curl_close($curl);
-        if (in_array($status, array(401, 403, 404), true) && self::hasCredentialForUrl($apiUrl)) {
-            $curl = self::createReleaseCurl($apiUrl, false);
-            if ($curl !== false) {
-                $body = curl_exec($curl);
-                $error = curl_error($curl);
-                $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
-                curl_close($curl);
-            }
-        }
+        $response = self::requestSafeUrl($apiUrl, array('Accept: application/json'), self::DEFAULT_TIMEOUT_MS, true);
+        $body = $response['body'];
+        $error = $response['error'];
+        $status = $response['status'];
         if ($body === false || $error !== '' || $status < 200 || $status >= 300) {
             throw new RuntimeException('无法连接 ' . self::channelLabel($channel) . ' 更新服务器' . ($error !== '' ? '：' . $error : '（HTTP ' . $status . '）'));
         }
@@ -217,7 +195,6 @@ class ProjectUpdater
         if (!is_array($payload)) {
             throw new RuntimeException(self::channelLabel($channel) . ' 更新服务器返回的数据无效');
         }
-        $payload = self::normalizeGiteePayload($payload, $apiUrl);
         try {
             return self::parseRelease($payload);
         } catch (InvalidArgumentException $e) {
@@ -225,80 +202,87 @@ class ProjectUpdater
         }
     }
 
-    /**
-     * Gitee API v5 的 Release 响应可能缺少 html_url / zipball_url 字段，
-     * 按仓库路径补齐官方标准的源码归档地址，保证源码 zip 与 Release 资产两条路都可用。
-     */
-    private static function normalizeGiteePayload(array $payload, $apiUrl)
-    {
-        if (strtolower((string) parse_url((string) $apiUrl, PHP_URL_HOST)) !== 'gitee.com') {
-            return $payload;
-        }
-        $tag = isset($payload['tag_name']) ? trim((string) $payload['tag_name']) : '';
-        $path = (string) parse_url((string) $apiUrl, PHP_URL_PATH);
-        if ($tag === '' || preg_match('#/repos/([^/]+)/([^/]+)(?:/|$)#', $path, $matches) !== 1) {
-            return $payload;
-        }
-        $base = 'https://gitee.com/' . $matches[1] . '/' . $matches[2];
-        if (!isset($payload['html_url']) || trim((string) $payload['html_url']) === '') {
-            $payload['html_url'] = $base . '/releases/tag/' . rawurlencode($tag);
-        }
-        if (!isset($payload['zipball_url']) || trim((string) $payload['zipball_url']) === '') {
-            $payload['zipball_url'] = $base . '/repository/archive/' . rawurlencode($tag) . '.zip';
-        }
-        return $payload;
-    }
-
     private static function channelLabel($channel)
     {
-        if ($channel === 'gitee') {
-            return 'Gitee';
-        }
-        return '自定义';
+        return $channel === 'github' ? 'GitHub' : '更新';
     }
 
-    private static function createReleaseCurl($apiUrl, $includeAuth = true)
+    private static function githubToken()
     {
-        if (!function_exists('curl_init')) {
-            return false;
-        }
-        $curl = curl_init($apiUrl);
-        if ($curl === false) {
-            return false;
-        }
-        $headers = array(
-            'Accept: application/json',
-            'User-Agent: Tieba-Cloud-Sign-Updater/' . (defined('SYSTEM_VER') ? SYSTEM_VER : 'unknown')
-        );
-        $host = strtolower((string) parse_url((string) $apiUrl, PHP_URL_HOST));
-        // 更新凭据只会发送给国内 Gitee API。
-        $giteeToken = getenv('UPDATE_GITEE_TOKEN');
-        if ($includeAuth && $giteeToken !== false && trim((string) $giteeToken) !== '' && $host === 'gitee.com') {
-            $headers[] = 'Authorization: Bearer ' . trim((string) $giteeToken);
-        }
-        curl_setopt_array($curl, array(
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_SSL_VERIFYHOST => 2,
-            CURLOPT_CONNECTTIMEOUT_MS => 3000,
-            CURLOPT_TIMEOUT_MS => self::DEFAULT_TIMEOUT_MS,
-            CURLOPT_HTTPHEADER => $headers
-        ));
-        $caInfo = self::findCaInfo();
-        if ($caInfo !== false) {
-            curl_setopt($curl, CURLOPT_CAINFO, $caInfo);
-        }
-        return $curl;
+        $token = getenv('UPDATE_GITHUB_TOKEN');
+        return $token === false ? '' : trim((string) $token);
     }
 
-    private static function hasCredentialForUrl($url)
+    private static function isGitHubReleaseApiEndpoint($url)
     {
-        $host = strtolower((string) parse_url((string) $url, PHP_URL_HOST));
-        if ($host === 'gitee.com') {
-            return trim((string) getenv('UPDATE_GITEE_TOKEN')) !== '';
+        $parts = parse_url((string) $url);
+        if (!$parts || strtolower((string) $parts['host']) !== 'api.github.com') {
+            return false;
         }
-        return false;
+        $path = isset($parts['path']) ? (string) $parts['path'] : '';
+        return in_array($path, array(
+            '/repos/yuchen0x1/baidu-tieba-yunqiandao/releases',
+            '/repos/yuchen0x1/baidu-tieba-yunqiandao/releases/latest'
+        ), true);
+    }
+
+    /**
+     * GitHub API calls are restricted to the official repository paths. Redirects
+     * are followed manually so credentials are never forwarded to another host.
+     */
+    private static function requestSafeUrl($url, array $headers, $timeoutMs, $isApi)
+    {
+        $currentUrl = (string) $url;
+        $token = $isApi ? self::githubToken() : '';
+        $initialHost = strtolower((string) parse_url($currentUrl, PHP_URL_HOST));
+        for ($redirects = 0; $redirects <= 5; $redirects++) {
+            if (!self::isAllowedUrl($currentUrl) || !self::isSafeRemoteEndpoint($currentUrl)) {
+                return array('body' => false, 'error' => '更新服务器地址不受信任', 'status' => 0);
+            }
+            $parts = parse_url($currentUrl);
+            $host = strtolower((string) $parts['host']);
+            $requestHeaders = array_merge(array(
+                'User-Agent: Tieba-Cloud-Sign-Updater/' . (defined('SYSTEM_VER') ? SYSTEM_VER : 'unknown')
+            ), $headers);
+            if ($isApi && $redirects === 0 && $host === $initialHost && $host === 'api.github.com' && self::isGitHubReleaseApiEndpoint($currentUrl) && $token !== '') {
+                $requestHeaders[] = 'Authorization: Bearer ' . $token;
+            }
+            $curl = curl_init($currentUrl);
+            if ($curl === false) {
+                return array('body' => false, 'error' => '无法初始化更新连接', 'status' => 0);
+            }
+            $port = isset($parts['port']) ? (int) $parts['port'] : 443;
+            $ip = self::resolveSafeIp($host);
+            $resolveAddress = strpos($ip, ':') !== false ? '[' . $ip . ']' : $ip;
+            curl_setopt_array($curl, array(
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_FOLLOWLOCATION => false,
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_SSL_VERIFYHOST => 2,
+                CURLOPT_CONNECTTIMEOUT_MS => 5000,
+                CURLOPT_TIMEOUT_MS => (int) $timeoutMs,
+                CURLOPT_RESOLVE => array($host . ':' . $port . ':' . $resolveAddress),
+                CURLOPT_HTTPHEADER => $requestHeaders
+            ));
+            $caInfo = self::findCaInfo();
+            if ($caInfo !== false) {
+                curl_setopt($curl, CURLOPT_CAINFO, $caInfo);
+            }
+            $body = curl_exec($curl);
+            $error = curl_error($curl);
+            $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+            $redirectUrl = curl_getinfo($curl, CURLINFO_REDIRECT_URL);
+            curl_close($curl);
+            if ($status >= 300 && $status < 400) {
+                if ($redirects === 5 || !is_string($redirectUrl) || $redirectUrl === '') {
+                    return array('body' => false, 'error' => '更新服务器重定向无效或次数过多', 'status' => $status);
+                }
+                $currentUrl = $redirectUrl;
+                continue;
+            }
+            return array('body' => $body, 'error' => $error, 'status' => $status);
+        }
+        return array('body' => false, 'error' => '更新服务器重定向次数过多', 'status' => 0);
     }
 
     /**
@@ -324,6 +308,7 @@ class ProjectUpdater
             return false;
         }
         $port = strtolower((string) $parts['scheme']) === 'http' ? 80 : 443;
+        $resolveAddress = strpos($ip, ':') !== false ? '[' . $ip . ']' : $ip;
         // 将连接固定在已校验的 IP 上，防止 DNS 解析与实际连接之间被重绑定
         curl_setopt_array($curl, array(
             CURLOPT_RETURNTRANSFER => true,
@@ -332,7 +317,7 @@ class ProjectUpdater
             CURLOPT_SSL_VERIFYHOST => 2,
             CURLOPT_CONNECTTIMEOUT_MS => self::GEO_TIMEOUT_MS,
             CURLOPT_TIMEOUT_MS => self::GEO_TIMEOUT_MS,
-            CURLOPT_RESOLVE => array($host . ':' . $port . ':' . $ip),
+            CURLOPT_RESOLVE => array($host . ':' . $port . ':' . $resolveAddress),
             CURLOPT_HTTPHEADER => array(
                 'Accept: application/json',
                 'User-Agent: Tieba-Cloud-Sign-Updater/' . (defined('SYSTEM_VER') ? SYSTEM_VER : 'unknown')
@@ -373,18 +358,10 @@ class ProjectUpdater
     private static function isSafeRemoteEndpoint($url)
     {
         $parts = parse_url((string) $url);
-        if (!$parts || empty($parts['scheme']) || empty($parts['host'])) {
+        if (!$parts || empty($parts['scheme']) || empty($parts['host']) || !self::isAllowedUrl($url)) {
             return false;
         }
-        $scheme = strtolower((string) $parts['scheme']);
-        if ($scheme !== 'http' && $scheme !== 'https') {
-            return false;
-        }
-        $host = strtolower((string) $parts['host']);
-        if ($host === '' || !in_array($host, self::REMOTE_HOST_WHITELIST, true)) {
-            return false;
-        }
-        return self::resolveSafeIp($host) !== false;
+        return self::resolveSafeIp(strtolower((string) $parts['host'])) !== false;
     }
 
     /**
@@ -419,12 +396,18 @@ class ProjectUpdater
                 $ips[] = $single;
             }
         }
+        $ips = array_values(array_unique($ips));
+        if (count($ips) === 0) {
+            return false;
+        }
+        // Reject mixed public/private DNS answers instead of selecting a public
+        // address while leaving clients vulnerable to alternate private records.
         foreach ($ips as $ip) {
-            if (self::isSafeIp($ip)) {
-                return $ip;
+            if (!self::isSafeIp($ip)) {
+                return false;
             }
         }
-        return false;
+        return $ips[0];
     }
 
     private static function isSafeIp($ip)
@@ -475,16 +458,13 @@ class ProjectUpdater
             throw new RuntimeException('无法创建更新临时目录');
         }
         try {
-            //多通道回退：Release 附件（预上传固定文件，通常不走归档风控）→ 源码归档 → Gitee 自动源码包
-            //（部分服务器出口 IP 会被 Gitee 风控拦截匿名归档下载，返回 HTML 页而非 ZIP）
+            // Prefer the signed Release asset. A source archive may be attempted for
+            // diagnostics, but verifyPackageDigest always rejects it for online overwrite.
             $candidates = array();
             foreach (array($release['asset_download_url'], $release['source_download_url']) as $url) {
                 if (!empty($url) && self::isAllowedUrl($url) && !in_array($url, $candidates, true)) {
                     $candidates[] = (string) $url;
                 }
-            }
-            if (preg_match('#^(https://gitee\.com/[^/]+/[^/]+)/#', $release['release_url'], $m) && !empty($release['tag_name'])) {
-                $candidates[] = $m[1] . '/archive/refs/tags/' . rawurlencode((string) $release['tag_name']) . '.zip';
             }
             if (empty($candidates)) {
                 throw new RuntimeException('Release 没有可信的下载地址');
@@ -499,7 +479,7 @@ class ProjectUpdater
                     continue;
                 }
                 if (!$res['is_zip']) {
-                    //典型场景：Gitee 风控/登录页 HTML。给出类型与片段便于定位
+                    // Reject non-ZIP bodies such as proxy or authentication error pages.
                     $errors[] = '返回内容不是 ZIP（' . $res['content_type'] . '，开头 ' . $res['snippet'] . '）';
                     continue;
                 }
@@ -508,7 +488,7 @@ class ProjectUpdater
             }
             if ($downloadedUrl === '') {
                 throw new RuntimeException('更新包下载失败，已尝试 ' . count($candidates) . ' 个地址：' . implode('；', $errors)
-                    . '。部分数据中心 IP 会被 Gitee 匿名风控拦截：可在服务器环境变量配置 UPDATE_GITEE_TOKEN（站长自己的 Gitee 个人令牌，仅发送至 gitee.com）后重试，或到 Release 页手动下载更新包覆盖安装');
+                    . '。请检查服务器与 GitHub 的网络连接，或到 Release 页手动下载更新包覆盖安装');
             }
             // ZIP 魔数只能证明“是个压缩包”，不能证明内容可信：安装前强制校验发布摘要
             self::verifyPackageDigest($zipPath, $release, $downloadedUrl);
@@ -569,7 +549,7 @@ class ProjectUpdater
     }
 
     /**
-     * 从 Release 资产中选取 SHA-256 校验文件（publish-gitee.ps1 随包上传的 .sha256）
+     * 从 GitHub Release 资产中选取 SHA-256 校验文件（.sha256）
      */
     private static function selectChecksumAsset(array $assets)
     {
@@ -589,7 +569,26 @@ class ProjectUpdater
         if (!$parts || empty($parts['scheme']) || empty($parts['host']) || strtolower($parts['scheme']) !== 'https') {
             return false;
         }
-        return strtolower($parts['host']) === 'gitee.com';
+        if (isset($parts['user']) || isset($parts['pass']) || (isset($parts['port']) && (int) $parts['port'] !== 443)) {
+            return false;
+        }
+        $host = strtolower((string) $parts['host']);
+        if (!in_array($host, self::REMOTE_HOST_WHITELIST, true)) {
+            return false;
+        }
+        $path = isset($parts['path']) ? (string) $parts['path'] : '';
+        if ($host === 'github.com') {
+            $repositoryRoot = '/yuchen0x1/baidu-tieba-yunqiandao';
+            return $path === $repositoryRoot || strpos($path, $repositoryRoot . '/') === 0;
+        }
+        if ($host === 'api.github.com') {
+            $repositoryRoot = '/repos/yuchen0x1/baidu-tieba-yunqiandao';
+            return $path === $repositoryRoot
+                || $path === $repositoryRoot . '/releases'
+                || $path === $repositoryRoot . '/releases/latest'
+                || preg_match('#^' . preg_quote($repositoryRoot . '/zipball/', '#') . '[^/]+$#', $path) === 1;
+        }
+        return true;
     }
 
     /**
@@ -598,42 +597,17 @@ class ProjectUpdater
      */
     private static function downloadToFile($url, $zipPath)
     {
-        $curl = curl_init($url);
-        if ($curl === false) {
-            return array('ok' => false, 'is_zip' => false, 'status' => 0, 'content_type' => '', 'snippet' => 'curl 初始化失败');
-        }
-        $headers = array('User-Agent: Tieba-Cloud-Sign-Updater/' . (defined('SYSTEM_VER') ? SYSTEM_VER : 'unknown'));
-        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
-        // 国内 Gitee 私有 Release 的源码包使用独立只读令牌。
-        $giteeToken = getenv('UPDATE_GITEE_TOKEN');
-        if ($giteeToken !== false && trim((string) $giteeToken) !== '' && $host === 'gitee.com') {
-            $headers[] = 'Authorization: Bearer ' . trim((string) $giteeToken);
-        }
-        curl_setopt_array($curl, array(
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_SSL_VERIFYHOST => 2,
-            CURLOPT_CONNECTTIMEOUT_MS => 5000,
-            CURLOPT_TIMEOUT_MS => 120000,
-            CURLOPT_HTTPHEADER => $headers
-        ));
-        $caInfo = self::findCaInfo();
-        if ($caInfo !== false) {
-            curl_setopt($curl, CURLOPT_CAINFO, $caInfo);
-        }
-        $body = curl_exec($curl);
-        $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        $contentType = (string) curl_getinfo($curl, CURLINFO_CONTENT_TYPE);
-        $error = curl_error($curl);
-        curl_close($curl);
+        $response = self::requestSafeUrl($url, array(), 120000, false);
+        $body = $response['body'];
+        $status = $response['status'];
+        $error = $response['error'];
+        $contentType = '';
         if ($body === false || $error !== '' || $status < 200 || $status >= 300) {
             return array('ok' => false, 'is_zip' => false, 'status' => $status, 'content_type' => $contentType, 'snippet' => $error);
         }
         if (file_put_contents($zipPath, $body, LOCK_EX) === false) {
             return array('ok' => false, 'is_zip' => false, 'status' => $status, 'content_type' => $contentType, 'snippet' => '写入临时文件失败');
         }
-        //ZIP 魔数校验：Gitee 对部分出口 IP 会返回风控/登录 HTML 页
         $isZip = strlen($body) >= 2 && substr($body, 0, 2) === 'PK';
         $snippet = $isZip ? '' : strtolower(substr(preg_replace('/\s+/', ' ', strip_tags((string) $body)), 0, 80));
         return array('ok' => true, 'is_zip' => $isZip, 'status' => $status, 'content_type' => $contentType, 'snippet' => $snippet);
@@ -649,7 +623,7 @@ class ProjectUpdater
     {
         $assetUrl = isset($release['asset_download_url']) ? rtrim((string) $release['asset_download_url'], '/') : '';
         if ($assetUrl === '' || strcasecmp(rtrim((string) $downloadedUrl, '/'), $assetUrl) !== 0) {
-            throw new RuntimeException('本次下载走的是源码归档回退通道，没有对应的发布摘要，已拒绝在线覆盖安装。请配置 UPDATE_GITEE_TOKEN 后重试，或到 Release 页手动下载更新包');
+            throw new RuntimeException('本次下载走的是源码归档回退通道，没有对应的发布摘要，已拒绝在线覆盖安装。请到 GitHub Release 页手动下载更新包');
         }
         $expected = '';
         $digest = trim((string) (isset($release['asset_digest']) ? $release['asset_digest'] : ''));
@@ -675,35 +649,9 @@ class ProjectUpdater
 
     private static function downloadToString($url)
     {
-        $curl = curl_init($url);
-        if ($curl === false) {
-            return array('ok' => false, 'body' => '');
-        }
-        $headers = array('User-Agent: Tieba-Cloud-Sign-Updater/' . (defined('SYSTEM_VER') ? SYSTEM_VER : 'unknown'));
-        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
-        $giteeToken = getenv('UPDATE_GITEE_TOKEN');
-        if ($giteeToken !== false && trim((string) $giteeToken) !== '' && $host === 'gitee.com') {
-            $headers[] = 'Authorization: Bearer ' . trim((string) $giteeToken);
-        }
-        curl_setopt_array($curl, array(
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_SSL_VERIFYHOST => 2,
-            CURLOPT_CONNECTTIMEOUT_MS => 5000,
-            CURLOPT_TIMEOUT_MS => self::DEFAULT_TIMEOUT_MS,
-            CURLOPT_HTTPHEADER => $headers
-        ));
-        $caInfo = self::findCaInfo();
-        if ($caInfo !== false) {
-            curl_setopt($curl, CURLOPT_CAINFO, $caInfo);
-        }
-        $body = curl_exec($curl);
-        $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        $error = curl_error($curl);
-        curl_close($curl);
-        $ok = $body !== false && $error === '' && $status >= 200 && $status < 300;
-        return array('ok' => $ok, 'body' => $ok ? (string) $body : '');
+        $response = self::requestSafeUrl($url, array(), self::DEFAULT_TIMEOUT_MS, false);
+        $ok = $response['body'] !== false && $response['error'] === '' && $response['status'] >= 200 && $response['status'] < 300;
+        return array('ok' => $ok, 'body' => $ok ? (string) $response['body'] : '');
     }
 
     private static function findSingleRootDirectory($directory)

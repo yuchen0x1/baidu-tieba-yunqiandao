@@ -49,11 +49,21 @@ foreach ($iterator as $file) {
         $failed[] = $path . ' (无法读取文件)';
         continue;
     }
-    try {
-        token_get_all($source, TOKEN_PARSE);
-    } catch (ParseError $e) {
-        $failed[] = $path . ' : ' . $e->getMessage();
-        continue;
+    if (function_exists('token_get_all')) {
+        try {
+            token_get_all($source, TOKEN_PARSE);
+        } catch (ParseError $e) {
+            $failed[] = $path . ' : ' . $e->getMessage();
+            continue;
+        }
+    } else {
+        // 环境未启用 tokenizer 扩展时，降级使用 php -l 校验语法
+        $cmd = escapeshellarg(PHP_BINARY) . ' -l ' . escapeshellarg($path);
+        exec($cmd . ' 2>&1', $lintOut, $lintCode);
+        if ($lintCode !== 0) {
+            $failed[] = $path . ' : ' . implode(' ', $lintOut);
+            continue;
+        }
     }
 
     // 高危/警告模式扫描（文件头部 @lint-ignore 注释可豁免整个文件）

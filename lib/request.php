@@ -1,5 +1,22 @@
 <?php
 
+// 针对未安装/未启用 ctype 扩展的极端运行环境提供无缝兼容 polyfill
+if (!function_exists('ctype_xdigit')) {
+    function ctype_xdigit($text) {
+        return (is_string($text) || is_int($text)) && $text !== '' && preg_match('/^[0-9a-fA-F]+$/', (string) $text) === 1;
+    }
+}
+if (!function_exists('ctype_digit')) {
+    function ctype_digit($text) {
+        return (is_string($text) || is_int($text)) && $text !== '' && preg_match('/^\d+$/', (string) $text) === 1;
+    }
+}
+if (!function_exists('ctype_space')) {
+    function ctype_space($text) {
+        return is_string($text) && $text !== '' && preg_match('/^\s+$/', $text) === 1;
+    }
+}
+
 /**
  * Read a scalar request value without triggering array-to-string warnings.
  */

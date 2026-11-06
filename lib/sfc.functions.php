@@ -234,22 +234,53 @@ function getGravatar($s = 140, $d = 'mm', $g = 'g', $site = 'secure')
  */
 function UnZip($zipfile, $path)
 {
-
     if (!class_exists('ZipArchive', false)) {
         return 3;
-//zip模块问题
     }
     $zip = new ZipArchive();
     if (@$zip->open($zipfile) !== true) {
         return 2;
-    //文件权限问题
     }
-    if (true === @$zip->extractTo($path)) {
+    $realDest = realpath($path);
+    if ($realDest === false) {
+        @mkdir($path, 0755, true);
+        $realDest = realpath($path);
+    }
+    if ($realDest === false) {
         $zip->close();
-        return 0;
-    } else {
-        return 1;//文件权限问题
+        return 1;
     }
+    $realDest = rtrim(str_replace('\\', '/', $realDest), '/');
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $name = $zip->getNameIndex($i);
+        if ($name === false) {
+            continue;
+        }
+        $name = str_replace('\\', '/', $name);
+        if (strpos($name, '../') !== false || strpos($name, "\0") !== false || (isset($name[0]) && $name[0] === '/')) {
+            continue;
+        }
+        $targetPath = $realDest . '/' . $name;
+        if (strpos($targetPath, $realDest . '/') !== 0) {
+            continue;
+        }
+        if (substr($name, -1) === '/') {
+            if (!is_dir($targetPath)) {
+                @mkdir($targetPath, 0755, true);
+            }
+        } else {
+            $dir = dirname($targetPath);
+            if (!is_dir($dir)) {
+                @mkdir($dir, 0755, true);
+            }
+            $content = $zip->getFromIndex($i);
+            if ($content !== false) {
+                @file_put_contents($targetPath, $content);
+            }
+        }
+    }
+    $zip->close();
+    return 0;
 }
 /**
  * 清空缓冲区的内容

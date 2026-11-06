@@ -9,7 +9,7 @@ doAction('admin_update_1');
 <section class="dashboard-hero" style="margin-top:16px">
     <div class="eyebrow hero-eyebrow">EXTENSIONS · 升级</div>
     <h1>系统更新</h1>
-    <p>按 Gitee 正式 Release 检查新版本，检测到更新后会显示版本说明与升级入口。</p>
+    <p>按 GitHub 正式 Release 检查新版本，检测到更新后会显示版本说明与升级入口。</p>
     <div class="dashboard-hero-meta">
         <span class="hero-tag">当前版本 V<?php echo SYSTEM_VER; ?></span>
     </div>
@@ -17,7 +17,7 @@ doAction('admin_update_1');
 <div class="input-group">
    <span class="input-group-addon">更新服务器</span>
    <select id="server" class="form-control">
-      <option value="0">Gitee Releases（国内主通道，获取最新正式版本）</option>
+      <option value="0">GitHub Releases（获取最新正式版本）</option>
   </select>
   <!--<span class="input-group-btn">
      <input id="save_btn" type="button" value="保存并应用" class="cs-btn cs-btn-info" onclick="save_server()">
@@ -68,7 +68,7 @@ if (is_writable(SYSTEM_ROOT . '/setup')) {
   <div class="panel panel-default" style="background-color: #F9F9F9;">
     <div class="panel-body">
 	  <b>Tips:</b><br/>
-	  1.系统现在按 Gitee 正式 Release 检查版本，不会把开发中的 commit 当成稳定更新。<br/>
+	  1.系统现在按 GitHub 正式 Release 检查版本，不会把开发中的 commit 当成稳定更新。<br/>
 	  2.检测到新版本后会显示版本说明、Release 页面和 Windows 部署包下载入口。<br/>
 	  3.部分版本变动需要执行升级脚本，请留意版本说明；升级后可前往<a href="./setup/update.php" target="_blank">脚本列表</a>查看。<br>
     </div>

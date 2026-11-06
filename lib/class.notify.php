@@ -205,18 +205,39 @@ class Notify
     }
 
     /**
+     * Create a cURL handle pinned to a validated public notification target.
+     *
+     * All user-configurable webhook/Bark/ntfy targets use this single entry
+     * point so DNS validation and transport pinning cannot diverge by channel.
+     *
+     * @param string $url
+     * @return wcurl|false
+     */
+    private static function createPublicClient($url)
+    {
+        $client = new wcurl();
+        if (!$client->setPublicUrl($url)) {
+            return false;
+        }
+        $client->set(CURLOPT_TIMEOUT, 15);
+        return $client;
+    }
+
+    /**
      * 通用 Webhook (JSON POST: {title, content, event})
      */
     public static function sendWebhook($url, $title, $content)
     {
         try {
+            $c = self::createPublicClient($url);
+            if ($c === false) {
+                return array('ok' => false, 'detail' => 'Webhook 拒绝访问内网或非公开地址 (SSRF 防御)');
+            }
             $payload = json_encode(array(
                 'title' => $title,
                 'content' => $content,
                 'time' => date('Y-m-d H:i:s')
             ), JSON_UNESCAPED_UNICODE);
-            $c = new wcurl($url);
-            $c->set(CURLOPT_TIMEOUT, 15);
             $c->set(CURLOPT_POST, 1);
             $c->set(CURLOPT_POSTFIELDS, $payload);
             $c->set(CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
@@ -237,8 +258,10 @@ class Notify
     {
         try {
             $url = rtrim($url, '/') . '/' . urlencode($title) . '/' . urlencode($content);
-            $c = new wcurl($url);
-            $c->set(CURLOPT_TIMEOUT, 15);
+            $c = self::createPublicClient($url);
+            if ($c === false) {
+                return array('ok' => false, 'detail' => 'Bark 拒绝访问内网或非公开地址 (SSRF 防御)');
+            }
             $resp = $c->exec();
             $json = json_decode($resp, true);
             if (is_array($json) && isset($json['code']) && (int) $json['code'] === 200) {
@@ -398,8 +421,10 @@ class Notify
             if (empty($parts['scheme']) || strtolower($parts['scheme']) !== 'https' || empty($parts['host'])) {
                 return array('ok' => false, 'detail' => 'ntfy 服务器必须是 HTTPS 地址');
             }
-            $c = new wcurl($server . '/' . rawurlencode($topic));
-            $c->set(CURLOPT_TIMEOUT, 15);
+            $c = self::createPublicClient($server . '/' . rawurlencode($topic));
+            if ($c === false) {
+                return array('ok' => false, 'detail' => 'ntfy 拒绝访问内网或非公开地址 (SSRF 防御)');
+            }
             $c->set(CURLOPT_POST, 1);
             $c->set(CURLOPT_POSTFIELDS, $content);
             $c->set(CURLOPT_HTTPHEADER, array(

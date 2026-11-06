@@ -1,12 +1,9 @@
 name: 发布 Windows 部署包
 
 on:
-  workflow_dispatch:
-    inputs:
-      enable_github_release:
-        description: 'Temporary migration override. Enter enable to allow a GitHub Release.'
-        required: true
-        type: string
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
@@ -14,50 +11,64 @@ permissions:
 jobs:
   release:
     name: 构建并发布 Windows 部署包
-    # 当前项目只使用国内 Gitee 发布。该旧工作流仅在迁移时经双重显式开关启用。
-    if: ${{ inputs.enable_github_release == 'enable' && vars.ALLOW_GITHUB_RELEASE_MIGRATION == 'true' }}
     runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: tcs_it_bootstrap
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
     steps:
-      - name: Checkout
+      - name: Checkout tagged source
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
+          extensions: curl, mbstring, mysqli, zip
           tools: composer
 
-      - name: Install package dependencies
-        run: composer install --prefer-dist --no-interaction --no-progress
-
-      - name: Verify release source
+      - name: Validate release source
         run: |
+          composer install --prefer-dist --no-interaction --no-progress
           composer validate --strict
           composer check
 
-      - name: Remove development dependencies
-        run: composer install --no-dev --prefer-dist --no-interaction --no-progress --classmap-authoritative
-
-      - name: Build Windows package
+      - name: Run database integration checks
         env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          package="tieba-cloud-sign-windows-${RELEASE_TAG}.zip"
-          zip -r "$package" . \
-            -x '.git/*' '.github/*' 'tests/*' 'upgrade-report/*' '.phpunit.result.cache' '*.zip'
-          sha256sum "$package" > "$package.sha256"
-          echo "PACKAGE=$package" >> "$GITHUB_ENV"
+          TCS_IT_DB_HOST: 127.0.0.1
+          TCS_IT_DB_PORT: '3306'
+          TCS_IT_DB_USER: root
+          TCS_IT_DB_PASS: root
+        run: composer integration
 
-      - name: Create GitHub Release
+      - name: Validate tag and publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+          REPOSITORY_NAME: ${{ github.event.repository.name }}
+        shell: pwsh
         run: |
-          if gh release view "$RELEASE_TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" "$PACKAGE" "$PACKAGE.sha256" --repo "${{ github.repository }}" --clobber
-          else
-            gh release create "$RELEASE_TAG" "$PACKAGE" "$PACKAGE.sha256" \
-              --repo "${{ github.repository }}" \
-              --title "百度贴吧云签到 $RELEASE_TAG Windows 部署包" \
-              --generate-notes
-          fi
+          $arguments = @{
+            Tag = $env:RELEASE_TAG
+            Owner = $env:REPOSITORY_OWNER
+            Repository = $env:REPOSITORY_NAME
+            Publish = $true
+            Confirm = $false
+          }
+          $notes = "release-notes/$env:RELEASE_TAG.md"
+          if (Test-Path -LiteralPath $notes) {
+            $arguments.ReleaseNotesFile = $notes
+          }
+          tools/publish-github.ps1 @arguments

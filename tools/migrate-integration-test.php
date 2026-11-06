@@ -58,12 +58,15 @@ try {
 
     // 6.6 存量夹具：完整结构但无迁移记录、core_version=6.6（等价经旧脚本链升级的 6.6 库）
     $fixture66 = substr($template, 0, $baselinePos);
-    $fixture66 = str_replace("('core_version', '{$workVersion}')", "('core_version', '6.6')", $fixture66);
+    $fixture66 = preg_replace("/\('core_version', '[^']*'\)/", "('core_version', '6.6')", $fixture66, 1);
     $fixture66 = str_replace('{VAR-PREFIX}', 'tca_', $fixture66);
     $fixture66 = str_replace('{VAR-DB}', $dbUp, $fixture66);
     $fixture66 = str_replace('{VAR-COOKIE-SALT}', bin2hex(random_bytes(32)), $fixture66);
     $fixture66 = str_replace('{VAR-SYSTEM-URL}', 'http://127.0.0.1', $fixture66);
+    // 旧版本签到历史表不含 V7.3 成长数据列，确保集成测试真实覆盖 ALTER TABLE 升级路径。
+    $fixture66 = preg_replace('/^\s*`(?:exp_gained|sign_rank|forum_level)`[^\r\n]*\R?/m', '', $fixture66);
     check('6.6 夹具不含 schema_migrations', strpos($fixture66, 'schema_migrations') === false);
+    check('6.6 夹具不含 V7.3 成长数据列', strpos($fixture66, 'exp_gained') === false && strpos($fixture66, 'sign_rank') === false && strpos($fixture66, 'forum_level') === false);
 
     check('写入测试配置（升级库）', it_write_config($workRoot, $dbUp, 'tca_', $port));
 
@@ -90,6 +93,8 @@ try {
     check('task_runs 表已创建', it_table_exists($conn, $dbUp, 'tca_task_runs'));
     check('api_rate_limits 表已创建', it_table_exists($conn, $dbUp, 'tca_api_rate_limits'));
     check('cron 调度列已补齐', it_column_exists($conn, $dbUp, 'tca_cron', 'nextrun') && it_column_exists($conn, $dbUp, 'tca_cron', 'enable'));
+    check('V7.3 成长数据列已补齐', it_column_exists($conn, $dbUp, 'tca_sign_history', 'exp_gained') && it_column_exists($conn, $dbUp, 'tca_sign_history', 'sign_rank') && it_column_exists($conn, $dbUp, 'tca_sign_history', 'forum_level'));
+    check('V7.3 迁移已记录', migrationStatus($conn, $dbUp, 'tca_', '007200') === 'success');
     check('调度选项已落库', it_query_value($conn, $dbUp, "SELECT COUNT(*) FROM `tca_options` WHERE `name` = 'cron_max_retry'") === '1');
     check('失败记录 009000 保留为审计痕迹', migrationStatus($conn, $dbUp, 'tca_', '009000') === 'failed');
 
@@ -147,6 +152,8 @@ try {
     check('全新安装 up 幂等成功', $code === 0 && strpos($output, '无待应用迁移') !== false);
     check('全新安装 core_version 为当前版本', it_query_value($conn, $dbFresh, "SELECT `value` FROM `tcz_options` WHERE `name` = 'core_version'") === $workVersion);
     check('全新安装基线记录为 success', migrationStatus($conn, $dbFresh, 'tcz_', '007000') === 'success');
+    check('全新安装 V7.3 基线记录为 success', migrationStatus($conn, $dbFresh, 'tcz_', '007200') === 'success');
+    check('全新安装含 V7.3 成长数据列', it_column_exists($conn, $dbFresh, 'tcz_sign_history', 'exp_gained') && it_column_exists($conn, $dbFresh, 'tcz_sign_history', 'sign_rank') && it_column_exists($conn, $dbFresh, 'tcz_sign_history', 'forum_level'));
     // 防漂移：基线迁移播种的选项必须与模板预置一致（缺失会导致新装与升级装行为不同）
     foreach (array('api_rate_limit', 'metrics_token', 'webhook_enable', 'cleanup_enable', 'cleanup_sign_history_days', 'cron_notify_interval') as $option) {
         check('全新安装选项已预置：' . $option, it_query_value($conn, $dbFresh, "SELECT COUNT(*) FROM `tcz_options` WHERE `name` = '" . $conn->real_escape_string($option) . "'") === '1');

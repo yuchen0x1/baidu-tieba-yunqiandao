@@ -82,6 +82,14 @@ jobs:
           TCS_IT_DB_PASS: root
         run: php tools/scheduler-integration-test.php
 
+      - name: Run API integration test
+        env:
+          TCS_IT_DB_HOST: 127.0.0.1
+          TCS_IT_DB_PORT: '3306'
+          TCS_IT_DB_USER: root
+          TCS_IT_DB_PASS: root
+        run: php tools/api-integration-test.php
+
       - name: Run backup restore drill
         env:
           TCS_IT_DB_HOST: 127.0.0.1
@@ -136,10 +144,8 @@ jobs:
 
       - name: Generate local package and checksum
         shell: pwsh
-        env:
-          GITEE_ACCESS_TOKEN: ci-dry-run-not-used
         run: |
-          tools/publish-gitee.ps1 -Tag v0.0.0-ci -OutputDirectory "$env:RUNNER_TEMP\pkg"
+          tools/publish-github.ps1 -Tag v0.0.0-ci -OutputDirectory "$env:RUNNER_TEMP\pkg"
 
       - name: Verify package integrity
         shell: pwsh

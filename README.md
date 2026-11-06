@@ -44,7 +44,7 @@
 **部署与运维**
 
 - Docker 部署：本地构建 PHP 8.4 + Caddy Web 镜像，配套 MariaDB 11.4、健康检查和命名卷。
-- 在线更新：管理员可在后台「系统更新」页面通过 Gitee 国内主通道检查并安装新版本（见 5.4 节）。
+- 在线更新：管理员可在后台「系统更新」页面通过 GitHub Releases 检查并安装新版本（见 5.4 节）。
 - 健康检查：`/healthz.php?mode=live` 检查 PHP 存活，`/healthz.php?mode=ready` 同时检查安装锁、数据库和核心表。
 
 ## 二、先选部署方式：环境要求对照
@@ -59,7 +59,7 @@
 **第 1 步 · 拉取代码**
 
 ```bash
-git clone https://gitee.com/yuchen0x1/baidu-tieba-yunqiandao.git
+git clone https://github.com/yuchen0x1/baidu-tieba-yunqiandao.git
 cd baidu-tieba-yunqiandao
 ```
 
@@ -113,7 +113,7 @@ docker compose -f docker/docker-compose.yml logs -f db
 ## 四、上手 B：传统 PHP 环境
 
 1. 安装 PHP、所需扩展、MySQL/MariaDB 和 Web 服务器。
-2. 获取代码并将仓库文件部署到 Web 根目录（克隆地址：<https://gitee.com/yuchen0x1/baidu-tieba-yunqiandao.git>），确保 Web 进程可写入安装需要的目录。
+2. 获取代码并将仓库文件部署到 Web 根目录（克隆地址：<https://github.com/yuchen0x1/baidu-tieba-yunqiandao.git>），确保 Web 进程可写入安装需要的目录。
 3. 可选：安装 Composer 依赖（开发或运行测试需要）：
 
    ```bash
@@ -157,7 +157,7 @@ powershell -ExecutionPolicy Bypass -File windows/start-web.ps1 -Port 8081
 | `PUID` / `PGID` | `1000` / `1000` | Compose 保留的容器用户配置变量 |
 | `TC_AUTO_CREATE_INSTALL_LOCK` | `false` | 容器启动时是否自动创建安装锁 |
 | `SSL_CERT_FILE` / `CURL_CA_BUNDLE` | 空 | Windows PHP 未配置 CA 根证书时，指向可信 CA bundle 文件；不要关闭 HTTPS 证书校验 |
-| `UPDATE_GITEE_TOKEN` | 空 | Gitee Release 为私有或 API 限流时必需的只读 Token，仅发送给 Gitee API；不要提交到 Git |
+| `UPDATE_GITHUB_TOKEN` | 空 | GitHub Releases API 受限或限流时可选的只读 Token，仅发送给 `api.github.com`；不要提交到 Git |
 
 ### 5.3 后台配置项
 
@@ -173,11 +173,12 @@ powershell -ExecutionPolicy Bypass -File windows/start-web.ps1 -Port 8081
 
 ### 5.4 在线更新机制
 
-- 管理员打开「系统更新」页面时，程序默认通过 HTTPS 请求当前仓库的 Gitee `latest` 正式 Release，并比较 Release tag 与当前程序版本；检测到更高版本后，页面会显示版本说明、Release 页面、Windows 部署包下载地址和「立即更新」按钮，没有更高版本时会明确显示当前已是最新版本。
-- 在线更新使用 Gitee Release 的源码 ZIP，不会覆盖当前站点的 `config.php`、`key.php`、`.env`、`docker/.env` 或 `setup/install.lock`，也不会修改数据库。
-- 若 Gitee API 返回 `403` 或 `429`，请在部署环境设置只读 `UPDATE_GITEE_TOKEN`；令牌不会写入配置文件，也不会发送到其他域名。
+- 管理员打开「系统更新」页面时，程序通过 HTTPS 请求当前仓库的 GitHub `latest` 正式 Release，并比较 Release tag 与当前程序版本；检测到更高版本后，页面会显示版本说明、Release 页面、Windows 部署包下载地址和「立即更新」按钮，没有更高版本时会明确显示当前已是最新版本。
+- 在线覆盖安装只接受带可信 SHA-256 摘要的 GitHub Release 资产：更新器会优先使用 Release API 提供的 `digest`，否则读取同一 Release 的 `.sha256` 资产，并在校验通过后才覆盖程序。缺少可信摘要、摘要不一致或下载的是源码归档时，更新器会拒绝在线覆盖安装并保留原程序；源码归档需从 Release 页面手动下载安装。
+- 校验通过后的更新不会覆盖当前站点的 `config.php`、`key.php`、`.env`、`docker/.env` 或 `setup/install.lock`，也不会修改数据库。
+- 若 GitHub API 返回 `403` 或 `429`，请在部署环境设置只读 `UPDATE_GITHUB_TOKEN`；令牌不会写入配置文件，也不会发送到其他域名。
 - 更新前会再次获取最新 Release，避免使用过期页面提交；网络不可用或服务器不可写时会保留原程序并提示手动更新。
-- 发布新版本时，请在 Gitee 创建正式 Release，并使用数字版本 tag（例如 `v7.0`）。Windows 部署包建议命名为包含 `windows` 的 `.zip` 文件，程序会自动将其作为下载入口展示。现有部署还可以运行 `windows/check-update.ps1` 做独立检查；完整发布流程（打 tag、`tools/publish-gitee.ps1 -Publish` 上传 ZIP + SHA-256、`-CleanOldReleases` 清理旧版本、发布后验证）见 [`docs/RELEASE.md`](docs/RELEASE.md)。
+- 项目源码与 Windows 部署包发布在 [GitHub Releases](https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases)。推送经确认的 `v*` 版本 tag 会触发 GitHub Actions 发布流程；完整发布、打包与验证说明见 [`docs/RELEASE.md`](docs/RELEASE.md)。
 
 ## 六、计划任务：让签到按时跑起来
 
@@ -259,7 +260,7 @@ Authorization: Bearer <api-token>
 | `/api.php?action=trend&days=30` | `GET` | 任意 | 签到趋势（每日成功/失败） |
 | `/api.php?action=tieba_health&days=30` | `GET` | 任意 | 每个贴吧的健康度统计 |
 | `/api.php?action=export` | `GET` | 任意 | 导出签到日志 CSV（用户 Token 仅本人） |
-| `/api.php?action=update` | `GET` | 仅全局 | 获取 Gitee 最新正式版本并判断是否需要更新 |
+| `/api.php?action=update` | `GET` | 仅全局 | 获取 GitHub 最新正式 Release 并判断是否需要更新 |
 | `/api.php?action=webhook_test` | `GET` | 仅全局 | 测试 Webhook 推送 |
 | `/api.php?action=openapi` | `GET` | 任意 | 接口文档（由权限矩阵自动生成） |
 
@@ -315,7 +316,8 @@ composer integration
 
 **持续集成与镜像发布**
 
-- `.github/workflows/ci.yml`：PHP 语法检查和 Compose 校验。
+- `.github/workflows/ci.yml`：PHP 语法检查、Compose 校验和 Windows ZIP + SHA-256 本地打包演练。
+- `.github/workflows/release.yml`：推送经确认的 `v*` tag 后，构建 Windows 包并创建 GitHub Release；需要仓库默认 `GITHUB_TOKEN` 的 `contents: write` 权限。
 - `.github/workflows/build.yml`：推送到 `main` 或手动触发多架构 Docker 镜像构建并推送到 Docker Hub，需要配置 `DOCKERHUB_USERNAME` 和 `DOCKERHUB_PASSWORD` Secrets。
 
 **项目结构**
@@ -331,7 +333,7 @@ composer integration
 ├── templates/              # Web 页面模板
 ├── plugins/                # 插件及插件说明
 ├── setup/                  # 安装、升级、检查和 SQL 模板
-├── lib/class.updater.php   # Gitee Release 在线检查和安全更新
+├── lib/class.updater.php   # GitHub Release 在线检查和安全更新
 ├── docker/                 # Dockerfile、Compose 和环境变量示例
 ├── source/                 # CSS、JavaScript、字体和文档素材
 ├── tests/                  # PHPUnit 测试
@@ -344,7 +346,7 @@ composer integration
 
 本项目使用 AGPL-3.0 授权，详见仓库中的 [`license.html`](license.html)。
 
-- 本仓库（Gitee）：<https://gitee.com/yuchen0x1/baidu-tieba-yunqiandao>
+- 本仓库与 Releases：<https://github.com/yuchen0x1/baidu-tieba-yunqiandao>
 - 原项目：shirakun/Tieba-Cloud-Sign
 - QQ 交流群：`1016190748`
 - Telegram：<https://t.me/lenmoC>

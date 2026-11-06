@@ -16,6 +16,12 @@ class wcurl
     public $conn;
 
     /**
+     * Last validated public target and its pinned transport address.
+     * @var array|false
+     */
+    protected $publicUrlTarget = false;
+
+    /**
      * 构造函数，返回curl指针实例
      * @param string $file 网络文件 如果要使用POST提交文件，在文件路径前面加上@
      * @param array $head 可选，HTTP头
@@ -438,30 +444,296 @@ class wcurl
     }
 
     /**
-     * 校验外发 URL：仅允许 http/https，且 host 不得指向本机或私有/保留地址
-     * @param string $url 待请求的 URL
+     * Check that an address is a globally routable IPv4 or IPv6 address.
+     * @param string $ip
+     * @return bool
+     */
+    public static function isPublicIpAddress($ip)
+    {
+        $ip = trim((string) $ip);
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+            return false;
+        }
+        if (!function_exists('inet_pton')) {
+            return false;
+        }
+        $packed = @inet_pton($ip);
+        if ($packed === false) {
+            return false;
+        }
+
+        if (strlen($packed) === 4) {
+            // FILTER_FLAG_NO_RES_RANGE does not cover every IANA special-purpose
+            // IPv4 range (for example documentation, benchmarking and multicast).
+            foreach (array(
+                '100.64.0.0/10',   // shared address space
+                '192.0.0.0/24',    // IETF protocol assignments
+                '192.0.2.0/24',    // documentation (TEST-NET-1)
+                '192.88.99.0/24',  // deprecated 6to4 relay anycast
+                '198.18.0.0/15',   // benchmarking
+                '198.51.100.0/24', // documentation (TEST-NET-2)
+                '203.0.113.0/24',  // documentation (TEST-NET-3)
+                '224.0.0.0/4',     // multicast
+            ) as $range) {
+                if (self::ipMatchesCidr($packed, $range)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        if (strlen($packed) !== 16) {
+            return false;
+        }
+        // IPv6 global unicast is within 2000::/3. This also excludes NAT64,
+        // link-local, site-local, unique-local, multicast and other non-global ranges.
+        if (!self::ipMatchesCidr($packed, '2000::/3')) {
+            return false;
+        }
+        foreach (array(
+            '2001::/32',       // Teredo
+            '2001:2::/48',     // benchmarking
+            '2001:10::/28',    // deprecated ORCHID
+            '2001:20::/28',    // ORCHIDv2
+            '2001:db8::/32',   // documentation
+            '2002::/16',       // 6to4 (can encapsulate a private IPv4 address)
+            '3fff::/20',       // documentation
+        ) as $range) {
+            if (self::ipMatchesCidr($packed, $range)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Match a packed IPv4/IPv6 address against a CIDR range.
+     * @param string $packed
+     * @param string $cidr
+     * @return bool
+     */
+    private static function ipMatchesCidr($packed, $cidr)
+    {
+        $parts = explode('/', $cidr, 2);
+        $network = @inet_pton($parts[0]);
+        if ($network === false || strlen($network) !== strlen($packed)) {
+            return false;
+        }
+        $bits = isset($parts[1]) ? (int) $parts[1] : strlen($packed) * 8;
+        $maxBits = strlen($packed) * 8;
+        if ($bits < 0 || $bits > $maxBits) {
+            return false;
+        }
+        $wholeBytes = (int) floor($bits / 8);
+        if ($wholeBytes > 0 && substr($packed, 0, $wholeBytes) !== substr($network, 0, $wholeBytes)) {
+            return false;
+        }
+        $remainingBits = $bits % 8;
+        if ($remainingBits === 0) {
+            return true;
+        }
+        $mask = (0xff << (8 - $remainingBits)) & 0xff;
+        return (ord($packed[$wholeBytes]) & $mask) === (ord($network[$wholeBytes]) & $mask);
+    }
+
+    /**
+     * Return true only when every resolved address is a valid public IP.
+     * @param array $addresses
+     * @return bool
+     */
+    public static function arePublicIpAddresses(array $addresses)
+    {
+        if (count($addresses) === 0) {
+            return false;
+        }
+        foreach ($addresses as $address) {
+            if (!self::isPublicIpAddress($address)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Fetch one DNS record family. Kept separate so focused tests can inject
+     * deterministic A/AAAA answers without making network requests.
+     *
+     * @param string $host
+     * @param int $type
+     * @return array|false
+     */
+    protected static function resolveDnsRecords($host, $type)
+    {
+        if (!function_exists('dns_get_record')) {
+            return false;
+        }
+        try {
+            return @dns_get_record($host, $type);
+        } catch (Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Resolve and validate every A/AAAA answer for a host.
+     *
+     * @param string $host
+     * @return array|false List of validated addresses, or false on failure
+     */
+    protected static function resolveHostAddresses($host)
+    {
+        if (!defined('DNS_A') || !defined('DNS_AAAA')) {
+            return false;
+        }
+
+        // Query A and AAAA separately. A combined query is not supported
+        // consistently across PHP platforms and may silently omit one family.
+        $addresses = array();
+        $invalid = false;
+        foreach (array(DNS_A, DNS_AAAA) as $type) {
+            $records = static::resolveDnsRecords($host, $type);
+            if (!is_array($records)) {
+                return false;
+            }
+            foreach ($records as $record) {
+                if (!is_array($record)) {
+                    $invalid = true;
+                    continue;
+                }
+                if ($type === DNS_A && isset($record['type']) && $record['type'] === 'A') {
+                    if (!isset($record['ip']) || !self::isPublicIpAddress($record['ip'])) {
+                        $invalid = true;
+                        continue;
+                    }
+                    $addresses[] = $record['ip'];
+                } elseif ($type === DNS_AAAA && isset($record['type']) && $record['type'] === 'AAAA') {
+                    if (!isset($record['ipv6']) || !self::isPublicIpAddress($record['ipv6'])) {
+                        $invalid = true;
+                        continue;
+                    }
+                    $addresses[] = $record['ipv6'];
+                }
+            }
+        }
+
+        if ($invalid || !self::arePublicIpAddresses($addresses)) {
+            return false;
+        }
+        return $addresses;
+    }
+
+    /**
+     * Parse and resolve a notification target; returns the parsed URL and one
+     * validated address to pin to cURL, or false on any invalid/unsafe answer.
+     * @param string $url
+     * @return array|false
+     */
+    protected static function resolvePublicUrl($url)
+    {
+        $url = (string) $url;
+        if ($url === '' || strpos($url, '\\') !== false || preg_match('/[\x00-\x20\x7f]/', $url)) {
+            return false;
+        }
+        try {
+            $parts = parse_url($url);
+        } catch (Throwable $e) {
+            return false;
+        }
+        if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host']) || isset($parts['user']) || isset($parts['pass'])) {
+            return false;
+        }
+        $scheme = strtolower((string) $parts['scheme']);
+        if (!in_array($scheme, array('http', 'https'), true)) {
+            return false;
+        }
+        $port = isset($parts['port']) ? (int) $parts['port'] : ($scheme === 'https' ? 443 : 80);
+        if ($port < 1 || $port > 65535) {
+            return false;
+        }
+
+        $host = strtolower(trim((string) $parts['host']));
+        if (strlen($host) > 1 && $host[0] === '[' && substr($host, -1) === ']') {
+            $host = substr($host, 1, -1);
+        }
+        if ($host === '') {
+            return false;
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            if (!self::isPublicIpAddress($host)) {
+                return false;
+            }
+            return array('host' => $host, 'port' => $port, 'ip' => $host, 'is_ip' => true);
+        }
+
+        $dnsHost = rtrim($host, '.');
+        if ($dnsHost === '' || $dnsHost === 'localhost' || substr($dnsHost, -6) === '.local' || substr($dnsHost, -9) === '.internal' || substr($dnsHost, -8) === '.cluster') {
+            return false;
+        }
+        // Reject malformed names and legacy numeric IPv4 spellings (e.g. 127.1 or 0x7f000001).
+        if (strlen($dnsHost) > 253 || preg_match('/^(?:[0-9]+|0x[0-9a-f]+)(?:\.(?:[0-9]+|0x[0-9a-f]+))*$/i', $dnsHost) ||
+            preg_match('/^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/i', $dnsHost) !== 1) {
+            return false;
+        }
+        $addresses = static::resolveHostAddresses($dnsHost);
+        if ($addresses === false || count($addresses) === 0) {
+            return false;
+        }
+        return array('host' => $host, 'port' => $port, 'ip' => $addresses[0], 'is_ip' => false);
+    }
+
+    /**
+     * Validate a user-configurable target and pin cURL to a validated DNS answer.
+     * Redirects and environment-configured proxies are disabled so transport cannot
+     * escape the validated address. Redirect responses are returned to the caller.
+     * @param string $url
+     * @return bool
+     */
+    public function setPublicUrl($url)
+    {
+        $target = static::resolvePublicUrl($url);
+        if ($target === false) {
+            return false;
+        }
+
+        if (!$target['is_ip'] && !defined('CURLOPT_RESOLVE')) {
+            return false;
+        }
+        if (!curl_setopt($this->conn, CURLOPT_URL, $url) ||
+            !curl_setopt($this->conn, CURLOPT_FOLLOWLOCATION, false)) {
+            return false;
+        }
+        if (defined('CURLOPT_PROXY') && !curl_setopt($this->conn, CURLOPT_PROXY, '')) {
+            return false;
+        }
+        if (!$target['is_ip']) {
+            // CURLOPT_RESOLVE keeps the original hostname for TLS/SNI and Host,
+            // while forcing the connection to the address that was validated.
+            $address = strpos($target['ip'], ':') !== false ? '[' . $target['ip'] . ']' : $target['ip'];
+            $resolve = $target['host'] . ':' . $target['port'] . ':' . $address;
+            if (!curl_setopt($this->conn, CURLOPT_RESOLVE, array($resolve))) {
+                return false;
+            }
+        }
+        $this->publicUrlTarget = array(
+            'url' => $url,
+            'host' => $target['host'],
+            'port' => $target['port'],
+            'ip' => $target['ip'],
+            'is_ip' => $target['is_ip'],
+            'follow_redirects' => false,
+        );
+        return true;
+    }
+
+    /**
+     * Validate that an HTTP(S) URL resolves only to public IPv4/IPv6 addresses.
+     * @param string $url
      * @return bool
      */
     public static function isAllowedPublicUrl($url)
     {
-        $parts = parse_url((string) $url);
-        if (!$parts || empty($parts['scheme']) || empty($parts['host'])) {
-            return false;
-        }
-        if (!in_array(strtolower((string) $parts['scheme']), array('http', 'https'), true)) {
-            return false;
-        }
-        $host = strtolower((string) $parts['host']);
-        if ($host === '' || $host === 'localhost' || substr($host, -6) === '.local' || substr($host, -9) === '.internal') {
-            return false;
-        }
-        if (filter_var($host, FILTER_VALIDATE_IP)) {
-            return filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false;
-        }
-        if (in_array($host, array('0.0.0.0', '::1', '::'), true)) {
-            return false;
-        }
-        return true;
+        return static::resolvePublicUrl($url) !== false;
     }
 
     /**

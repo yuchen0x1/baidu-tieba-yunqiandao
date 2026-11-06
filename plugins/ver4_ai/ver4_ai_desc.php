@@ -10,14 +10,14 @@ return array(
         'version'     => '2.2',
         'description' => '用户在个人面板配置自己的大模型（OpenAI 兼容）后，可对自己的百度账号开启 AI 定时发主题帖（每日/每小时、全自动或生成候选半自动发布）与智能回帖；支持自定义人设模板与内容审查拦截记录排查；管理员可控制站点开关并提供可选共享配置。',
         'onsale'      => false,
-        'url'         => 'https://gitee.com/yuchen0x1/baidu-tieba-yunqiandao',
+        'url'         => 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao',
         'for'         => 'all',
         'forphp'      => '7.0'
     ),
     'author' => array(
         'author'      => 'yuchen0x1',
         'email'       => '',
-        'url'         => 'https://gitee.com/yuchen0x1'
+        'url'         => 'https://github.com/yuchen0x1'
     ),
     'view'   => array(
         'setting'     => true,

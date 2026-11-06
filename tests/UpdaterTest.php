@@ -12,18 +12,18 @@ final class UpdaterTest extends TestCase
             'tag_name' => $tag,
             'name' => '百度贴吧云签到 ' . $tag,
             'body' => '测试版本说明',
-            'html_url' => 'https://gitee.com/yuchen0x1/baidu-tieba-yunqiandao/releases/tag/' . $tag,
-            'zipball_url' => 'https://gitee.com/yuchen0x1/baidu-tieba-yunqiandao/repository/archive/' . $tag . '.zip',
+            'html_url' => 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/tag/' . $tag,
+            'zipball_url' => 'https://api.github.com/repos/yuchen0x1/baidu-tieba-yunqiandao/zipball/' . $tag . '.zip',
             'published_at' => '2026-08-29T00:00:00Z',
             'prerelease' => false,
             'assets' => array(array(
                 'name' => 'tieba-cloud-sign-windows-' . $tag . '.zip',
-                'browser_download_url' => 'https://gitee.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/' . $tag . '/package.zip',
+                'browser_download_url' => 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/' . $tag . '/package.zip',
                 'size' => 123,
                 'digest' => 'sha256:test'
             ), array(
                 'name' => 'tieba-cloud-sign-windows-' . $tag . '.zip.sha256',
-                'browser_download_url' => 'https://gitee.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/' . $tag . '/package.zip.sha256',
+                'browser_download_url' => 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/' . $tag . '/package.zip.sha256',
                 'size' => 100,
                 'digest' => ''
             ))
@@ -61,20 +61,73 @@ final class UpdaterTest extends TestCase
         ProjectUpdater::parseRelease($payload);
     }
 
-    public function testForeignReleaseUrlIsRejected(): void
+    public function testHostileGitHubLookalikeAndAssetHostsAreRejected(): void
     {
+        foreach (array('https://github.com.evil.example/release', 'https://evil.example/file.zip', 'https://user@github.com/release', 'https://github.com:444/release') as $url) {
+            $payload = $this->payload();
+            $payload['html_url'] = $url;
+            try {
+                ProjectUpdater::parseRelease($payload);
+                $this->fail('Expected hostile host to be rejected: ' . $url);
+            } catch (InvalidArgumentException $e) {
+                $this->assertSame('Release 下载地址不受信任', $e->getMessage());
+            }
+        }
         $payload = $this->payload();
-        $payload['html_url'] = 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/tag/v5.10';
-        $this->expectException(InvalidArgumentException::class);
-        ProjectUpdater::parseRelease($payload);
+        $payload['assets'][0]['browser_download_url'] = 'https://evil.example/file.zip';
+        $this->assertSame('', ProjectUpdater::parseRelease($payload)['asset_download_url']);
     }
 
-    public function testDomesticChannelIsTheDefault(): void
+    public function testOfficialHostsWithUnrelatedRepositoryPathsAreRejected(): void
+    {
+        foreach (array(
+            'https://github.com/attacker/other-repository/releases/tag/v5.08',
+            'https://github.com/yuchen0x1/baidu-tieba-yunqiandao-malicious/releases/tag/v5.08',
+            'https://api.github.com/repos/attacker/other-repository/releases/latest'
+        ) as $url) {
+            $payload = $this->payload();
+            $payload['html_url'] = $url;
+            try {
+                ProjectUpdater::parseRelease($payload);
+                $this->fail('Expected unrelated repository path to be rejected: ' . $url);
+            } catch (InvalidArgumentException $e) {
+                $this->assertSame('Release 下载地址不受信任', $e->getMessage());
+            }
+        }
+
+        $payload = $this->payload();
+        $payload['assets'][0]['browser_download_url'] = 'https://github.com/attacker/other-repository/releases/download/v5.08/package.zip';
+        $this->assertSame('', ProjectUpdater::parseRelease($payload)['asset_download_url']);
+    }
+
+    public function testMissingGitHubFieldsAreDerivedFromTag(): void
+    {
+        $payload = array('tag_name' => 'v5.08', 'name' => null, 'body' => null, 'html_url' => null, 'zipball_url' => null, 'assets' => null, 'published_at' => null, 'prerelease' => null);
+        $release = ProjectUpdater::parseRelease($payload);
+        $this->assertSame('https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/tag/v5.08', $release['release_url']);
+        $this->assertSame('https://api.github.com/repos/yuchen0x1/baidu-tieba-yunqiandao/zipball/v5.08', $release['source_download_url']);
+        $this->assertSame('', $release['body']);
+        $this->assertSame('', $release['published_at']);
+        $this->assertFalse($release['is_prerelease']);
+    }
+
+    public function testTrustedGitHubReleaseAndAssetHostsAreAccepted(): void
+    {
+        $payload = $this->payload();
+        $payload['zipball_url'] = 'https://api.github.com/repos/yuchen0x1/baidu-tieba-yunqiandao/zipball/v5.08';
+        $payload['assets'][0]['browser_download_url'] = 'https://release-assets.githubusercontent.com/package.zip';
+        $payload['assets'][1]['browser_download_url'] = 'https://objects.githubusercontent.com/package.zip.sha256';
+        $release = ProjectUpdater::parseRelease($payload);
+        $this->assertSame('https://release-assets.githubusercontent.com/package.zip', $release['asset_download_url']);
+        $this->assertSame('https://objects.githubusercontent.com/package.zip.sha256', $release['asset_checksum_url']);
+    }
+
+    public function testGitHubChannelIsTheDefault(): void
     {
         $previous = getenv('UPDATE_PRIMARY_CHANNEL');
         putenv('UPDATE_PRIMARY_CHANNEL');
         try {
-            $this->assertSame('gitee', ProjectUpdater::primaryChannel());
+            $this->assertSame('github', ProjectUpdater::primaryChannel());
             $this->assertFalse(ProjectUpdater::foreignFallbackEnabled());
         } finally {
             if ($previous === false) {
@@ -85,12 +138,12 @@ final class UpdaterTest extends TestCase
         }
     }
 
-    public function testForeignChannelConfigurationCannotEnableIt(): void
+    public function testLegacyChannelConfigurationCannotChangeGitHubDefault(): void
     {
         $previous = getenv('UPDATE_PRIMARY_CHANNEL');
         putenv('UPDATE_PRIMARY_CHANNEL=github');
         try {
-            $this->assertSame('gitee', ProjectUpdater::primaryChannel());
+            $this->assertSame('github', ProjectUpdater::primaryChannel());
         } finally {
             if ($previous === false) {
                 putenv('UPDATE_PRIMARY_CHANNEL');
@@ -112,7 +165,7 @@ final class UpdaterTest extends TestCase
     private function releaseWithDigest(string $digest, string $checksumUrl = ''): array
     {
         return array(
-            'asset_download_url' => 'https://gitee.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/v5.08/package.zip',
+            'asset_download_url' => 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/v5.08/package.zip',
             'asset_digest' => $digest,
             'asset_checksum_url' => $checksumUrl
         );
@@ -122,7 +175,7 @@ final class UpdaterTest extends TestCase
     {
         $release = ProjectUpdater::parseRelease($this->payload());
         $this->assertSame(
-            'https://gitee.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/v5.08/package.zip.sha256',
+            'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/v5.08/package.zip.sha256',
             $release['asset_checksum_url']
         );
     }
@@ -161,7 +214,7 @@ final class UpdaterTest extends TestCase
             $release = $this->releaseWithDigest('sha256:' . hash('sha256', 'source-archive'));
             $this->expectException(RuntimeException::class);
             $this->expectExceptionMessage('回退通道');
-            ProjectUpdater::verifyPackageDigest($path, $release, 'https://gitee.com/yuchen0x1/baidu-tieba-yunqiandao/repository/archive/v5.08.zip');
+            ProjectUpdater::verifyPackageDigest($path, $release, 'https://api.github.com/repos/yuchen0x1/baidu-tieba-yunqiandao/zipball/v5.08.zip');
         } finally {
             @unlink($path);
         }

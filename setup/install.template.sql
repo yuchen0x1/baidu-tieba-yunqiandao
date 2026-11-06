@@ -117,7 +117,7 @@ INSERT INTO `{VAR-PREFIX}options` VALUES ('cron_sign_again', 'a:2:{s:3:\"num\";i
 INSERT INTO `{VAR-PREFIX}options` VALUES ('sign_hour', '0');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('mail_secure', 'none');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('freetable', 'tieba');
-INSERT INTO `{VAR-PREFIX}options` VALUES ('core_version', '7.2.3');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('core_version', '7.3.0');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('core_revision', '');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('vid', '10000');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('update_server', '0');
@@ -265,6 +265,9 @@ CREATE TABLE `{VAR-PREFIX}sign_history` (
   `status` VARCHAR(20) NOT NULL DEFAULT '',
   `error_code` INT NOT NULL DEFAULT 0,
   `message` VARCHAR(500) NOT NULL DEFAULT '',
+  `exp_gained` INT UNSIGNED NOT NULL DEFAULT 0,
+  `sign_rank` INT UNSIGNED NOT NULL DEFAULT 0,
+  `forum_level` TINYINT UNSIGNED NOT NULL DEFAULT 0,
   `created_at` INT UNSIGNED NOT NULL,
   PRIMARY KEY (`id`),
   KEY `pid_created_at` (`pid`, `created_at`),
@@ -360,4 +363,5 @@ CREATE TABLE `{VAR-PREFIX}schema_migrations` (
 INSERT INTO `{VAR-PREFIX}schema_migrations` (`version`, `applied_at`, `description`, `status`, `started_at`, `finished_at`) VALUES
   ('001001', UNIX_TIMESTAMP(), 'V5.13：cron 表调度增强列 + task_runs + api_rate_limits + 新增选项', 'success', UNIX_TIMESTAMP(), UNIX_TIMESTAMP()),
   ('007000', UNIX_TIMESTAMP(), 'V7.0：升级基线校验与调度结构修复（幂等，无破坏性变更）', 'success', UNIX_TIMESTAMP(), UNIX_TIMESTAMP()),
-  ('007100', UNIX_TIMESTAMP(), 'V7.0：新增 cron_notify_interval 失败通知去重选项', 'success', UNIX_TIMESTAMP(), UNIX_TIMESTAMP());
+  ('007100', UNIX_TIMESTAMP(), 'V7.0：新增 cron_notify_interval 失败通知去重选项', 'success', UNIX_TIMESTAMP(), UNIX_TIMESTAMP()),
+  ('007200', UNIX_TIMESTAMP(), 'V7.3：签到历史表增加成长经验/签到排名/贴吧等级支持', 'success', UNIX_TIMESTAMP(), UNIX_TIMESTAMP());

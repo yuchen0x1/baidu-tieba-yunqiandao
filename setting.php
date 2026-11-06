@@ -708,7 +708,7 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
         if (isset($_POST['delete']) || isset($_GET['delete'])) {
             doAction('baiduid_set_1');
             CleanUser(UID);
-            $m->query("DELETE FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `" . DB_PREFIX . "baiduid`.`uid` = " . UID);
+            $m->pquery("DELETE FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `" . DB_PREFIX . "baiduid`.`uid` = ?", array((int) UID));
         } elseif (!empty($bdussIn) && !empty($stokenIn)) {
             if (option::get('bduss_num') == '-1' && ROLE != 'admin') {
                 msg('本站禁止绑定新账号');
@@ -754,11 +754,11 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
         } elseif (!empty($delIn)) {
             $del = (int) $delIn;
             doAction('baiduid_set_3');
-            $x = $m->once_fetch_array("SELECT * FROM  `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE  `id` = " . UID . " LIMIT 1");
-            $m->query("DELETE FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `" . DB_PREFIX . "baiduid`.`uid` = " . UID . " AND `" . DB_PREFIX . "baiduid`.`id` = " . $del);
+            $x = $m->once_fetch_array("SELECT * FROM  `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE  `id` = " . (int) UID . " LIMIT 1");
+            $m->pquery("DELETE FROM `" . DB_NAME . "`.`" . DB_PREFIX . "baiduid` WHERE `" . DB_PREFIX . "baiduid`.`uid` = ? AND `" . DB_PREFIX . "baiduid`.`id` = ?", array((int) UID, $del));
             // 分表名来自数据库（users.t），拼入标识符前必须过白名单
             $userTable = function_exists('safe_table_name') ? safe_table_name($x['t']) : 'tieba';
-            $m->query('DELETE FROM `' . DB_NAME . '`.`' . DB_PREFIX . $userTable . '` WHERE `' . DB_PREFIX . $userTable . '`.`uid` = ' . UID . ' AND `' . DB_PREFIX . $userTable . '`.`pid` = ' . $del);
+            $m->pquery('DELETE FROM `' . DB_NAME . '`.`' . DB_PREFIX . $userTable . '` WHERE `' . DB_PREFIX . $userTable . '`.`uid` = ? AND `' . DB_PREFIX . $userTable . '`.`pid` = ?', array((int) UID, $del));
         } elseif (isset($_POST['batch_import'])) {
             //批量导入 BDUSS（可带 STOKEN），每行一个账号
             $batchRaw = (string) (isset($_POST['batch_bduss']) ? $_POST['batch_bduss'] : '');
@@ -911,16 +911,14 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
             }
             Redirect('index.php?mod=showtb&ok');
         } elseif (isset($_GET['set'])) {
-            $x = $m->fetch_array($m->query('SELECT * FROM  `' . DB_NAME . '`.`' . DB_PREFIX . TABLE . '` WHERE  `uid` = ' . UID . ' LIMIT 1'));
-            $f = $x['tieba'];
-            foreach ($_POST['no'] as $k => $x) {
-                $id = intval($k);
-                if ($x == '0') {
-                    $xv = '0';
-                } else {
-                    $xv = '1';
+            $x = $m->once_fetch_array('SELECT * FROM `' . DB_NAME . '`.`' . DB_PREFIX . TABLE . '` WHERE `uid` = ' . (int) UID . ' LIMIT 1');
+            $f = isset($x['tieba']) ? $x['tieba'] : '';
+            if (isset($_POST['no']) && is_array($_POST['no'])) {
+                foreach ($_POST['no'] as $k => $x) {
+                    $id = (int) $k;
+                    $xv = ($x == '0') ? '0' : '1';
+                    $m->pquery("UPDATE `" . DB_PREFIX . TABLE . "` SET `no` = ? WHERE `id` = ? AND `uid` = ?", array($xv, $id, (int) UID));
                 }
-                $m->query("UPDATE `" . DB_PREFIX . TABLE . "` SET `no` =  '{$xv}' WHERE  `id` = '{$id}' AND `uid` = '" . UID . "' ;");
             }
             Redirect('index.php?mod=showtb&ok');
         } elseif (isset($_GET['refreshTiebaList'])) {
@@ -942,12 +940,14 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
                 $pid = (int) strip_tags($_POST['pid']);
                 $osq = $m->pquery("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . TABLE . "` WHERE `uid` = ? AND `tieba` = ?", array(UID, $v));
                 if ($m->num_rows($osq) == 0) {
-                    $table = $m->fetch_array($m->query('select * from `' . DB_NAME . '`.`' . DB_PREFIX . 'users` where `id` = ' . UID));
-                    $tb_max = $m->fetch_row($m->query("SELECT COUNT(*) FROM `" . DB_NAME . "`.`" . DB_PREFIX . $table['t'] . "` where `uid` = " . UID));
+                    $table = $m->once_fetch_array('SELECT * FROM `' . DB_NAME . '`.`' . DB_PREFIX . 'users` WHERE `id` = ' . (int) UID . ' LIMIT 1');
+                    $userTable = function_exists('safe_table_name') ? safe_table_name($table['t']) : 'tieba';
+                    $tb_max_row = $m->once_fetch_array("SELECT COUNT(*) AS c FROM `" . DB_NAME . "`.`" . DB_PREFIX . $userTable . "` WHERE `uid` = " . (int) UID);
+                    $tb_count = (int) ($tb_max_row['c'] ?? 0);
                     if (ROLE == 'admin' || ROLE == 'vip') {
                         $m->pquery("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . TABLE . "` (`pid`, `uid`, `tieba`, `no`, `latest`) VALUES (?, ?, ?, 0, 0)", array($pid, UID, $v));
                     } else {
-                        if ($tb_max[0] < option::get('tb_max')) {
+                        if ($tb_count < option::get('tb_max')) {
                             $m->pquery("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . TABLE . "` (`pid`, `uid`, `tieba`, `no`, `latest`) VALUES (?, ?, ?, 0, 0)", array($pid, UID, $v));
                         } else {
                             msg('错误：您的贴吧数量超过限制，无法刷新！');
@@ -993,11 +993,11 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
                 $plainToken = 'tcs_' . hash('sha256', uniqid('', true) . mt_rand());
             }
             $tokenHash = hash('sha256', $plainToken);
-            $m->query("UPDATE `" . DB_PREFIX . "users` SET `api_token_hash` = '" . $m->real_escape_string($tokenHash) . "' WHERE `id` = " . (int) UID);
+            $m->pquery("UPDATE `" . DB_PREFIX . "users` SET `api_token_hash` = ? WHERE `id` = ?", array($tokenHash, (int) UID));
             msg('新的个人 API Token 已生成。此值只显示一次，请立即保存：<br/><br/><code style="word-break:break-all;display:block;padding:12px;background:#f5f5f5">' . htmlspecialchars($plainToken, ENT_QUOTES, 'UTF-8') . '</code><br/>调用时使用 <code>Authorization: Bearer 上述Token</code>。它只能访问当前账号的数据，可在个人设置中随时撤销。', 'index.php?mod=set');
         }
         if ($apiAction === 'revoke') {
-            $m->query("UPDATE `" . DB_PREFIX . "users` SET `api_token_hash` = NULL WHERE `id` = " . (int) UID);
+            $m->pquery("UPDATE `" . DB_PREFIX . "users` SET `api_token_hash` = NULL WHERE `id` = ?", array((int) UID));
             Redirect('index.php?mod=set&ok');
         }
         // 获取头像的url

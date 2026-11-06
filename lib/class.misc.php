@@ -425,6 +425,10 @@ class misc
 
         //dump(json_decode(self::DoSign_Client($uid,$kw,$id,$pid,$fid,$ck),true),true);die;
 
+        $expGained = 0;
+        $signRank = 0;
+        $forumLevel = 0;
+
         if (!empty($sign_mode) && in_array('1', $sign_mode) && $status_succ === false) {
             $r = self::DoSign_Client($uid, $kw, $id, $pid, $fid, $ck);
             $v = json_decode($r, true);
@@ -432,6 +436,13 @@ class misc
             //decode失败时会直接返回原文或NULL
                 if (empty($v['error_code']) || $v['error_code'] == $again_error_id) {
                     $status_succ = true;
+                    // 解析客户端签到返回中的成长经验、排名、等级
+                    if (!empty($v['user_info'])) {
+                        $uInfo = $v['user_info'];
+                        $expGained = isset($uInfo['sign_bonus']) ? (int) $uInfo['sign_bonus'] : (isset($uInfo['c_sign_bonus']) ? (int) $uInfo['c_sign_bonus'] : 0);
+                        $signRank = isset($uInfo['user_sign_rank']) ? (int) $uInfo['user_sign_rank'] : 0;
+                        $forumLevel = isset($uInfo['level_id']) ? (int) $uInfo['level_id'] : 0;
+                    }
                 } else {
                     $error_code = $v['error_code'];
                     $error_msg  = $v['error_msg'];
@@ -446,6 +457,9 @@ class misc
             //decode失败时会直接返回原文或NULL
                 if (empty($v['no']) || $v['no'] == $again_error_id_2 || $v['no'] == $again_error_id_3) {
                     $status_succ = true;
+                    if (!empty($v['data']['sign_version'])) {
+                        $expGained = isset($v['data']['sign_bonus']) ? (int) $v['data']['sign_bonus'] : 0;
+                    }
                 } else {
                     $error_code  = $v['no'];
                     $error_msg   = $v['error'];
@@ -462,7 +476,7 @@ class misc
         if ($status_succ === true) {
             $m->pquery("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` SET `latest` = ?, `status` = 0, `last_error` = NULL WHERE `" . DB_PREFIX . $table . "`.`id` = ?", array($today, (int) $id));
             if (class_exists('SignManager')) {
-                SignManager::logTiebaResult($pid, $uid, $kw, 'success');
+                SignManager::logTiebaResult($pid, $uid, $kw, 'success', 0, '', $expGained, $signRank, $forumLevel);
             }
         } elseif (!empty($error_code)) {
             //error_msg 来自百度接口返回，可能含引号等字符，必须参数化否则落库失败且无法复签

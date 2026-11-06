@@ -1,18 +1,21 @@
 ﻿param(
     [string]$Repository = "yuchen0x1/baidu-tieba-yunqiandao",
-    [string]$CurrentVersion = "7.2.3"
+    [string]$CurrentVersion = "7.3.0"
 )
 
-# 在线更新仅使用 Gitee 国内 Release 通道。
+# Online update checks use GitHub Releases only.
 $ErrorActionPreference = "Stop"
 
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
 
-function Get-GiteeRelease {
+function Get-GitHubRelease {
     param([string]$Uri)
 
     $headers = @{ "User-Agent" = "Tieba-Cloud-Sign-Updater"; "Accept" = "application/json" }
-    $token = [string]$env:UPDATE_GITEE_TOKEN
+    if ($Uri -notmatch '^https://api\.github\.com/repos/yuchen0x1/baidu-tieba-yunqiandao/releases/latest$') {
+        throw "Untrusted GitHub release API URL"
+    }
+    $token = [string]$env:UPDATE_GITHUB_TOKEN
     if (-not [string]::IsNullOrWhiteSpace($token)) {
         $headers["Authorization"] = "Bearer " + $token
     }
@@ -31,8 +34,8 @@ function Get-GiteeRelease {
     }
 }
 
-$apiUrl = "https://gitee.com/api/v5/repos/$Repository/releases/latest"
-$release = Get-GiteeRelease -Uri $apiUrl
+$apiUrl = "https://api.github.com/repos/$Repository/releases/latest"
+$release = Get-GitHubRelease -Uri $apiUrl
 $latest = [string]$release.tag_name -replace '^[vV]', ''
 if ([string]::IsNullOrWhiteSpace($latest)) {
     throw "更新服务器响应缺少 tag_name"
@@ -43,7 +46,7 @@ if ([version]$latest -gt [version]$CurrentVersion) {
     $checksum = @($release.assets | Where-Object { $_.name -match '\.zip\.sha256$' } | Select-Object -First 1)
     $releaseUrl = [string]$release.html_url
     if ([string]::IsNullOrWhiteSpace($releaseUrl)) {
-        $releaseUrl = "https://gitee.com/$Repository/releases/tag/$($release.tag_name)"
+        $releaseUrl = "https://github.com/$Repository/releases/tag/$($release.tag_name)"
     }
     Write-Output "Update available: V$latest (current V$CurrentVersion)"
     Write-Output "Release: $releaseUrl"

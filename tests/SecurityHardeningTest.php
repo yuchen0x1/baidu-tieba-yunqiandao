@@ -5,6 +5,33 @@ use PHPUnit\Framework\TestCase;
 require_once dirname(__DIR__) . '/lib/security.php';
 require_once dirname(__DIR__) . '/lib/class.option.php';
 require_once dirname(__DIR__) . '/lib/sfc.functions.php';
+require_once dirname(__DIR__) . '/lib/class.wcurl.php';
+
+/**
+ * Deterministic DNS resolver used to verify that every A/AAAA answer is
+ * checked and that the selected address is pinned into cURL options.
+ */
+final class SecurityHardeningDnsClient extends wcurl
+{
+    public static array $answers = array();
+    public static array $requestedTypes = array();
+
+    protected static function resolveDnsRecords($host, $type)
+    {
+        self::$requestedTypes[] = $type;
+        return isset(self::$answers[$type]) ? self::$answers[$type] : array();
+    }
+
+    public static function resolveForTest($url)
+    {
+        return static::resolvePublicUrl($url);
+    }
+
+    public function getPinnedTargetForTest()
+    {
+        return $this->publicUrlTarget;
+    }
+}
 
 if (!defined('DB_NAME')) {
     define('DB_NAME', 'test_db');
@@ -49,6 +76,81 @@ final class SecurityHardeningTest extends TestCase
                 return array('options' => '');
             }
         };
+    }
+
+    public function testPublicIpAddressValidationRejectsPrivateReservedAndMappedAddresses(): void
+    {
+        foreach (array(
+            '127.0.0.1', '10.0.0.1', '169.254.169.254', '192.168.1.1',
+            '100.64.0.1', '192.0.2.1', '198.51.100.1', '203.0.113.1',
+            '224.0.0.1', '::1', 'fc00::1', 'fe80::1', '::ffff:127.0.0.1',
+            '2001:db8::1', '2002::1',
+        ) as $ip) {
+            $this->assertFalse(wcurl::isPublicIpAddress($ip), $ip . ' must not be accepted');
+        }
+        foreach (array('8.8.8.8', '2606:4700:4700::1111') as $ip) {
+            $this->assertTrue(wcurl::isPublicIpAddress($ip), $ip . ' should be accepted');
+        }
+        $this->assertFalse(wcurl::arePublicIpAddresses(array('8.8.8.8', '127.0.0.1')));
+        $this->assertFalse(wcurl::arePublicIpAddresses(array()));
+    }
+
+    public function testPublicUrlValidationRejectsInvalidSchemesAndMissingDnsAnswers(): void
+    {
+        $this->assertFalse(wcurl::isAllowedPublicUrl('file:///etc/passwd'));
+        $this->assertFalse(wcurl::isAllowedPublicUrl('http://127.0.0.1/'));
+        $this->assertFalse(wcurl::isAllowedPublicUrl('http://does-not-exist.invalid/'));
+        $this->assertFalse(wcurl::isAllowedPublicUrl('http://127.1/'));
+    }
+
+    public function testAllDnsAnswersAreValidatedBeforeAnAddressIsSelected(): void
+    {
+        SecurityHardeningDnsClient::$answers = array(
+            DNS_A => array(
+                array('type' => 'A', 'ip' => '8.8.8.8'),
+                array('type' => 'A', 'ip' => '10.0.0.1'),
+            ),
+            DNS_AAAA => array(),
+        );
+        SecurityHardeningDnsClient::$requestedTypes = array();
+
+        $this->assertFalse(SecurityHardeningDnsClient::resolveForTest('https://notify.example/hook'));
+        $this->assertSame(array(DNS_A, DNS_AAAA), SecurityHardeningDnsClient::$requestedTypes);
+    }
+
+    public function testPrivateIpv6DnsAnswerIsRejected(): void
+    {
+        SecurityHardeningDnsClient::$answers = array(
+            DNS_A => array(array('type' => 'A', 'ip' => '8.8.8.8')),
+            DNS_AAAA => array(array('type' => 'AAAA', 'ipv6' => 'fc00::1')),
+        );
+
+        $this->assertFalse(SecurityHardeningDnsClient::resolveForTest('https://notify.example/hook'));
+    }
+
+    public function testMissingDnsAnswersAreRejected(): void
+    {
+        SecurityHardeningDnsClient::$answers = array(DNS_A => array(), DNS_AAAA => array());
+
+        $this->assertFalse(SecurityHardeningDnsClient::resolveForTest('https://notify.example/hook'));
+    }
+
+    public function testValidatedDnsAddressIsPinnedAndRedirectsAreDisabled(): void
+    {
+        SecurityHardeningDnsClient::$answers = array(
+            DNS_A => array(array('type' => 'A', 'ip' => '8.8.8.8')),
+            DNS_AAAA => array(array('type' => 'AAAA', 'ipv6' => '2606:4700:4700::1111')),
+        );
+
+        $client = new SecurityHardeningDnsClient();
+        $this->assertTrue($client->setPublicUrl('https://notify.example:8443/hook'));
+
+        $target = $client->getPinnedTargetForTest();
+        $this->assertSame('https://notify.example:8443/hook', $target['url']);
+        $this->assertSame('notify.example', $target['host']);
+        $this->assertSame(8443, $target['port']);
+        $this->assertSame('8.8.8.8', $target['ip']);
+        $this->assertFalse($target['follow_redirects']);
     }
 
     public function testMustAdminWarningCastsIdsToIntBeforeSql(): void

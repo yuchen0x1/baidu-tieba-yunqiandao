@@ -4,5 +4,6 @@
 .env
 docker/.env
 mysql
+vendor
 setup/update_cache
 setup/install.lock

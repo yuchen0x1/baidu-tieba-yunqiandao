@@ -1,4 +1,15 @@
-// v4: alert() 兜底使用 CS 原语 modal；CS 未就绪时降级原生 alert
+// 全局 Toast 便捷函数
+function showToast(title, opts) {
+    if (window.CS && CS.toast && typeof CS.toast === 'function') {
+        return CS.toast(title, opts);
+    }
+    // 降级使用 alert
+    if (typeof title === 'string' && (!opts || !opts.silent)) {
+        alert(opts && opts.body ? title + '\n' + opts.body : title);
+    }
+}
+
+// v4: alert() 兜底使用 CS 原语 modal / toast；CS 未就绪时降级原生 alert
 function alert(text, title) {
     var body = (text != null) ? String(text) : '未指定的异常';
     var head = (title != null) ? String(title) : '提示信息';
@@ -69,9 +80,13 @@ $(function () {
 
     if (themeToggle) {
         themeToggle.addEventListener('click', function () {
-            var next = (root.getAttribute('data-theme') === 'dark') ? 'light' : 'dark';
+            var current = root.getAttribute('data-theme');
+            var next = (current === 'dark') ? 'light' : 'dark';
             applyTheme(next);
             try { localStorage.setItem('tc-theme', next); } catch (e) {}
+            if (window.CS && CS.toast) {
+                CS.toast(next === 'dark' ? '已切换至深色模式' : '已切换至浅色模式', { type: 'info', duration: 2000 });
+            }
         });
     }
 

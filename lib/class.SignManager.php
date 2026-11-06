@@ -168,6 +168,9 @@ class SignManager
             `status` VARCHAR(20) NOT NULL DEFAULT '',
             `error_code` INT NOT NULL DEFAULT 0,
             `message` VARCHAR(500) NOT NULL DEFAULT '',
+            `exp_gained` INT UNSIGNED NOT NULL DEFAULT 0,
+            `sign_rank` INT UNSIGNED NOT NULL DEFAULT 0,
+            `forum_level` TINYINT UNSIGNED NOT NULL DEFAULT 0,
             `created_at` INT UNSIGNED NOT NULL,
             PRIMARY KEY (`id`),
             KEY `pid_created_at` (`pid`, `created_at`),
@@ -181,17 +184,20 @@ class SignManager
     /**
      * 写入单个贴吧的最终签到结果。
      */
-    public static function logTiebaResult($pid, $uid, $tieba, $status, $errorCode = 0, $message = '')
+    public static function logTiebaResult($pid, $uid, $tieba, $status, $errorCode = 0, $message = '', $expGained = 0, $signRank = 0, $forumLevel = 0)
     {
         global $m;
         self::ensureHistoryTable();
         $status = (string) $status;
         $message = substr((string) $message, 0, 500);
+        $expGained = max(0, (int) $expGained);
+        $signRank = max(0, (int) $signRank);
+        $forumLevel = max(0, min(100, (int) $forumLevel));
         $m->query("INSERT INTO `" . DB_PREFIX . self::HISTORY_TABLE . "`
-            (`pid`, `uid`, `tieba`, `status`, `error_code`, `message`, `created_at`) VALUES ("
+            (`pid`, `uid`, `tieba`, `status`, `error_code`, `message`, `exp_gained`, `sign_rank`, `forum_level`, `created_at`) VALUES ("
             . (int) $pid . ", " . (int) $uid . ", '" . $m->real_escape_string($tieba) . "', '"
             . $m->real_escape_string($status) . "', " . (int) $errorCode . ", '"
-            . $m->real_escape_string($message) . "', UNIX_TIMESTAMP())");
+            . $m->real_escape_string($message) . "', " . $expGained . ", " . $signRank . ", " . $forumLevel . ", UNIX_TIMESTAMP())");
     }
 
     /**
@@ -814,7 +820,7 @@ class SignManager
         if ($page > $pages) { $page = $pages; }
         $offset = ($page - 1) * $pageSize;
 
-        $sql = "SELECT `id`, `pid`, `uid`, `tieba`, `status`, `error_code`, `message`, `created_at`
+        $sql = "SELECT `id`, `pid`, `uid`, `tieba`, `status`, `error_code`, `message`, `exp_gained`, `sign_rank`, `forum_level`, `created_at`
             FROM `" . DB_PREFIX . self::HISTORY_TABLE . "`
             WHERE " . $whereSql . "
             ORDER BY `created_at` DESC, `id` DESC
@@ -830,6 +836,9 @@ class SignManager
                 'status' => (string) $row['status'],
                 'error_code' => (int) $row['error_code'],
                 'message' => (string) $row['message'],
+                'exp_gained' => (int) ($row['exp_gained'] ?? 0),
+                'sign_rank' => (int) ($row['sign_rank'] ?? 0),
+                'forum_level' => (int) ($row['forum_level'] ?? 0),
                 'created_at' => (int) $row['created_at'],
             );
         }
@@ -922,13 +931,22 @@ class SignManager
             SUBSTRING_INDEX(GROUP_CONCAT(t.`status` ORDER BY t.`id` DESC), ',', 1) AS `last_status`,
             (SELECT t2.`message` FROM `" . DB_PREFIX . self::HISTORY_TABLE . "` t2
               WHERE t2.`uid` = t.`uid` AND t2.`tieba` = t.`tieba` AND t2.`created_at` >= ?
-              ORDER BY t2.`id` DESC LIMIT 1) AS `last_msg`
+              ORDER BY t2.`id` DESC LIMIT 1) AS `last_msg`,
+            (SELECT t3.`exp_gained` FROM `" . DB_PREFIX . self::HISTORY_TABLE . "` t3
+              WHERE t3.`uid` = t.`uid` AND t3.`tieba` = t.`tieba` AND t3.`status` = 'success' AND t3.`created_at` >= ?
+              ORDER BY t3.`id` DESC LIMIT 1) AS `last_exp`,
+            (SELECT t4.`sign_rank` FROM `" . DB_PREFIX . self::HISTORY_TABLE . "` t4
+              WHERE t4.`uid` = t.`uid` AND t4.`tieba` = t.`tieba` AND t4.`status` = 'success' AND t4.`created_at` >= ?
+              ORDER BY t4.`id` DESC LIMIT 1) AS `last_rank`,
+            (SELECT t5.`forum_level` FROM `" . DB_PREFIX . self::HISTORY_TABLE . "` t5
+              WHERE t5.`uid` = t.`uid` AND t5.`tieba` = t.`tieba` AND t5.`status` = 'success' AND t5.`created_at` >= ?
+              ORDER BY t5.`id` DESC LIMIT 1) AS `last_level`
             FROM `" . DB_PREFIX . self::HISTORY_TABLE . "` t
             WHERE t.`uid` = ? AND t.`created_at` >= ?
             GROUP BY t.`uid`, t.`tieba`
             ORDER BY `total` DESC";
         $sinceTs = $since;
-        $result = $m->pquery($sql, array($sinceTs, $uid, $since));
+        $result = $m->pquery($sql, array($sinceTs, $sinceTs, $sinceTs, $sinceTs, $uid, $since));
         $rows = array();
         while ($row = $m->fetch_array($result)) {
             $success = (int) $row['success'];
@@ -943,6 +961,9 @@ class SignManager
                 'last_status' => (string) $row['last_status'],
                 'last_time'   => (int) $row['last_time'],
                 'last_msg'    => (string) $row['last_msg'],
+                'last_exp'    => (int) ($row['last_exp'] ?? 0),
+                'last_rank'   => (int) ($row['last_rank'] ?? 0),
+                'last_level'  => (int) ($row['last_level'] ?? 0),
             );
         }
         return $rows;

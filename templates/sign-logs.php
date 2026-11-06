@@ -83,6 +83,7 @@ function build_query($override = array()) {
                 <th style="width:140px">时间</th>
                 <th>贴吧</th>
                 <th style="width:80px">状态</th>
+                <th style="width:110px">成长经验</th>
                 <th style="width:80px">错误码</th>
                 <th>信息</th>
                 <th style="width:80px">操作</th>
@@ -90,14 +91,34 @@ function build_query($override = array()) {
         </thead>
         <tbody>
         <?php if (empty($rows)) { ?>
-            <tr><td colspan="6" style="text-align:center;padding:24px;color:var(--color-ink-soft)">没有符合条件的记录</td></tr>
+            <tr><td colspan="7" style="text-align:center;padding:24px;color:var(--color-ink-soft)">没有符合条件的记录</td></tr>
         <?php } else { foreach ($rows as $row) {
             $statusBadge = $row['status'] === 'success' ? 'cs-badge-success' : ($row['status'] === 'error' ? 'cs-badge-error' : 'cs-badge-neutral');
+            $expGained = isset($row['exp_gained']) ? (int) $row['exp_gained'] : 0;
+            $signRank = isset($row['sign_rank']) ? (int) $row['sign_rank'] : 0;
+            $forumLevel = isset($row['forum_level']) ? (int) $row['forum_level'] : 0;
         ?>
             <tr>
                 <td><?php echo htmlspecialchars(date('Y-m-d H:i', $row['created_at']), ENT_QUOTES, 'UTF-8'); ?></td>
                 <td><?php echo htmlspecialchars($row['tieba'], ENT_QUOTES, 'UTF-8'); ?></td>
                 <td><span class="cs-badge <?php echo $statusBadge; ?>"><?php echo htmlspecialchars($row['status'], ENT_QUOTES, 'UTF-8'); ?></span></td>
+                <td>
+                    <?php if ($row['status'] === 'success') { ?>
+                        <?php if ($expGained > 0) { ?>
+                            <span class="cs-badge cs-badge-success">+<?php echo $expGained; ?> 经验</span>
+                        <?php } else { ?>
+                            <span class="cs-badge cs-badge-neutral">经验未知</span>
+                        <?php } ?>
+                        <?php if ($signRank > 0 || $forumLevel > 0) { ?>
+                            <span class="text-muted" style="font-size:11px;display:block">
+                                <?php if ($signRank > 0) { ?>第 <?php echo $signRank; ?> 签<?php } ?>
+                                <?php if ($forumLevel > 0) { ?><?php echo $signRank > 0 ? ' · ' : ''; ?>贴吧 Lv.<?php echo $forumLevel; ?><?php } ?>
+                            </span>
+                        <?php } ?>
+                    <?php } else { ?>
+                        <span class="text-muted">-</span>
+                    <?php } ?>
+                </td>
                 <td><?php echo $row['error_code'] ? (int) $row['error_code'] : '-'; ?></td>
                 <td><?php echo htmlspecialchars($row['message'] ?: '-', ENT_QUOTES, 'UTF-8'); ?></td>
                 <td>

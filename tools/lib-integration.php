@@ -88,8 +88,10 @@ function it_copy_project($src, $dst)
  */
 function it_write_config($workRoot, $db, $prefix, $port)
 {
+    $host = getenv('TCS_IT_DB_HOST') ?: '127.0.0.1';
+    $dbHost = ($port && $port != 3306) ? "{$host}:{$port}" : $host;
     $config = "<?php\n"
-        . "define('DB_HOST', '127.0.0.1:{$port}');\n"
+        . "define('DB_HOST', " . var_export($dbHost, true) . ");\n"
         . "define('DB_USER', " . var_export(getenv('TCS_IT_DB_USER') ?: 'root', true) . ");\n"
         . "define('DB_PASSWD', " . var_export(getenv('TCS_IT_DB_PASS') ?: '', true) . ");\n"
         . "define('DB_NAME', '{$db}');\n"
