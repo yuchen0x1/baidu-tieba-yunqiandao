@@ -89,7 +89,7 @@ try {
         if ($existingRelease) {
             Invoke-Gh -Arguments @('release', 'upload', $Tag, $package, $checksum, '--repo', $githubRepository, '--clobber') | Out-Null
         } else {
-            $createArgs = @('release', 'create', $Tag, $package, $checksum, '--repo', $githubRepository, '--verify-tag', '--title', "百度贴吧云签到 $Tag Windows 部署包")
+            $createArgs = @('release', 'create', $Tag, $package, $checksum, '--repo', $githubRepository, '--verify-tag', '--title', "V$($Tag.TrimStart('v', 'V'))：签到成长指标与安全可靠性加固")
             if (-not [string]::IsNullOrWhiteSpace($ReleaseNotesFile)) {
                 if (-not (Test-Path -LiteralPath $ReleaseNotesFile)) {
                     throw "ReleaseNotesFile not found: $ReleaseNotesFile"
