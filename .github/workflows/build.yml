@@ -26,7 +26,7 @@ jobs:
         # SYSTEM_VER 的唯一来源是 version.php（V7.0 起不再写在 init.php）
         name: Get version
         run: |
-          version=$(sed -n "s/define('SYSTEM_VER', '\([^']*\)');/\1/p" version.php)
+          version=$(sed -n "s/^.*define('SYSTEM_VER', '\([^']*\)');.*/\1/p" version.php | tr -d '[:space:]')
           if [ -z "$version" ]; then
             echo "无法从 version.php 解析 SYSTEM_VER" >&2
             exit 1
