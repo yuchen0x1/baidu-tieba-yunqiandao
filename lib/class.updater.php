@@ -403,16 +403,20 @@ class ProjectUpdater
                 CURLOPT_RESOLVE => array($host . ':' . $port . ':' . $resolveAddress),
                 CURLOPT_HTTPHEADER => $requestHeaders,
                 CURLOPT_HEADERFUNCTION => function ($handle, $line) use (&$responseHeaders) {
-                    $line = trim((string) $line);
-                    if ($line === '' || strpos($line, ':') === false) {
-                        return strlen((string) $line) + 2;
+                    // 必须原样返回接收到的字节数：头可能被分块截断（如 "\r"、"\n"），
+                    // 返回值与实际长度不符会触发 CURLE_WRITE_ERROR
+                    $raw = (string) $line;
+                    $length = strlen($raw);
+                    $trimmed = trim($raw);
+                    if ($trimmed === '' || strpos($trimmed, ':') === false) {
+                        return $length;
                     }
-                    list($name, $value) = explode(':', $line, 2);
+                    list($name, $value) = explode(':', $trimmed, 2);
                     $name = strtolower(trim($name));
                     if (in_array($name, array('retry-after', 'x-ratelimit-limit', 'x-ratelimit-remaining', 'x-ratelimit-reset', 'location'), true)) {
                         $responseHeaders[$name] = trim($value);
                     }
-                    return strlen((string) $line) + 2;
+                    return $length;
                 }
             ));
             $caInfo = self::findCaInfo();
