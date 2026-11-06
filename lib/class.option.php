@@ -52,6 +52,10 @@ class option
         $name = sqladds($name);
         $value = sqladds($value);
         if ($m->query("INSERT INTO `" . DB_PREFIX . "options` (`name`, `value`) VALUES ('{$name}','{$value}') ON DUPLICATE KEY UPDATE `value` = '{$value}';")) {
+            //防御模板误用 $i 作为循环变量破坏全局缓存：损坏时丢弃本次内存缓存，避免致命错误
+            if (!isset($i['opt']) || !is_array($i['opt'])) {
+                $i['opt'] = array();
+            }
             $i['opt'][$name] = $value;
             return true;
         } else {
@@ -71,6 +75,10 @@ class option
         $name = sqladds($name);
         $value = sqladds($value);
         if ($m->query("INSERT IGNORE INTO  `" . DB_PREFIX . "options` (`name`, `value`) VALUES ('{$name}', '{$value}');")) {
+            //同 option::set：全局缓存被破坏时降级为空数组，避免 "Cannot use a scalar value as an array"
+            if (!isset($i['opt']) || !is_array($i['opt'])) {
+                $i['opt'] = array();
+            }
             $i['opt'][$name] = $value;
             return true;
         } else {

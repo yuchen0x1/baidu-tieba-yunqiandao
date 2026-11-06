@@ -8,8 +8,8 @@ if (!defined('SYSTEM_FN')) {
     define('SYSTEM_FN', '百度贴吧云签到');
 }
 if (!defined('SYSTEM_VER')) {
-    define('SYSTEM_VER', '7.3.1');
+    define('SYSTEM_VER', '7.3.2');
 }
 if (!defined('SYSTEM_VER_NOTE')) {
-    define('SYSTEM_VER_NOTE', 'V7.3.1：更新通道限流回退与部署可靠性修复');
+    define('SYSTEM_VER_NOTE', 'V7.3.2：扫码绑定自动确认与成功提示');
 }

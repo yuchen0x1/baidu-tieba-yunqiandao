@@ -434,41 +434,112 @@ $bindMax = (option::get('bduss_num') != '0' && ISVIP != true && option::get('bdu
 <!-- PAGE2: NEWID -->
 <div id="newid" hidden>
   <script type="text/javascript">
-      $(document).ready(function(){
-          $("#addbdid_form").submit(function(e){
-              $('#addbdid_submit').attr('disabled',true);
-              $('#addbdid_prog').css({"display":""});
-              $('.addbdis_text').html('正在拉取验证信息...');
-              $('#addbdid_pb').css({"width":"25%"});
-              $.ajax({
-                  url:"ajax.php?mod=baiduid:qrlogin",
-                  async:true,
-                  dataType:"json",
-                  type:'POST',
-                  data: {
-                      'sign': $('#sign').val(),
-                      'csrf_token': $('input[name="csrf_token"]').val()
-                  },
-                  complete: function(x,y) {
-                      $('#addbdid_submit').removeAttr('disabled');
-                  },
-                  success: function(x) {
-                      if(x.error == 0) {
-                          $('#addbdid_msg').text('成功绑定百度账号：' + x.name);
-                          $('#addbdid_pb').css({"width":"100%"});
-                          $('#addbdid_prog').fadeOut(500);
-                          if (window.CS && CS.toast) { CS.toast('绑定成功', { type: 'success', body: x.name }); }
+  // 扫码绑定自动确认（V7.3.2）：向导弹窗打开期间自动轮询绑定状态，
+  // 手机扫码授权确认后无需手动点击，自动提示绑定成功并刷新页面。
+  // 注意：本脚本位于面板顶部，下方元素尚未解析，必须等 DOM 就绪后再初始化。
+  (function () {
+      function init() {
+      var panel = document.getElementById('newid');
+      var form = document.getElementById('addbdid_form');
+      if (!panel || !form || !document.getElementById('sign')) { return; }
+      var signInput = document.getElementById('sign');
+      var csrfInput = form.querySelector('input[name="csrf_token"]');
+      var msgBox = document.getElementById('addbdid_msg');
+      var submitBtn = document.getElementById('addbdid_submit');
+      var timer = null;
+      var polling = false;
+      var unknownCount = 0;
+      var finished = false;
+
+      function setMsg(text, tone) {
+          if (!msgBox) { return; }
+          msgBox.className = 'cs-alert ' + (tone || 'cs-alert-warning');
+          msgBox.innerHTML = '<svg class="cs-alert-icon" aria-hidden="true"><use href="#i-info"/></svg><div class="cs-alert-body"></div>';
+          msgBox.querySelector('.cs-alert-body').textContent = text;
+      }
+
+      function stopPolling() {
+          if (timer) { clearInterval(timer); timer = null; }
+      }
+
+      function checkOnce() {
+          if (polling || finished || !document.getElementById('sign')) { return; }
+          polling = true;
+          $.ajax({
+              url: 'ajax.php?mod=baiduid:qrlogin',
+              async: true,
+              dataType: 'json',
+              type: 'POST',
+              data: {
+                  'sign': signInput.value,
+                  'csrf_token': csrfInput ? csrfInput.value : ''
+              },
+              complete: function () { polling = false; },
+              success: function (x) {
+                  if (!x || typeof x.error === 'undefined') { return; }
+                  var err = String(x.error);
+                  if (err === '0') {
+                      // 授权确认并入库：提示成功后自动刷新（列表随即出现新账号）
+                      finished = true;
+                      stopPolling();
+                      setMsg('成功绑定百度账号：' + (x.name || ''), 'cs-alert-success');
+                      if (window.CS && CS.toast) { CS.toast('绑定成功', { type: 'success', body: x.name || '' }); }
+                      if (submitBtn) { submitBtn.disabled = true; }
+                      setTimeout(function () { window.location.reload(); }, 1200);
+                  } else if (err === '-1') {
+                      unknownCount = 0;
+                      setMsg('已扫码，请在手机上确认授权…', 'cs-alert-warning');
+                  } else if (err === '-2') {
+                      finished = true;
+                      stopPolling();
+                      setMsg('二维码已失效，请刷新页面重新扫码。', 'cs-alert-danger');
+                  } else if (Number(err) < -1) {
+                      // 业务错误（如重复绑定）：停止轮询并展示原因
+                      finished = true;
+                      stopPolling();
+                      setMsg(x.msg || '绑定失败，请刷新重试。', 'cs-alert-danger');
+                  } else {
+                      // 尚未扫码：继续等待；接近二维码有效期上限时提示重扫
+                      unknownCount++;
+                      if (unknownCount > 100) {
+                          finished = true;
+                          stopPolling();
+                          setMsg('二维码可能已失效，请刷新页面重新扫码。', 'cs-alert-danger');
                       } else {
-                          $('#addbdid_msg').text(x.msg);
+                          setMsg('等待扫码…请在手机上打开百度 APP 扫一扫', 'cs-alert-warning');
                       }
-                  },
-                  error: function(x) {
-                      $('#addbdid_prog').fadeOut(500);
-                      $('#addbdid_msg').text('操作失败，未知错误。这可能是网络原因所致，请刷新重试#2');
                   }
-              });
+              },
+              error: function () {
+                  // 网络抖动：保持轮询，等下一轮重试
+              }
           });
+      }
+
+      function startPolling() {
+          stopPolling();
+          timer = setInterval(checkOnce, 2500);
+          checkOnce();
+      }
+
+      // 手动「点击绑定」仍可用：立即检查一次
+      if (window.jQuery) {
+          jQuery(form).on('submit', function (e) { e.preventDefault(); checkOnce(); });
+      }
+
+      // 向导弹窗打开时开始轮询，关闭时停止（openBindWizard 切换 panel.hidden）
+      var observer = new MutationObserver(function () {
+          if (panel.hidden) { stopPolling(); } else { startPolling(); }
       });
+      observer.observe(panel, { attributes: true, attributeFilter: ['hidden'] });
+      if (!panel.hidden) { startPolling(); }
+      }
+      if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+      } else {
+          init();
+      }
+  })();
   </script>
 <div id="addbdid_prog" style="display:none">
   <b><span class="addbdis_text">正在拉取验证信息...</span></b><br/><br/>
@@ -516,6 +587,7 @@ $bindMax = (option::get('bduss_num') != '0' && ISVIP != true && option::get('bdu
     <div class="cs-collapse-body">
       <ul>
         <li>可直接点击 "网页授权" 并在新打开页授权，无需客户端扫码，非移动设备的UA可能会导致无法打开</li>
+        <li>扫码并授权后系统会自动完成绑定并提示成功，无需手动点击「点击绑定」</li>
         <li>若二维码失效请刷新本页以刷新二维码</li>
       </ul>
     </div>

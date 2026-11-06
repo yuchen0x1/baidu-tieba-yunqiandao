@@ -144,8 +144,8 @@ $hasApiTokenHero = !empty($tokenRow0['api_token_hash']);
             <td>
                 <select name="sign_retry_max" class="cs-form-control" style="width:auto;display:inline-block">
                     <option value="0" <?php if ($userRetryMax == 0) echo 'selected'; ?>>跟随全局（<?php echo $globalRetryMax > 0 ? $globalRetryMax . ' 次' : '未启用'; ?>）</option>
-                    <?php for ($i = 1; $i <= 5; $i++) { ?>
-                    <option value="<?php echo $i; ?>" <?php if ($userRetryMax == $i) echo 'selected'; ?>>重试 <?php echo $i; ?> 次</option>
+                    <?php for ($retryOption = 1; $retryOption <= 5; $retryOption++) { ?>
+                    <option value="<?php echo $retryOption; ?>" <?php if ($userRetryMax == $retryOption) echo 'selected'; ?>>重试 <?php echo $retryOption; ?> 次</option>
                     <?php } ?>
                 </select>
                 <div style="font-size:12px;color:var(--color-muted);margin-top:4px">
