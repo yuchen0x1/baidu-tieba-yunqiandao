@@ -9,6 +9,9 @@ if (isset($_GET['ok'])) {
 if (isset($_GET['retry_msg'])) {
     echo '<div class="cs-alert cs-alert-info"><svg class="cs-alert-icon" aria-hidden="true"><use href="#i-refresh"/></svg><div class="cs-alert-body">' . htmlspecialchars((string) $_GET['retry_msg'], ENT_QUOTES, 'UTF-8') . '</div></div>';
 }
+if (isset($_GET['restore_msg'])) {
+    echo '<div class="cs-alert cs-alert-success"><svg class="cs-alert-icon" aria-hidden="true"><use href="#i-check"/></svg><div class="cs-alert-body">' . htmlspecialchars((string) $_GET['restore_msg'], ENT_QUOTES, 'UTF-8') . '</div></div>';
+}
 
 // 一键复签失败贴吧表单
 $todayDay = date('d');

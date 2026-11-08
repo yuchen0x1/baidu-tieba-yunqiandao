@@ -8,7 +8,13 @@
  *   2. 兼容回退：api_token（全局 API Token）
  * 未配置任一 Token 时返回 403（未启用）。
  *
- * 调用方式：GET /metrics.php?token=xxx  或  Header: Authorization: Bearer xxx
+ * 调用方式（只接受请求头，V7.4 起不再接受 ?token= 查询参数）：
+ *   Header: Authorization: Bearer xxx
+ *   Header: X-API-Token: xxx
+ *
+ * 为什么不用查询参数：URL 会进入 Web/反代/CDN 访问日志、浏览器历史与 Referer，
+ * 长期 Token 一旦落日志即等于泄露。Prometheus 请在 scrape_config 里配
+ * authorization.credentials 或 headers，Uptime Kuma 等工具同理改用请求头。
  */
 
 define('SYSTEM_NO_UI', true);
@@ -16,8 +22,8 @@ define('SYSTEM_NO_CHECK_LOGIN', true);
 require dirname(__FILE__) . '/init.php';
 
 // ---------- 认证 ----------
-$provided = isset($_GET['token']) ? trim((string) $_GET['token']) : '';
-if ($provided === '' && isset($_SERVER['HTTP_AUTHORIZATION'])) {
+$provided = '';
+if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
     $auth = trim((string) $_SERVER['HTTP_AUTHORIZATION']);
     if (stripos($auth, 'Bearer ') === 0) {
         $provided = trim(substr($auth, 7));
@@ -26,22 +32,31 @@ if ($provided === '' && isset($_SERVER['HTTP_AUTHORIZATION'])) {
 if ($provided === '' && isset($_SERVER['HTTP_X_API_TOKEN'])) {
     $provided = trim((string) $_SERVER['HTTP_X_API_TOKEN']);
 }
+// 旧版允许 ?token=xxx，会让 Token 落进各类访问日志，故直接拒绝并给出迁移指引
+$queryTokenProvided = isset($_GET['token']) && trim((string) $_GET['token']) !== '';
 $metricsToken = (string) option::get('metrics_token');
 require_once SYSTEM_ROOT . '/lib/security.php';
 $valid = false;
-if ($metricsToken !== '') {
-    //兼容哈希存储与明文存储（历史手工配置），推荐库里只存 SHA-256
-    $valid = api_token_matches($metricsToken, $provided);
-} else {
-    $apiToken = (string) option::get('api_token');
-    if ($apiToken !== '') {
-        //与 api.php 一致：兼容哈希存储与升级前旧站的明文存储两种形态
-        $valid = api_token_matches($apiToken, $provided);
+if ($provided !== '') {
+    if ($metricsToken !== '') {
+        //兼容哈希存储与明文存储（历史手工配置），推荐库里只存 SHA-256
+        $valid = api_token_matches($metricsToken, $provided);
+    } else {
+        $apiToken = (string) option::get('api_token');
+        if ($apiToken !== '') {
+            //与 api.php 一致：兼容哈希存储与升级前旧站的明文存储两种形态
+            $valid = api_token_matches($apiToken, $provided);
+        }
     }
 }
 if (!$valid) {
     http_response_code(403);
     header('Content-Type: text/plain; charset=UTF-8');
+    if ($queryTokenProvided && $provided === '') {
+        die("# metrics 认证失败：V7.4 起不再接受 ?token= 查询参数（URL 会泄露到访问日志）。\n"
+            . "# 请改用请求头：Authorization: Bearer <token> 或 X-API-Token: <token>。\n"
+            . "# Prometheus 示例：authorization: { type: Bearer, credentials: \"<token>\" }\n");
+    }
     die("# metrics 未启用或 Token 无效\n");
 }
 

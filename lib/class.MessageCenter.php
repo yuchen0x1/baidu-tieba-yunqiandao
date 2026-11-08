@@ -38,9 +38,12 @@ class MessageCenter
             UNIQUE KEY `uk_uid_key` (`uid`, `msg_key`),
             KEY `uid_read` (`uid`, `is_read`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
-        // 自愈：确保拉取计划任务已注册（首次注册 nextrun=1，下轮 do.php 立即执行）
+        // 自愈：确保拉取计划任务已注册，但默认 enable=0。
+        // 百度的 replyme/atme 接口当前对纯 BDUSS 返回 needlogin=1（见 docs/feature-roadmap.md Phase 1），
+        // 保持启用只会让每个账号每小时白打一次被拦截的请求并污染任务日志。
+        // 管理员确认数据源可用后，可到「计划任务」页手动启用 system_message_pull。
         $m->query("INSERT IGNORE INTO `" . DB_PREFIX . "cron` (`name`, `orde`, `file`, `no`, `desc`, `freq`, `lastdo`, `nextrun`, `enable`)
-            VALUES ('system_message_pull', 0, 'lib/cron_system_message_pull.php', 0, '贴吧消息中心拉取（回复/@我聚合）', 3600, 0, 1, 1);");
+            VALUES ('system_message_pull', 0, 'lib/cron_system_message_pull.php', 0, '贴吧消息中心拉取（回复/@我聚合）——数据源恢复前默认停用', 3600, 0, 1, 0);");
     }
 
     /**

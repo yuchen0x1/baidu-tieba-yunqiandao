@@ -24,19 +24,19 @@ $healthTotal = $healthStats['ok'] + $healthStats['invalid'] + $healthStats['unkn
         <span class="hero-tag">未知 <?php echo (int) $healthStats['unknown']; ?></span>
     </div>
     <div class="hero-actions">
-        <form action="do.php?mod=runcron&cron=system_sign" method="post" target="_blank" style="display:inline;">
+        <?php if (isset($_GET['run_ok'])) { ?>
+        <span class="cs-badge cs-badge-success" role="status">已触发执行：<?php echo htmlspecialchars((string) $_GET['run_ok'], ENT_QUOTES, 'UTF-8'); ?></span>
+        <?php } ?>
+        <form action="setting.php?mod=admin:sign&run=system_sign" method="post" style="display:inline;">
             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
-            <input type="hidden" name="pw" value="<?php echo htmlspecialchars(option::get('cron_pw'), ENT_QUOTES, 'UTF-8'); ?>">
             <button type="submit" class="cs-btn cs-btn-primary cs-btn-sm"><svg class="cs-icon" style="width:12px;height:12px" aria-hidden="true"><use href="#i-check"/></svg> 立即执行全部签到</button>
         </form>
-        <form action="do.php?mod=runcron&cron=system_sign_retry" method="post" target="_blank" style="display:inline;">
+        <form action="setting.php?mod=admin:sign&run=system_sign_retry" method="post" style="display:inline;">
             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
-            <input type="hidden" name="pw" value="<?php echo htmlspecialchars(option::get('cron_pw'), ENT_QUOTES, 'UTF-8'); ?>">
             <button type="submit" class="cs-btn cs-btn-secondary cs-btn-sm"><svg class="cs-icon" style="width:12px;height:12px" aria-hidden="true"><use href="#i-refresh"/></svg> 立即复签失败贴吧</button>
         </form>
-        <form action="do.php?mod=runcron&cron=system_health_check" method="post" target="_blank" style="display:inline;">
+        <form action="setting.php?mod=admin:sign&run=system_health_check" method="post" style="display:inline;">
             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
-            <input type="hidden" name="pw" value="<?php echo htmlspecialchars(option::get('cron_pw'), ENT_QUOTES, 'UTF-8'); ?>">
             <button type="submit" class="cs-btn cs-btn-secondary cs-btn-sm"><svg class="cs-icon" style="width:12px;height:12px" aria-hidden="true"><use href="#i-pulse"/></svg> 手动健康度检查</button>
         </form>
     </div>

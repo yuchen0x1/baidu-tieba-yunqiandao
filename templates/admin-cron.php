@@ -99,9 +99,8 @@ foreach ($runs as $r) {
     </div>
     <div class="hero-actions">
         <a href="index.php?mod=admin:editcron" class="cs-btn cs-btn-primary cs-btn-sm">+ 添加新计划任务</a>
-        <form action="do.php" method="post" style="display:inline;">
+        <form action="setting.php?mod=admin:cron&runall" method="post" style="display:inline;">
             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
-            <input type="hidden" name="pw" value="<?php echo htmlspecialchars(option::get('cron_pw'), ENT_QUOTES, 'UTF-8'); ?>">
             <button type="submit" class="cs-btn cs-btn-secondary cs-btn-sm">运行全部计划任务</button>
         </form>
     </div>

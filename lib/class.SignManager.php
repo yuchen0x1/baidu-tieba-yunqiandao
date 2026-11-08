@@ -234,6 +234,11 @@ class SignManager
 
     /**
      * 恢复指定账号的贴吧签到（仅账号所有者或管理员可调用）。
+     *
+     * 恢复前会先实测 BDUSS 是否仍有效：已失效的凭据即使恢复，下一轮签到也必然再失败，
+     * 用户只会看到"恢复了又停用"的假闭环。凭据无效时直接拒绝并要求重新绑定。
+     *
+     * @return array{ok:bool,msg:string} ok=false 时 msg 为可直接展示的原因
      */
     public static function restoreBaiduid($pid, $uid = 0)
     {
@@ -241,9 +246,18 @@ class SignManager
         $pid = (int) $pid;
         $uid = (int) $uid;
         $ownerWhere = $uid > 0 ? ' AND `uid` = ' . $uid : '';
-        $account = $m->once_fetch_array("SELECT `id`, `uid` FROM `" . DB_PREFIX . "baiduid` WHERE `id` = {$pid}{$ownerWhere} LIMIT 1");
+        $account = $m->once_fetch_array("SELECT `id`, `uid`, `bduss` FROM `" . DB_PREFIX . "baiduid` WHERE `id` = {$pid}{$ownerWhere} LIMIT 1");
         if (empty($account)) {
-            return false;
+            return array('ok' => false, 'msg' => '账号不存在或无权恢复');
+        }
+        $bduss = (string) P::decrypt($account['bduss']);
+        if ($bduss === '') {
+            return array('ok' => false, 'msg' => '凭据无法解密，请重新绑定该账号后再恢复签到');
+        }
+        //先按健康检查的同一口径实测凭据：通过则顺带把健康状态重置为正常，
+        //失败则维持失效状态并返回原因（账号已停用，重复停用不会产生额外通知）
+        if (!self::checkBaiduidHealth($pid, $bduss)) {
+            return array('ok' => false, 'msg' => '该账号 BDUSS 仍处于失效状态，已阻止恢复。请先重新绑定百度账号，再恢复签到。');
         }
         $ownerUid = (int) $account['uid'];
         require_once SYSTEM_ROOT . '/lib/security.php';
@@ -251,8 +265,7 @@ class SignManager
         foreach ($tables as $table) {
             $m->query("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` SET `no` = '0' WHERE `pid` = {$pid} AND `uid` = {$ownerUid}");
         }
-        $m->query("UPDATE `" . DB_PREFIX . self::HEALTH_TABLE . "` SET `status` = 'unknown', `fail_count` = 0, `error_msg` = NULL, `updated_at` = UNIX_TIMESTAMP() WHERE `pid` = {$pid}");
-        return true;
+        return array('ok' => true, 'msg' => '凭据验证通过，已恢复该账号的贴吧自动签到');
     }
     /**
      * 获取随机 UA

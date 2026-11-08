@@ -3,6 +3,7 @@
 }
 global $i;
 global $m;
+require_once SYSTEM_ROOT . '/lib/security.php'; // credential_mask：凭据默认掩码
 $allowBind = (option::get('bduss_num') != '-1' || ISVIP);
 ?>
 
@@ -101,6 +102,7 @@ $bindMax = (option::get('bduss_num') != '0' && ISVIP != true && option::get('bdu
       <th style="width:20%">Portrait</th>
       <th style="width:30%">BDUSS</th>
       <th style="width:20%">STOKEN</th>
+      <th style="width:70px">凭据</th>
       <th style="min-width:170px">操作</th>
     </tr>
   </thead>
@@ -195,8 +197,13 @@ $bindMax = (option::get('bduss_num') != '0' && ISVIP != true && option::get('bdu
         $hColor = $hScore >= 80 ? '#3cb45a' : ($hScore >= 60 ? '#ff9800' : '#e53935');
         echo '<td style="white-space:nowrap"><span class="cs-badge" style="font-size:12px;white-space:nowrap;background:' . $hColor . '22;color:' . $hColor . '" title="' . htmlspecialchars(implode('，', $hParts), ENT_QUOTES, 'UTF-8') . '">健康度 ' . $hScore . '</span></td>';
         echo '<td><input type="text" class="form-control" readonly value="' . htmlspecialchars($i['user']['baidu_portrait'][$key], ENT_QUOTES, 'UTF-8') . '"></td>';
-        echo '<td><input type="text" class="form-control" readonly value="' . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . '"></td>';
-        echo '<td><input type="text" class="form-control" readonly value="' . htmlspecialchars($i['user']['stoken'][$key], ENT_QUOTES, 'UTF-8') . '"></td>';
+        //凭据默认掩码，不把明文写进 HTML 源码；点「显示」才经 AJAX 按需解密（见 ajax.php baiduid:credential）
+        $bdussMask = credential_mask($value);
+        $stokenRaw = isset($i['user']['stoken'][$key]) ? (string) $i['user']['stoken'][$key] : '';
+        $stokenMask = $stokenRaw !== '' ? credential_mask($stokenRaw) : '（未设置）';
+        echo '<td><input type="text" class="form-control cred-field" readonly data-pid="' . (int) $key . '" data-kind="bduss" value="' . htmlspecialchars($bdussMask, ENT_QUOTES, 'UTF-8') . '" title="默认隐藏完整凭据，点击右侧「显示」查看"></td>';
+        echo '<td><input type="text" class="form-control cred-field" readonly data-pid="' . (int) $key . '" data-kind="stoken" value="' . htmlspecialchars($stokenMask, ENT_QUOTES, 'UTF-8') . '" title="默认隐藏完整凭据，点击右侧「显示」查看"></td>';
+        echo '<td><button type="button" class="cs-btn cs-btn-ghost cs-btn-sm cred-toggle" data-pid="' . (int) $key . '">显示</button></td>';
         echo '<td><div style="display:flex;flex-direction:column;gap:6px">';
         echo '<form method="post" action="setting.php" style="display:inline" data-confirm="确定要解绑该账号吗？解绑后其贴吧数据将一并清除。">';
         echo '<input type="hidden" name="mod" value="baiduid">';
@@ -425,6 +432,76 @@ $bindMax = (option::get('bduss_num') != '0' && ISVIP != true && option::get('bdu
                 }
             });
         });
+
+        //凭据明文按需加载：默认只显示掩码，点「显示」才向服务端取一次明文，
+        //「隐藏」立即清空内存中的明文，避免凭据长期留在页面与 DOM 快照里。
+        var credCache = {};
+        $('.cred-toggle').on('click', function () {
+            var $btn = $(this);
+            var pid = String($btn.data('pid'));
+            var $fields = $('.cred-field[data-pid="' + pid + '"]');
+            if ($btn.text() === '显示') {
+                if (credCache[pid]) {
+                    applyCred(pid, credCache[pid]);
+                    $btn.text('隐藏');
+                    return;
+                }
+                $btn.prop('disabled', true).text('取回中…');
+                $.ajax({
+                    url: 'ajax.php?mod=baiduid:credential',
+                    dataType: 'json',
+                    type: 'POST',
+                    data: { 'pid': pid, 'csrf_token': $('input[name="csrf_token"]').val() },
+                    success: function (x) {
+                        $btn.prop('disabled', false);
+                        if (!x || x.error !== 0) {
+                            $btn.text('显示');
+                            var m = (x && x.msg) || '凭据取回失败';
+                            if (window.CS && CS.toast) { CS.toast('无法显示凭据', { type: 'warning', body: m }); }
+                            else { alert(m); }
+                            return;
+                        }
+                        credCache[pid] = x;
+                        applyCred(pid, x);
+                        $btn.text('隐藏');
+                    },
+                    error: function () {
+                        $btn.prop('disabled', false).text('显示');
+                        alert('请求失败，请稍后重试');
+                    }
+                });
+            } else {
+                //先取缓存再删除：STOKEN 从未设置时要还原成「（未设置）」而不是打码
+                var cached = credCache[pid];
+                delete credCache[pid];
+                $fields.each(function () {
+                    var kind = $(this).data('kind');
+                    if (kind === 'stoken' && cached && !cached.stoken_present) {
+                        $(this).val('（未设置）');
+                        return;
+                    }
+                    $(this).val(maskFallback($(this).val()));
+                });
+                $btn.text('显示');
+            }
+        });
+
+        function applyCred(pid, data) {
+            $('.cred-field[data-pid="' + pid + '"]').each(function () {
+                var kind = $(this).data('kind');
+                var v = kind === 'stoken' ? data.stoken : data.bduss;
+                if (kind === 'stoken' && !data.stoken_present) { $(this).val('（未设置）'); return; }
+                $(this).val(v || '');
+            });
+        }
+
+        //再次隐藏时按已显示明文长度重建掩码；未取回过则保持原掩码不变
+        function maskFallback(current) {
+            if (!current || current.indexOf('*') !== -1) { return current; }
+            var len = current.length;
+            if (len < 12) { return new Array(Math.min(12, Math.max(4, len)) + 1).join('*'); }
+            return current.slice(0, 4) + new Array(Math.min(24, Math.max(8, len - 8)) + 1).join('*') + current.slice(-4);
+        }
     })();
 </script>
     <?php

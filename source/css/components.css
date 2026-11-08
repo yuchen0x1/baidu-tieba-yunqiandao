@@ -106,18 +106,28 @@
 .cs-btn-lg { min-height: 46px; padding: 0 var(--space-5); font-size: var(--fs-md); }
 .cs-btn-block { display: flex; width: 100%; }
 
-/* loading 态 */
+/* loading 态
+ * 文字用 color:transparent 隐藏，但 spinner 若沿用 currentColor 会一起变透明，
+ * 导致按钮只剩禁用态、看不到任何进行中指示。故 spinner 单独取色：
+ * 浅底按钮用品牌色，实心按钮（文字为白）用白色。 */
 .cs-btn[data-loading="true"] {
   position: relative;
   color: transparent !important;
   pointer-events: none;
+  --cs-btn-loading-color: var(--color-brand);
+}
+.cs-btn-primary[data-loading="true"],
+.cs-btn-success[data-loading="true"],
+.cs-btn-warning[data-loading="true"],
+.cs-btn-danger[data-loading="true"] {
+  --cs-btn-loading-color: #fff;
 }
 .cs-btn[data-loading="true"]::after {
   content: "";
   position: absolute;
   width: 16px;
   height: 16px;
-  border: 2px solid currentColor;
+  border: 2px solid var(--cs-btn-loading-color, var(--color-brand));
   border-top-color: transparent;
   border-radius: 50%;
   animation: cs-spin var(--motion-slower) linear infinite;

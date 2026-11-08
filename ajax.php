@@ -357,6 +357,45 @@ switch (SYSTEM_PAGE) {
         echo $out;
         die;
 
+    case 'baiduid:credential':
+        //按需解密单个账号的 BDUSS/STOKEN：页面默认只渲染掩码，避免凭据进入 HTML 源码、
+        //浏览器缓存与截图；仅本人（或管理员控制模式）且携带 CSRF 时才返回明文。
+        global $m;
+        if (!defined('UID')) {
+            msg('请先登录');
+        }
+        $crPid = isset($_POST['pid']) ? (int) $_POST['pid'] : 0;
+        if ($crPid <= 0) {
+            echo json_encode(array('error' => 1, 'msg' => '缺少账号参数'), JSON_UNESCAPED_UNICODE);
+            die;
+        }
+        $crSql = "SELECT `id`, `uid`, `bduss`, `stoken` FROM `" . DB_PREFIX . "baiduid` WHERE `id` = ?";
+        $crParams = array($crPid);
+        if (!ISADMIN) {
+            $crSql .= " AND `uid` = ?";
+            $crParams[] = (int) UID;
+        }
+        $crSql .= " LIMIT 1";
+        $crRs = $m->pquery($crSql, $crParams);
+        $crRow = $crRs !== false ? $crRs->fetch_array() : false;
+        if (empty($crRow)) {
+            echo json_encode(array('error' => 1, 'msg' => '账号不存在或无权访问'), JSON_UNESCAPED_UNICODE);
+            die;
+        }
+        $crBduss = (string) P::decrypt($crRow['bduss']);
+        $crStoken = (string) P::decrypt($crRow['stoken']);
+        if ($crBduss === '') {
+            echo json_encode(array('error' => 2, 'msg' => '凭据无法解密，请重新绑定该账号'), JSON_UNESCAPED_UNICODE);
+            die;
+        }
+        echo json_encode(array(
+            'error' => 0,
+            'bduss' => $crBduss,
+            'stoken' => $crStoken,
+            'stoken_present' => $crStoken !== '',
+        ), JSON_UNESCAPED_UNICODE);
+        die;
+
     case 'baiduid:getverify':
         global $m;
         if (option::get('bduss_num') == '-1' && ROLE != 'admin') {

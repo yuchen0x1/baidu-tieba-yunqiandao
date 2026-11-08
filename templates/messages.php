@@ -52,7 +52,7 @@ if (!function_exists('message_relative_time')) {
 <section class="dashboard-hero">
     <div class="eyebrow hero-eyebrow">Messages / <?php echo date('Y-m-d'); ?></div>
     <h1>贴吧消息中心</h1>
-    <p>聚合展示已绑定百度账号的「回复我的 / @我的」消息，每小时自动拉取一次。</p>
+    <p>聚合展示已绑定百度账号的「回复我的 / @我的」消息。百度消息接口当前对本站返回拦截，拉取任务默认停用；接口恢复后可在「计划任务」页启用 system_message_pull。</p>
     <div class="dashboard-hero-meta">
         <span class="hero-tag">未读 <?php echo (int) $unreadCount; ?> 条</span>
         <span class="hero-tag">共 <?php echo (int) $total; ?> 条消息</span>
@@ -89,7 +89,7 @@ if (!function_exists('message_relative_time')) {
             <tbody>
             <?php if (empty($rows)) { ?>
                 <tr><td colspan="6" style="text-align:center;padding:24px;color:var(--color-muted)">
-                    暂无消息。绑定并保持百度账号有效后，系统会每小时自动拉取。
+                    暂无消息。拉取任务当前默认停用（百度消息接口暂不可用），启用后才会自动拉取。
                 </td></tr>
             <?php } else { foreach ($rows as $row) {
                 $isUnread = $row['is_read'] == 0;

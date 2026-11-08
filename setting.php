@@ -650,6 +650,18 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
         template('admin-totp');
         loadfoot();
         break;
+    case 'admin:sign':
+        // 签到看板的「立即执行」按钮改走管理员会话 + CSRF，
+        // 不再把长期计划任务密码渲染进页面 HTML（原 do.php?pw= 形态会把密码写进
+        // 访问日志与浏览器历史）。任务名走白名单，避免任意任务被触发。
+        $signRunTask = isset($_GET['run']) ? (string) $_GET['run'] : '';
+        if (!in_array($signRunTask, array('system_sign', 'system_sign_retry', 'system_health_check'), true)) {
+            msg('未指定可执行的任务');
+        }
+        cron::runOnce($signRunTask);
+        Redirect('index.php?mod=admin:sign&run_ok=' . urlencode($signRunTask));
+
+        break;
     case 'admin:cron':
         doAction('cron_setting_1');
         if (!empty($_GET['act']) && preg_match('/^[A-Za-z0-9_]+$/', (string) $_GET['act'])) {
@@ -674,6 +686,9 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
         } elseif (isset($_GET['run']) && preg_match('/^[A-Za-z0-9_]+$/', (string) $_GET['run'])) {
             // V5.13：完整执行单个任务（加锁→执行→记录→排程）
             cron::runOnce($_GET['run']);
+        } elseif (isset($_GET['runall'])) {
+            // 运行全部到期任务：走管理员会话 + CSRF，避免把计划任务密码写进页面 HTML
+            cron::runall();
         } elseif (isset($_GET['retry']) && preg_match('/^[A-Za-z0-9_]+$/', (string) $_GET['retry'])) {
             // V5.13：手动重试，先清零重试计数再立即执行
             cron::aset($_GET['retry'], array('retry' => 0, 'nextrun' => 0));
@@ -906,10 +921,12 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
                 msg('无效的账号参数');
             }
             $restorePid = (int) $restorePidRaw;
-            if (!SignManager::restoreBaiduid($restorePid, ISADMIN ? 0 : UID)) {
-                msg('账号不存在或无权恢复');
+            $restoreResult = SignManager::restoreBaiduid($restorePid, ISADMIN ? 0 : UID);
+            if (empty($restoreResult['ok'])) {
+                //凭据失效等业务原因需要原样展示，权限类错误保持原有提示
+                msg(htmlspecialchars((string) $restoreResult['msg'], ENT_QUOTES, 'UTF-8'));
             }
-            Redirect('index.php?mod=showtb&ok');
+            Redirect('index.php?mod=showtb&restore_msg=' . urlencode((string) $restoreResult['msg']));
         } elseif (isset($_GET['set'])) {
             $x = $m->once_fetch_array('SELECT * FROM `' . DB_NAME . '`.`' . DB_PREFIX . TABLE . '` WHERE `uid` = ' . (int) UID . ' LIMIT 1');
             $f = isset($x['tieba']) ? $x['tieba'] : '';

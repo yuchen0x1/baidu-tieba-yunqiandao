@@ -296,3 +296,25 @@ if (!function_exists('api_token_matches')) {
         return hash_equals($stored, hash('sha256', $provided));
     }
 }
+
+if (!function_exists('credential_mask')) {
+    /**
+     * 把敏感凭据渲染为掩码形态：只保留首尾少量字符供比对，中间全部打码。
+     * 用于账号列表等场景，避免 BDUSS/STOKEN 明文进入 HTML 源码与截图。
+     * 长度不足 12 时整体打码（不泄露长度信息）。
+     */
+    function credential_mask($value)
+    {
+        $value = (string) $value;
+        if ($value === '') {
+            return '';
+        }
+        $len = strlen($value);
+        if ($len < 12) {
+            return str_repeat('*', min(12, max(4, $len)));
+        }
+        $head = substr($value, 0, 4);
+        $tail = substr($value, -4);
+        return $head . str_repeat('*', min(24, max(8, $len - 8))) . $tail;
+    }
+}
