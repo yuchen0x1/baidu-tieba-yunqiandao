@@ -64,3 +64,26 @@ function parse_database_endpoint($endpoint)
     }
     return array('host' => $endpoint, 'port' => null);
 }
+
+/**
+ * 判断当前请求是否为 HTTPS（含反向代理场景）。
+ *
+ * 供 set_site_cookie()、session_boot() 等安全属性决策统一使用，
+ * 避免各处自行判断 $_SERVER['HTTPS'] 而漏掉 X-Forwarded-Proto。
+ * @return bool
+ */
+function request_is_https()
+{
+    if (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off') {
+        return true;
+    }
+    if (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443) {
+        return true;
+    }
+    //反向代理（Caddy/nginx 转发 HTTPS）场景
+    if (isset($_SERVER['HTTP_X_FORWARDED_PROTO'])
+        && strtolower(trim((string) $_SERVER['HTTP_X_FORWARDED_PROTO'])) === 'https') {
+        return true;
+    }
+    return false;
+}

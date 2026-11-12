@@ -301,6 +301,29 @@ final class SecurityHardeningTest extends TestCase
         }
     }
 
+    public function testOptionSetUsesRawValuesForDatabaseAndRuntimeCache(): void
+    {
+        global $m, $i;
+        $previousM = $m ?? null;
+        $previousI = $i ?? null;
+        $db = $this->makeRecordingDb();
+        $m = $db;
+        $i = array('opt' => array());
+
+        try {
+            $value = "path\\with\\quote'and\\slashes";
+            $this->assertTrue(option::set('quoted_option', $value));
+            $this->assertCount(1, $db->prepared);
+            $this->assertStringContainsString('INSERT INTO `test_options`', $db->prepared[0][0]);
+            $this->assertSame(array('quoted_option', $value), $db->prepared[0][1]);
+            $this->assertSame($value, $i['opt']['quoted_option']);
+            $this->assertSame($value, option::get('quoted_option'));
+        } finally {
+            $m = $previousM;
+            $i = $previousI;
+        }
+    }
+
     public function testSignManagerLogRunsCreateTableAtMostOncePerRequest(): void
     {
         global $m;

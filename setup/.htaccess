@@ -1,0 +1,7 @@
+# 安装目录：install.php / update.php 需要可访问，但 SQL 模板与迁移源码不应被下载。
+# .sql 中含表结构与默认配置项，.original.php 是历史安装器残留。
+<FilesMatch "\.(sql|original\.php)$">
+    Require all denied
+    Order allow,deny
+    Deny from all
+</FilesMatch>

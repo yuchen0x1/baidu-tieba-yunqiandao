@@ -129,7 +129,7 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
 		</div><br/>
 		<div class="input-group">
 			  <span class="input-group-addon">密码(可选)</span>
-			  <input type="text" class="form-control" name="proxy_pass" value="' . htmlspecialchars(option::get('proxy_pass'), ENT_QUOTES, 'UTF-8') . '">
+			  <input type="password" class="form-control" name="proxy_pass" value="" placeholder="' . htmlspecialchars(SecretBox::masked('proxy_pass') ?: '未配置，留空保持不变', ENT_QUOTES, 'UTF-8') . '" autocomplete="off">
 		</div>
 		</div>
 		</td></tr>';
@@ -146,11 +146,13 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
 		<div id="dama_set" style="' . ($damaType == 'chaojiying' ? '' : 'display:none') . '">
 		<div class="input-group">
 			  <span class="input-group-addon">账号</span>
-			  <input type="text" class="form-control" name="dama_username" value="' . htmlspecialchars(option::get('dama_username'), ENT_QUOTES, 'UTF-8') . '">
+			  <input type="password" class="form-control" name="dama_username" value="" placeholder="' . htmlspecialchars(SecretBox::masked('dama_username') ?: '未配置，留空保持不变', ENT_QUOTES, 'UTF-8') . '" autocomplete="off">
+			  ' . (SecretBox::has('dama_username') ? '<input type="hidden" name="clear_dama_username" value="0" class="secret-clear-flag"><button type="button" class="btn btn-xs btn-default secret-clear-btn" onclick="var f=this.previousElementSibling;f.value=f.value==\'1\'?\'0\':\'1\';this.textContent=f.value==\'1\'?\'已标记清空\':\'清空\'">清空</button>' : '') . '
 		</div><br/>
 		<div class="input-group">
 			  <span class="input-group-addon">密码</span>
-			  <input type="text" class="form-control" name="dama_password" value="' . htmlspecialchars(option::get('dama_password'), ENT_QUOTES, 'UTF-8') . '">
+			  <input type="password" class="form-control" name="dama_password" value="" placeholder="' . htmlspecialchars(SecretBox::masked('dama_password') ?: '未配置，留空保持不变', ENT_QUOTES, 'UTF-8') . '" autocomplete="off">
+			  ' . (SecretBox::has('dama_password') ? '<input type="hidden" name="clear_dama_password" value="0" class="secret-clear-flag"><button type="button" class="btn btn-xs btn-default secret-clear-btn" onclick="var f=this.previousElementSibling;f.value=f.value==\'1\'?\'0\':\'1\';this.textContent=f.value==\'1\'?\'已标记清空\':\'清空\'">清空</button>' : '') . '
 		</div><br/>
 		<div class="input-group">
 			  <span class="input-group-addon">软件ID(可选)</span>
@@ -195,7 +197,7 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
     } else {
         $content1['cron_asyn'] = array('html' => '<input type="number" name="cron_asyn" value="0" hidden>','type' => 'else');
     }
-    $content1['cron_pw'] = array('td1' => '<b>计划任务密码</b><br/>留空为无密码，不能包含空格等特殊字符<br/><a href="javascript:;" onclick="alert(\'你需要通过访问 <b>do.php?pw=密码</b> 执行计划任务<br/>例如：' . SYSTEM_URL . 'do.php?pw=yourpassword<br/><br/>若您要通过命令行执行计划任务，请加上参数 <b>--pw=密码</b><br/>例如：php do.php --pw=yourpassword<br/>命令行模式注意：你需要指明do.php的绝对路径，或者将do.php加入PATH\')">帮助：启用密码功能后如何执行计划任务？</a>','type' => 'text','text' => '','extra' => '');
+    $content1['cron_pw'] = array('html' => '<tr><td><b>计划任务密码</b><br/>留空为无密码，不能包含空格等特殊字符<br/><a href="javascript:;" onclick="alert(\'你需要通过访问 <b>do.php?pw=密码</b> 执行计划任务<br/>例如：' . SYSTEM_URL . 'do.php?pw=yourpassword<br/><br/>若您要通过命令行执行计划任务，请加上参数 <b>--pw=密码</b><br/>例如：php do.php --pw=yourpassword<br/>命令行模式注意：你需要指明do.php的绝对路径，或者将do.php加入PATH\')">帮助：启用密码功能后如何执行计划任务？</a></td><td><input type="password" class="form-control" name="cron_pw" value="" placeholder="' . htmlspecialchars(SecretBox::masked('cron_pw') ?: '未配置，留空保持不变', ENT_QUOTES, 'UTF-8') . '" autocomplete="off"></td></tr>','type' => 'else');
     $reg1 = option::get('enable_reg') == 1 ? ' checked' : '' ;
     $reg3 = option::get('yr_reg');
     $reg4 = option::get('stop_reg');
@@ -220,7 +222,8 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
 			<span class="input-group-addon">Client ID</span><input type="text" name="oauth_github_client_id" value="' . htmlspecialchars(option::get('oauth_github_client_id'), ENT_QUOTES, 'UTF-8') . '" class="form-control">
 		</div><br/>
 		<div class="input-group">
-			<span class="input-group-addon">Client Secret</span><input type="text" name="oauth_github_client_secret" value="' . htmlspecialchars(option::get('oauth_github_client_secret'), ENT_QUOTES, 'UTF-8') . '" class="form-control">
+			<span class="input-group-addon">Client Secret</span><input type="password" name="oauth_github_client_secret" value="" placeholder="' . htmlspecialchars(SecretBox::masked('oauth_github_client_secret') ?: '未配置，留空保持不变', ENT_QUOTES, 'UTF-8') . '" class="form-control" autocomplete="off">
+			' . (SecretBox::has('oauth_github_client_secret') ? '<input type="hidden" name="clear_oauth_github_client_secret" value="0"><button type="button" class="btn btn-xs btn-default secret-clear-btn" onclick="var f=this.previousElementSibling;f.value=f.value==\'1\'?\'0\':\'1\';this.textContent=f.value==\'1\'?\'已标记清空\':\'清空\'">清空</button>' : '') . '
 		</div><br/>
 		<label class="checkbox-inline"><input type="checkbox" name="oauth_auto_register" value="1"' . (option::get('oauth_auto_register') == '1' ? ' checked' : '') . '> 新 GitHub 用户自动注册本站账号（跳过邀请码，仅在上方"允许用户注册"开启时生效）</label>
 		</td></tr>';
@@ -326,7 +329,7 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
 
                     <div class="input-group">
                       <span class="input-group-addon">SMTP密码</span>
-                         <input type="text" onclick="$(this).attr('value','').attr('type','password').attr('name','mail_smtppw').removeAttr('readonly');" class="form-control" readonly value="保持原密码 ( 点击可以修改 )">
+                         <input type="password" name="mail_smtppw" class="form-control" value="" placeholder="<?php echo htmlspecialchars(SecretBox::masked('mail_smtppw') ?: '未配置，留空保持不变', ENT_QUOTES, 'UTF-8'); ?>" autocomplete="off">
                     </div><br/>
                 </div>
             </div>
@@ -375,11 +378,11 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
         </div><br/>
         <div class="input-group">
             <span class="input-group-addon">Server酱 SendKey</span>
-            <input type="text" name="notify_serverchan_key" class="form-control" value="<?php echo htmlspecialchars(option::get('notify_serverchan_key'), ENT_QUOTES, 'UTF-8'); ?>" placeholder="sctp...">
+            <input type="password" name="notify_serverchan_key" class="form-control" value="" placeholder="<?php echo htmlspecialchars(SecretBox::masked('notify_serverchan_key') ?: '未配置，留空保持不变', ENT_QUOTES, 'UTF-8'); ?>" autocomplete="off">
         </div><br/>
         <div class="input-group">
             <span class="input-group-addon">Telegram Token</span>
-            <input type="text" name="notify_telegram_token" class="form-control" value="<?php echo htmlspecialchars(option::get('notify_telegram_token'), ENT_QUOTES, 'UTF-8'); ?>" placeholder="123456:ABC...">
+            <input type="password" name="notify_telegram_token" class="form-control" value="" placeholder="<?php echo htmlspecialchars(SecretBox::masked('notify_telegram_token') ?: '未配置，留空保持不变', ENT_QUOTES, 'UTF-8'); ?>" autocomplete="off">
         </div><br/>
         <div class="input-group">
             <span class="input-group-addon">Telegram Chat ID</span>
@@ -387,35 +390,35 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
         </div><br/>
         <div class="input-group">
             <span class="input-group-addon">Bark URL</span>
-            <input type="text" name="notify_bark_url" class="form-control" value="<?php echo htmlspecialchars(option::get('notify_bark_url'), ENT_QUOTES, 'UTF-8'); ?>" placeholder="https://api.day.app/your-key">
+            <input type="password" name="notify_bark_url" class="form-control" value="" placeholder="<?php echo htmlspecialchars(SecretBox::masked('notify_bark_url') ?: '未配置，留空保持不变', ENT_QUOTES, 'UTF-8'); ?>" autocomplete="off">
         </div><br/>
         <div class="input-group">
             <span class="input-group-addon">PushPlus Token</span>
-            <input type="text" name="notify_pushplus_token" class="form-control" value="<?php echo htmlspecialchars(option::get('notify_pushplus_token'), ENT_QUOTES, 'UTF-8'); ?>" placeholder="your-token">
+            <input type="password" name="notify_pushplus_token" class="form-control" value="" placeholder="<?php echo htmlspecialchars(SecretBox::masked('notify_pushplus_token') ?: '未配置，留空保持不变', ENT_QUOTES, 'UTF-8'); ?>" autocomplete="off">
         </div><br/>
         <div class="input-group">
             <span class="input-group-addon">Webhook URL</span>
-            <input type="text" name="notify_webhook_url" class="form-control" value="<?php echo htmlspecialchars(option::get('notify_webhook_url'), ENT_QUOTES, 'UTF-8'); ?>" placeholder="https://example.com/hook">
+            <input type="password" name="notify_webhook_url" class="form-control" value="" placeholder="<?php echo htmlspecialchars(SecretBox::masked('notify_webhook_url') ?: '未配置，留空保持不变', ENT_QUOTES, 'UTF-8'); ?>" autocomplete="off">
         </div><br/>
         <div class="input-group">
             <span class="input-group-addon">钉钉 Webhook</span>
-            <input type="text" name="notify_dingtalk_webhook" class="form-control" value="<?php echo htmlspecialchars(option::get('notify_dingtalk_webhook'), ENT_QUOTES, 'UTF-8'); ?>" placeholder="https://oapi.dingtalk.com/robot/send?access_token=...">
+            <input type="password" name="notify_dingtalk_webhook" class="form-control" value="" placeholder="<?php echo htmlspecialchars(SecretBox::masked('notify_dingtalk_webhook') ?: '未配置，留空保持不变', ENT_QUOTES, 'UTF-8'); ?>" autocomplete="off">
         </div><br/>
         <div class="input-group">
             <span class="input-group-addon">钉钉加签密钥</span>
-            <input type="text" name="notify_dingtalk_secret" class="form-control" value="<?php echo htmlspecialchars(option::get('notify_dingtalk_secret'), ENT_QUOTES, 'UTF-8'); ?>" placeholder="SEC 开头，未开启加签可留空">
+            <input type="password" name="notify_dingtalk_secret" class="form-control" value="" placeholder="<?php echo htmlspecialchars(SecretBox::masked('notify_dingtalk_secret') ?: '未配置，留空保持不变', ENT_QUOTES, 'UTF-8'); ?>" autocomplete="off">
         </div><br/>
         <div class="input-group">
             <span class="input-group-addon">企业微信 Webhook</span>
-            <input type="text" name="notify_wecom_webhook" class="form-control" value="<?php echo htmlspecialchars(option::get('notify_wecom_webhook'), ENT_QUOTES, 'UTF-8'); ?>" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=...">
+            <input type="password" name="notify_wecom_webhook" class="form-control" value="" placeholder="<?php echo htmlspecialchars(SecretBox::masked('notify_wecom_webhook') ?: '未配置，留空保持不变', ENT_QUOTES, 'UTF-8'); ?>" autocomplete="off">
         </div><br/>
         <div class="input-group">
             <span class="input-group-addon">飞书 Webhook</span>
-            <input type="text" name="notify_feishu_webhook" class="form-control" value="<?php echo htmlspecialchars(option::get('notify_feishu_webhook'), ENT_QUOTES, 'UTF-8'); ?>" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/...">
+            <input type="password" name="notify_feishu_webhook" class="form-control" value="" placeholder="<?php echo htmlspecialchars(SecretBox::masked('notify_feishu_webhook') ?: '未配置，留空保持不变', ENT_QUOTES, 'UTF-8'); ?>" autocomplete="off">
         </div><br/>
         <div class="input-group">
             <span class="input-group-addon">WxPusher AppToken</span>
-            <input type="text" name="notify_wxpusher_token" class="form-control" value="<?php echo htmlspecialchars(option::get('notify_wxpusher_token'), ENT_QUOTES, 'UTF-8'); ?>" placeholder="AT_...">
+            <input type="password" name="notify_wxpusher_token" class="form-control" value="" placeholder="<?php echo htmlspecialchars(SecretBox::masked('notify_wxpusher_token') ?: '未配置，留空保持不变', ENT_QUOTES, 'UTF-8'); ?>" autocomplete="off">
         </div><br/>
         <div class="input-group">
             <span class="input-group-addon">WxPusher UID</span>
@@ -436,7 +439,8 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
     <?php
     $notifyhtml = ob_get_clean();
     $content1['notify'] = array('html' => $notifyhtml,'type' => 'else');
-    $content1['api_token'] = array('td1' => '<b>开放 API Token</b><br/>留空为禁用 API。设置后可通过 <code>api.php?action=status</code> 等接口访问（需带 Bearer Token 头）', 'type' => 'text', 'text' => '', 'extra' => 'autocomplete="off" placeholder="随机字符串"');
+    $content1['api_token'] = array('html' => '<tr><td><b>开放 API Token</b><br/>留空为禁用 API。设置后可通过 <code>api.php?action=status</code> 等接口访问（需带 Bearer Token 头）<br/><span class="text-muted">Token 只存哈希不存明文，此处不回显已配置值</span></td><td><input type="password" class="form-control" name="api_token" value="" placeholder="' . ((option::get('api_token') !== '' && option::get('api_token') !== null) ? '已配置，留空保持不变' : '未配置，输入随机字符串') . '" autocomplete="off"><input type="hidden" name="clear_api_token" value="0"><button type="button" class="btn btn-xs btn-default secret-clear-btn" onclick="var f=this.previousElementSibling;f.value=f.value==\'1\'?\'0\':\'1\';this.textContent=f.value==\'1\'?\'已标记清空\':\'清空\'">清空</button></td></tr>', 'type' => 'else');
+    $content1['metrics_token'] = array('html' => '<tr><td><b>监控指标 Token</b><br/>供 Prometheus / Uptime Kuma 抓取 <code>/metrics.php</code> 使用<br/>留空则回退到上方 API Token；同样只存哈希不回显</td><td><input type="password" class="form-control" name="metrics_token" value="" placeholder="' . ((option::get('metrics_token') !== '' && option::get('metrics_token') !== null) ? '已配置，留空保持不变' : '未配置，输入随机字符串') . '" autocomplete="off"><input type="hidden" name="clear_metrics_token" value="0"><button type="button" class="btn btn-xs btn-default secret-clear-btn" onclick="var f=this.previousElementSibling;f.value=f.value==\'1\'?\'0\':\'1\';this.textContent=f.value==\'1\'?\'已标记清空\':\'清空\'">清空</button></td></tr>', 'type' => 'else');
     echo former::create($set1, $content1);
 }
 ?>

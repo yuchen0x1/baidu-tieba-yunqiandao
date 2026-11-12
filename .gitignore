@@ -17,7 +17,12 @@ vendor/
 
 # 运行产物（不入库）
 data/log/
+data/cache/
+setup/update_cache/
 plugins/.rollback/
+
+# 本地升级过程的临时状态目录（正式报告已归档到 docs/reports/）
+.autonomous-upgrade/
 
 # 官方服务/密钥安全边界（private key / 实例库不入开源仓库）
 official-service/keys/

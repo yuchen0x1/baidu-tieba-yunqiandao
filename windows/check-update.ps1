@@ -1,6 +1,6 @@
 ﻿param(
     [string]$Repository = "yuchen0x1/baidu-tieba-yunqiandao",
-    [string]$CurrentVersion = "7.4.0"
+    [string]$CurrentVersion = "7.5.0"
 )
 
 # Online update checks use GitHub Releases only.

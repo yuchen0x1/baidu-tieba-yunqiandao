@@ -1,6 +1,11 @@
 <?php
 // @lint-ignore 本文件是扫描器本身，内含危险模式规则字符串，故豁免自检。
 
+// CLI 守卫：本工具为命令行专用，Web 访问时拒绝执行
+if (PHP_SAPI !== 'cli') {
+    die('仅支持命令行运行：php tools/lint.php');
+}
+
 $root = dirname(__DIR__);
 $iterator = new RecursiveIteratorIterator(
     new RecursiveCallbackFilterIterator(

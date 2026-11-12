@@ -1,0 +1,51 @@
+# 百度贴吧云签到 · 容器内 Caddy 配置
+#
+# 为什么单独成文件：此前 Caddyfile 由 Dockerfile 里一行 echo -e 生成，
+# 无法审查、无法 diff、也不方便加访问控制。root 是站点根目录，file_server
+# 默认会把 data/、tools/、tests/、setup/*.sql 原样当静态文件对外提供——
+# 数据库备份（含加密 BDUSS、用户邮箱、Token 哈希）因此可被直接下载。
+# Apache 的 .htaccess 对 Caddy 无效，本文件中的 @private 是唯一防线。
+
+{
+	admin off
+}
+
+:8080
+
+root * {$WORKDIR}
+
+encode zstd gzip
+
+log {
+	level warn
+}
+
+route {
+	# ---- 私密路径：一律 404 ----
+	# data/      运行期日志与数据库备份（dbbackup_*.sql、pre-upgrade_*.sql）
+	# tools/     lint / secret-scan / migrate / 集成测试脚本
+	# tests/     测试夹具与源码
+	# docs/      文档与宣传截图
+	# upgrade-report/  内部升级报告与截图
+	# official-service/ 官方网关参考实现（只应部署在私有基础设施）
+	# setup/*.sql / *.template.*  安装 SQL 模板（含 schema 与默认凭据占位）
+	# vendor/    第三方依赖（不应直接暴露 composer 元数据）
+	@private path /data/* /data /tools/* /tools /tests/* /tests /docs/* /docs /upgrade-report/* /upgrade-report /official-service/* /official-service /vendor/* /vendor /setup/*.sql /setup/*.template.* /setup/install.lock /composer.json /composer.lock /phpunit.xml /.gitignore /.dockerignore
+	respond @private 404
+
+	# ---- 安全响应头 ----
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy same-origin
+		X-Frame-Options SAMEORIGIN
+		Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
+		# 容器自身只监听明文 8080，HTTPS/HSTS 由外层反向代理负责。
+	}
+
+	# ---- 静态资源长缓存 ----
+	@static path /source/* /favicon.ico /robots.txt
+	header @static Cache-Control "public, max-age=31536000, immutable"
+
+	php_fastcgi 127.0.0.1:9000
+	file_server
+}

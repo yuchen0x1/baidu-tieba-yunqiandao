@@ -111,7 +111,7 @@ $bindMax = (option::get('bduss_num') != '0' && ISVIP != true && option::get('bdu
     //每个账号今日签到进度（按 pid 统计所有分表）
     $signProgress = array();
     if (!empty($i['table'])) {
-        $todayD = date('d');
+        $todayD = date('Y-m-d');
         foreach ($i['table'] as $spTable) {
             $spQs = $m->query("SELECT `pid`, COUNT(*) AS total, SUM(`latest` = '{$todayD}') AS signed FROM `" . DB_NAME . "`.`" . DB_PREFIX . $spTable . "` WHERE `uid` = " . (int) UID . " GROUP BY `pid`");
             if ($spQs === false) {

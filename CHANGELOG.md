@@ -1,6 +1,39 @@
 # 更新日志
 
-## 2026-11-08 V7.4.0：凭据掩码与恢复校验等安全加固
+## 2026-11-10 V7.5.0：安全与正确性升级
+
+### P0 级修复（默认部署可被利用 / 数据会错）
+
+- **修复二阶 SQL 注入**：`misc::findFid()` / `mSetFid()` 此前将贴吧名直接拼入 SQL 单引号字符串，插件配置（AI 回帖、自动回帖、帖子监控、封禁）中的目标贴吧关键词来自普通用户，可在 cron 进程中触发 UNION/盲注读取整库。现改为 `pquery` 参数绑定 + `normalize_forum_keyword()` 白名单（汉字/字母/数字/下划线/连字符/加号/间隔号），11 处 `misc::getFid()` 调用链全部收敛到同一校验入口。
+- **修复吧名双重转义**：`scanTiebaByPid()` 此前用 `addslashes(htmlspecialchars($name))` 入库，含 `&` 的吧名被存成 `&amp;`、引号被存反斜杠，导致签到失败、健康度对不上。现改为原样入库 + `pquery` 绑定，新增迁移 `007300` 修复历史数据（`html_entity_decode` + `stripslashes`，幂等）。
+- **修复跨月漏签**：签到标记 `latest` 此前存日号（`date('d')`），跨月同号（1 月 15 日签过、2 月 15 日恢复）会被误判为"今日已签"而全天跳过。现改为存完整日期 `Y-m-d`（列宽 `varchar(10)` 恰好容纳），新增迁移 `007301` 一次性重置（强制重签），同步更新 `weltolk_sign_qq` 插件两处日期比较。
+- **敏感配置加密落库**：18 个选项（OAuth Secret、SMTP 密码、打码凭据、各类通知 Token/Secret、Webhook URL、代理密码、计划任务密码等）此前明文存 `options` 表 + 明文回显页面。现通过 `SecretBox`（AES-256-GCM）加密落库，页面只显示掩码；空提交保持不变，`clear_<name>=1` 才清空。迁移 `007302` 批量加密历史数据。`api_token` / `metrics_token` 保持哈希语义不变。
+- **容器部署暴露面封禁**：Caddy 此前将 `data/`（含 SQL 备份）、`tools/`、`tests/`、`setup/*.sql`、`official-service/` 原样对外提供。Caddyfile 独立成文件并增加 `respond @private 404` 规则，`.dockerignore` 排除运行时数据与开发工具，新增 3 个 Apache `.htaccess` 供传统部署使用。
+
+### P1 级修复
+
+- **签到并发 claim**：cron、常驻循环和手动/API 签到在请求百度前对贴吧行执行带 TTL 的原子 claim；成功/失败释放 claim，异常进程由过期时间自动接管，新增迁移 `007500` 与回归测试，避免重复签到请求。
+
+- **Session 加固**：新增 `session_boot()` 统一启动（`use_strict_mode`、`cookie_httponly`、`cookie_samesite=Lax`、`use_only_cookies`），登录后 `session_regenerate_id(true)`，登出 `session_destroy_all()` 清 cookie。`set_site_cookie()` 的 Secure 判断补 `X-Forwarded-Proto`。
+- **2FA 失败锁定**：同一 UID 10 分钟内失败 ≥ 5 次锁定 15 分钟，校验成功清零计数。
+- **IP 级登录限流**：同一 IP 15 分钟内失败 ≥ 20 次（换用户名喷洒）锁定 15 分钟。
+- **删除用户级联清理**：`DeleteUser()` 此前只删贴吧数据和用户行，百度凭据（BDUSS/STOKEN）永久残留。现级联清理 `baiduid`（含 `baiduid_health`）、`sign_history`、`notice`、`achievements`、`users_oauth`，`login_audit` 保留但脱敏。
+- **日报发送时机修正**：此前每次签到结束就发"每日日报"，用户第一批签到完成就收到（大部分贴吧还没签）。新增独立任务 `system_daily_report`（默认关闭，需手动启用），满足时间窗（默认 21 点）或完成度条件才发送。
+- **ECharts 本地化**：图表库从 jsDelivr CDN 迁移到本地 `source/js/echarts.min.js`（v5.6.0，Apache-2.0），断网/内网部署也能出图；保留 CDN 动态回退。
+- **metrics_token 后台写入口**：补后台配置界面（此前只能手改库），与 `api_token` 同样只存哈希不回显。
+
+### P2 级改进
+
+- **option 缓存值一致性**：`option::set()` 改用 `pquery` upsert，运行时缓存保持原始值，修复含引号/反斜杠配置在同一请求内读回变形。
+
+- **补缺失索引**：`tieba(pid,no,latest)`、`users_options(uid,name)` 唯一（先去重）、`sign_history(uid,tieba,created_at)`、`login_audit(username,ip,ts)`（迁移 `007303`）。
+- **日志轮转**：`system.log` 超 10MB 自动归档，保留 3 份。
+- **lint 守卫**：`tools/lint.php` 补 CLI 守卫，Web 访问拒绝执行。
+- **LICENSE**：新增 AGPL-3.0 全文 `LICENSE` 文件（composer.json 声明一致）。
+
+### 数据库迁移说明
+
+本版本新增 5 个迁移（`007300`~`007303`、`007500`）。V7.4.x 站点点「立即更新」后访问 `upgrade.php` 即可自动完成迁移。V7.3.x 以下版本请先升级到 V7.4.0。
 
 - **账号凭据默认掩码**：百度账号页不再把完整 BDUSS/STOKEN 写进 HTML 源码，列表默认显示首尾各 4 位的掩码形态；点「显示」才经 `ajax.php?mod=baiduid:credential`（管理员会话 + CSRF + 归属校验）按需解密一次，点「隐藏」立即从内存清除。凭据不再进入页面源码、浏览器缓存与截图。
 - **恢复签到前先验证凭据**：`SignManager::restoreBaiduid` 恢复贴吧自动签到前，先按健康检查的同一口径实测 BDUSS；凭据仍失效时直接拒绝恢复并提示重新绑定，不再出现「恢复了下一轮又停用」的假闭环。恢复成功/失败原因在「贴吧与签到」页明确展示。

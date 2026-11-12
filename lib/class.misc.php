@@ -10,6 +10,59 @@ if (!defined('SYSTEM_ROOT')) {
 
 class misc
 {
+    /** @var string|null 当前进程的签到 claim 标识 */
+    private static $signClaimOwner = null;
+
+    /**
+     * 为签到行抢占一个短期 claim，避免多个 cron/API 进程同时调用百度接口。
+     * claim 到期后可被其他进程接管；调用方完成后应由 DoSign_All 释放。
+     */
+    public static function claimSignRow($table, $id, $ttl = 900)
+    {
+        global $m;
+        require_once SYSTEM_ROOT . '/lib/security.php';
+        $table = safe_table_name($table);
+        $id = (int) $id;
+        $ttl = max(60, min(86400, (int) $ttl));
+        if ($id <= 0) {
+            return false;
+        }
+        $owner = self::signClaimOwner();
+        $now = time();
+        $result = $m->pquery(
+            "UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . $table . "`
+             SET `claim_owner` = ?, `claimed_at` = ?
+             WHERE `id` = ? AND (`claim_owner` IS NULL OR `claim_owner` = '' OR `claimed_at` IS NULL OR `claimed_at` < ?)",
+            array($owner, $now, $id, $now - $ttl)
+        );
+        if ($result === false || !method_exists($m, 'affected_rows')) {
+            return false;
+        }
+        return (int) $m->affected_rows() === 1;
+    }
+
+    private static function signClaimOwner()
+    {
+        if (self::$signClaimOwner === null) {
+            try {
+                $entropy = bin2hex(random_bytes(12));
+            } catch (Throwable $e) {
+                $entropy = substr(sha1(uniqid('', true)), 0, 24);
+            }
+            self::$signClaimOwner = substr('sign-' . getmypid() . '-' . $entropy, 0, 80);
+        }
+        return self::$signClaimOwner;
+    }
+
+    private static function releaseSignClaimSql($table, $id, $owner)
+    {
+        global $m;
+        $m->pquery(
+            "UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` SET `claim_owner` = NULL, `claimed_at` = NULL WHERE `id` = ? AND `claim_owner` = ?",
+            array((int) $id, (string) $owner)
+        );
+    }
+
     /**
      * 快捷发送一封邮件
      * @param string $to 收件人
@@ -26,7 +79,7 @@ class misc
             $Port = intval(option::get('mail_port'));
             $SMTPAuth = option::get('mail_auth');
             $Username = option::get('mail_smtpname');
-            $Password = option::get('mail_smtppw');
+            $Password = SecretBox::get('mail_smtppw');
             $Nickname = option::get('mail_yourname');
             $Secure = option::get('mail_secure');
             $mail = new SMTP($Host, $Port, $SMTPAuth, $Username, $Password, $Secure);
@@ -72,8 +125,14 @@ class misc
     public static function getTable($uid)
     {
         global $m;
-        $x = $m->once_fetch_array("SELECT * FROM `" . DB_PREFIX . "users` WHERE `id` = '{$uid}';");
-        return $x['t'];
+        $x = $m->pquery("SELECT `t` FROM `" . DB_PREFIX . "users` WHERE `id` = ? LIMIT 1", array((int) $uid));
+        $row = $x !== false ? $m->fetch_array($x) : false;
+        if (empty($row['t'])) {
+            return 'tieba';
+        }
+        //users.t 是二阶标识符来源：进 SQL 前必须过白名单，否则可被改成任意表名
+        require_once SYSTEM_ROOT . '/lib/security.php';
+        return safe_table_name($row['t']);
     }
 
     /**
@@ -85,11 +144,18 @@ class misc
     {
         global $i;
         global $m;
+        require_once SYSTEM_ROOT . '/lib/security.php';
+        //历史上 $kw 直接拼进单引号字符串；插件关键词来自普通用户，构成二阶注入。
+        //统一在入口规范化：非法关键词直接视为未找到，不再触碰数据库。
+        $kw = normalize_forum_keyword($kw);
+        if ($kw === '') {
+            return false;
+        }
         foreach ($i['table'] as $v) {
-            $r = $m->once_fetch_array("SELECT * FROM `" . DB_PREFIX . $v . "` WHERE `tieba` = '{$kw}' AND `fid` IS NOT NULL LIMIT 1");
-            if (!empty($r['fid'])) {
-                return $r['fid'];
-                break;
+            $r = $m->pquery("SELECT `fid` FROM `" . DB_PREFIX . $v . "` WHERE `tieba` = ? AND `fid` IS NOT NULL LIMIT 1", array($kw));
+            $row = $r !== false ? $m->fetch_array($r) : false;
+            if (!empty($row['fid'])) {
+                return $row['fid'];
             }
         }
         return false;
@@ -104,31 +170,45 @@ class misc
     public static function mSetFid($kw, $fid)
     {
         global $m,$i;
-        if (empty($fid)) {
+        require_once SYSTEM_ROOT . '/lib/security.php';
+        $fid = (int) $fid;
+        if ($fid <= 0) {
+            return false;
+        }
+        $kw = normalize_forum_keyword($kw);
+        if ($kw === '') {
             return false;
         }
         foreach ($i['table'] as $v) {
-            $r = $m->query("UPDATE  `" . DB_PREFIX . $v . "` SET  `fid` =  '{$fid}' WHERE  `" . DB_PREFIX . $v . "`.`tieba` = '{$kw}';");
+            $m->pquery("UPDATE `" . DB_PREFIX . $v . "` SET `fid` = ? WHERE `tieba` = ?", array($fid, $kw));
         }
+        return true;
     }
 
     /**
      * 得到贴吧 FID
      * @param string $kw 贴吧名
-     * @return string FID
+     * @return int FID，失败返回 0
      */
 
     public static function getFid($kw)
     {
         global $m;
+        require_once SYSTEM_ROOT . '/lib/security.php';
+        //所有调用方（内置插件与签到引擎）都收敛到这里的白名单校验：
+        //贴吧名只能是汉字/字母/数字/下划线/连字符/加号/间隔号，其余一律拒绝。
+        $kw = normalize_forum_keyword($kw);
+        if ($kw === '') {
+            return 0;
+        }
         $f  = misc::findFid($kw);
         if ($f) {
-            return $f;
+            return (int) $f;
         } else {
             $ch = new wcurl('https://tieba.baidu.com/f/commit/share/fnameShareApi?ie=utf-8&fname=' . urlencode($kw), array('User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 14_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.1 Mobile/15E148 Safari/604.1','Referer: https://tieba.baidu.com/'));
             self::applyProxy($ch);
             $r = json_decode($ch->exec(), true);
-            return intval($r['no']) === 0 ? $r['data']['fid'] : false;
+            return (is_array($r) && intval($r['no']) === 0 && !empty($r['data']['fid'])) ? (int) $r['data']['fid'] : 0;
         }
     }
 
@@ -405,9 +485,12 @@ class misc
     /**
      * 对一个贴吧执行完整的签到任务
      */
-    public static function DoSign_All($uid, $kw, $id, $table, $sign_mode, $pid, $fid)
+    public static function DoSign_All($uid, $kw, $id, $table, $sign_mode, $pid, $fid, $claimOwner = '')
     {
         global $m;
+        require_once SYSTEM_ROOT . '/lib/security.php';
+        $table = safe_table_name($table);
+        $claimOwner = (string) $claimOwner;
         $again_error_id     = 160002;
 //重复签到错误代码
         $again_error_id_2   = 1101;
@@ -416,8 +499,11 @@ class misc
 //特殊的重复签到错误代码！！！签到过快=已签到
         $status_succ    = false;
         $ck = misc::getCookie($pid);
-        $kw = addslashes($kw);
-        $today = date('d');
+        //贴吧名原样使用（参数化/URL 编码由下游各自处理），不再 addslashes：
+        //此处转义会让含引号/反斜杠的吧名落库与百度侧不一致。
+        $kw = (string) $kw;
+        //签到标记存完整日期（Y-m-d）：日号会在跨月同号时误判为"今日已签"而漏签
+        $today = date('Y-m-d');
         if (empty($fid)) {
             $fid = misc::getFid($kw);
             $m->pquery("UPDATE `" . DB_PREFIX . $table . "` SET `fid` = ? WHERE `" . DB_PREFIX . $table . "`.`id` = ?", array((string) $fid, (int) $id));
@@ -474,17 +560,28 @@ class misc
         }
 
         if ($status_succ === true) {
-            $m->pquery("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` SET `latest` = ?, `status` = 0, `last_error` = NULL WHERE `" . DB_PREFIX . $table . "`.`id` = ?", array($today, (int) $id));
+            if ($claimOwner !== '') {
+                $m->pquery("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` SET `latest` = ?, `status` = 0, `last_error` = NULL, `claim_owner` = NULL, `claimed_at` = NULL WHERE `" . DB_PREFIX . $table . "`.`id` = ? AND `claim_owner` = ?", array($today, (int) $id, $claimOwner));
+            } else {
+                $m->pquery("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` SET `latest` = ?, `status` = 0, `last_error` = NULL WHERE `" . DB_PREFIX . $table . "`.`id` = ?", array($today, (int) $id));
+            }
             if (class_exists('SignManager')) {
                 SignManager::logTiebaResult($pid, $uid, $kw, 'success', 0, '', $expGained, $signRank, $forumLevel);
             }
         } elseif (!empty($error_code)) {
             //error_msg 来自百度接口返回，可能含引号等字符，必须参数化否则落库失败且无法复签
-            $m->pquery("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` SET `latest` = ?, `status` = ?, `last_error` = ? WHERE `" . DB_PREFIX . $table . "`.`id` = ?", array($today, (string) $error_code, (string) $error_msg, (int) $id));
+            if ($claimOwner !== '') {
+                $m->pquery("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` SET `latest` = ?, `status` = ?, `last_error` = ?, `claim_owner` = NULL, `claimed_at` = NULL WHERE `" . DB_PREFIX . $table . "`.`id` = ? AND `claim_owner` = ?", array($today, (string) $error_code, (string) $error_msg, (int) $id, $claimOwner));
+            } else {
+                $m->pquery("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` SET `latest` = ?, `status` = ?, `last_error` = ? WHERE `" . DB_PREFIX . $table . "`.`id` = ?", array($today, (string) $error_code, (string) $error_msg, (int) $id));
+            }
             if (class_exists('SignManager')) {
                 SignManager::logTiebaResult($pid, $uid, $kw, 'error', (int) $error_code, $error_msg);
             }
         } else {
+            if ($claimOwner !== '') {
+                self::releaseSignClaimSql($table, $id, $claimOwner);
+            }
             if (class_exists('SignManager')) {
                 SignManager::logTiebaResult($pid, $uid, $kw, 'error', 0, '签到接口未返回可识别的结果');
             }
@@ -575,8 +672,11 @@ class misc
     {
         global $m;
         require_once SYSTEM_ROOT . '/lib/security.php';
+        $table = safe_table_name($table);
+        $claimOwner = self::signClaimOwner();
         $sign_mode = safe_sign_modes(option::get('sign_mode'));
-        $today = date('d');
+        //签到标记存完整日期（Y-m-d）：日号跨月同号会误判为已签而漏签
+        $today = date('Y-m-d');
         $uidWhere = (int) $onlyUid > 0 ? ' AND `uid` = ' . (int) $onlyUid : '';
         $windowBlocked = self::signWindowBlocked();
         if ($windowBlocked !== false) {
@@ -609,7 +709,9 @@ class misc
         }
 
         foreach ($q as $x) {
-            self::DoSign_All($x['uid'], $x['tieba'], $x['id'], $table, $sign_mode, $x['pid'], $x['fid']);
+            if (self::claimSignRow($table, $x['id'])) {
+                self::DoSign_All($x['uid'], $x['tieba'], $x['id'], $table, $sign_mode, $x['pid'], $x['fid'], $claimOwner);
+            }
         }
     }
 
@@ -620,9 +722,13 @@ class misc
     public static function DoSign_retry($table, $onlyUid = 0)
     {
         global $m;
+        require_once SYSTEM_ROOT . '/lib/security.php';
+        $table = safe_table_name($table);
+        $claimOwner = self::signClaimOwner();
         $uidWhere = (int) $onlyUid > 0 ? ' AND `uid` = ' . (int) $onlyUid : '';
+        //签到标记存完整日期（Y-m-d），复签的"今日未签"判定同样按全日期比较
         $today = date('Y-m-d');
-        $todayDay = date('d');
+        $todayDay = date('Y-m-d');
         $windowBlocked = self::signWindowBlocked();
         if ($windowBlocked !== false) {
             return $windowBlocked;
@@ -690,7 +796,9 @@ class misc
             }
 
             foreach ($q as $x) {
-                self::DoSign_All($x['uid'], $x['tieba'], $x['id'], $table, $sign_mode, $x['pid'], $x['fid']);
+                if (self::claimSignRow($table, $x['id'])) {
+                    self::DoSign_All($x['uid'], $x['tieba'], $x['id'], $table, $sign_mode, $x['pid'], $x['fid'], $claimOwner);
+                }
             }
         }
     }
@@ -926,16 +1034,17 @@ class misc
                     continue;
                 }
 
-                $vn  = addslashes(htmlspecialchars($v['forum_name']));
-                $ist = $m->once_fetch_array("SELECT COUNT(id) AS `c` FROM `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` WHERE `pid` = {$pid} AND `tieba` = '{$vn}';");
-                if ($ist['c'] == 0) {
+                // 吧名必须原样入库：此前 htmlspecialchars + addslashes 会把 '&' 存成 &amp;、
+                // 把引号存成反斜杠形态，落库即损坏，导致签到失败、健康度表对不上。
+                // 吧名进入 SQL 一律走 pquery 绑定，输出时再由模板负责转义。
+                $vn  = (string) $v['forum_name'];
+                $vFid = (int) $v['forum_id'];
+                $ist = $m->pquery("SELECT COUNT(id) AS `c` FROM `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` WHERE `pid` = ? AND `tieba` = ? LIMIT 1", array((int) $pid, $vn));
+                $istRow = $ist !== false ? $m->fetch_array($ist) : array('c' => 0);
+                if (empty($istRow['c'])) {
                     $a++;
-                    if (!$v['is_sign']) {
-                        $latest = 0;
-                    } else {
-                        $latest = date('d');
-                    }
-                    $m->query("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` (`pid`,`fid`, `uid`, `tieba`, `latest`) VALUES ({$pid},'{$v['forum_id']}', {$uid}, '{$vn}', {$latest});");
+                    $latest = !$v['is_sign'] ? '0' : date('Y-m-d');
+                    $m->pquery("INSERT INTO `" . DB_NAME . "`.`" . DB_PREFIX . $table . "` (`pid`, `fid`, `uid`, `tieba`, `latest`) VALUES (?, ?, ?, ?, ?)", array((int) $pid, $vFid, (int) $uid, $vn, $latest));
                 }
             }
             $pn++;

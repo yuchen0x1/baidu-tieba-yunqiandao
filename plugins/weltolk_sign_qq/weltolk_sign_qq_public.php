@@ -44,7 +44,8 @@ if ($i['opt']['core_version'] >= 4.0) {
         $tieba_count = 0;
         while ($tieba = $m->fetch_array($query)) {
             $tieba_count++;
-            if ((date("Y-m-") . $tieba[$zt] == date("Y-m-j", strtotime("-1 day"))) || empty($tieba[$zt])) {
+            //latest 自 V7.5 起存完整日期（Y-m-d），不再拼接"年月+日号"
+            if (((string) $tieba[$zt] === date('Y-m-d', strtotime('-1 day'))) || empty($tieba[$zt])) {
                 $style_str = 'warning';
                 $status_str = '还未签到';
                 $status_icon = 'question-sign';
@@ -67,7 +68,7 @@ if ($i['opt']['core_version'] >= 4.0) {
             }
             $out_put_str = '<tr class="alert alert-' . $style_str
                 . '"><td>' . ($i['user']['baidu'][$tieba['pid']])
-                . '</td><td>' . (date("Y-m-") . $tieba[$zt] ? date("Y-m-") . $tieba[$zt] : '-')
+                . '</td><td>' . (!empty($tieba[$zt]) ? htmlspecialchars((string) $tieba[$zt], ENT_QUOTES, 'UTF-8') : '-')
                 . '</td><td><a href="http://tieba.baidu.com/f?kw='
                 . urlencode($tieba['tieba']) . '" target="_blank">'
                 . $tieba['tieba'] . '</a></td><td>'

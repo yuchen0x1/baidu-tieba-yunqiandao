@@ -17,7 +17,7 @@
         "phpunit/phpunit": "^11.5"
     },
     "scripts": {
-        "test": "phpunit",
+        "test": "@php vendor/bin/phpunit",
         "lint": "@php tools/lint.php",
         "security-scan": "@php tools/secret-scan.php",
         "integration": [

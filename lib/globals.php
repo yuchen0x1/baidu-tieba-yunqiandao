@@ -273,7 +273,7 @@ if (SYSTEM_PAGE == 'admin:login') {
     doAction('admin_login_1');
 // 检查验证码
     if (option::get('captcha')) {
-        session_start();
+        session_boot();
         $captcha = request_scalar_value($_POST, 'captcha');
         if ($captcha === '') {
             redirect('index.php?mod=login&error_msg=' . urlencode('请填写验证码'));
@@ -300,6 +300,12 @@ if (SYSTEM_PAGE == 'admin:login') {
     $loginLockRemain = LoginGuard::isLocked($loginRawName);
     if ($loginLockRemain > 0) {
         ReDirect("index.php?mod=login&error_msg=" . urlencode('登录失败次数过多，请 ' . (int) ceil($loginLockRemain / 60) . ' 分钟后再试'));
+        die;
+    }
+    // IP 级限流：同一 IP 短时间失败多次（换用户名喷洒）后锁定
+    $ipLockRemain = LoginGuard::isIpLocked();
+    if ($ipLockRemain > 0) {
+        ReDirect("index.php?mod=login&error_msg=" . urlencode('您的 IP 登录失败次数过多，请 ' . (int) ceil($ipLockRemain / 60) . ' 分钟后再试'));
         die;
     }
     $osq = $m->pquery("SELECT * FROM  `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE `name` = ? OR `email` = ? LIMIT 1", array($rawLoginName, $rawLoginName));
@@ -335,10 +341,13 @@ if (SYSTEM_PAGE == 'admin:login') {
                 $cktime = auth_cookie_lifetime();
             }
             $cktime = min(max($cktime, 1), auth_cookie_lifetime());
+            //登录成功后重新生成 session id，防会话固定攻击
+            session_regenerate();
             set_site_cookie('uid', (int) $p['id'], time() + $cktime);
             set_site_cookie('pwd', hash_hmac('sha256', $p['pw'], $p['id'] . $p['pw']), time() + $cktime);
             ReDirect('index.php');
         } else {
+            session_regenerate();
             set_site_cookie('uid', (int) $p['id']);
             set_site_cookie('pwd', hash_hmac('sha256', $p['pw'], $p['id'] . $p['pw']));
             ReDirect('index.php');
@@ -356,7 +365,7 @@ if (SYSTEM_PAGE == 'admin:login') {
     }
     // 检查验证码
     if (option::get('captcha')) {
-        session_start();
+        session_boot();
         $captcha = request_scalar_value($_POST, 'captcha');
         if ($captcha === '') {
             redirect('index.php?mod=reg&error_msg=' . urlencode('请填写验证码'));
@@ -631,7 +640,7 @@ if (SYSTEM_PAGE == 'admin:login') {
         require_once SYSTEM_ROOT . '/lib/class.captcha.php';
         $c = new Captcha($data[$level]);
         $c->create();
-        session_start();
+        session_boot();
         $_SESSION['captcha'] = $c->getCode();
     } else {
         require_once SYSTEM_ROOT . '/lib/class.captcha.php';
@@ -743,13 +752,26 @@ if (SYSTEM_PAGE == 'admin:login') {
     }
     if (isset($_POST['code'])) {
         csrf();
+        // 2FA 失败锁定：同一 UID 10 分钟内失败 ≥ 5 次即锁定 15 分钟
+        $twoFaLockRemain = LoginGuard::is2faLocked(UID);
+        if ($twoFaLockRemain > 0) {
+            msg('双因素验证码错误次数过多，请 ' . (int) ceil($twoFaLockRemain / 60) . ' 分钟后再试');
+        }
         require_once SYSTEM_ROOT . '/lib/class.totp.php';
         if (TOTP::verify(totp_get_secret(), (string) $_POST['code'])) {
+            LoginGuard::clear2faFailures(UID);
             totp_issue_cookie();
             ReDirect('index.php');
             die;
         }
-        msg('验证码错误，请重试');
+        LoginGuard::record2faFailure(UID);
+        $twoFaFailData = json_decode((string) option::get('totp_fail_' . UID), true);
+        $twoFaFailCount = is_array($twoFaFailData) ? (int) ($twoFaFailData['count'] ?? 0) : 0;
+        $twoFaFailRemain = LoginGuard::TOTP_MAX_FAIL - $twoFaFailCount;
+        if ($twoFaFailRemain <= 0) {
+            msg('双因素验证码错误次数过多，账号已临时锁定');
+        }
+        msg('验证码错误，请重试（还可尝试 ' . max(0, $twoFaFailRemain) . ' 次）');
     }
     $i['mode'] = array('admin', '2fa');
     template('admin-2fa');
@@ -757,6 +779,7 @@ if (SYSTEM_PAGE == 'admin:login') {
 } elseif (SYSTEM_PAGE == 'admin:logout') {
     csrf();
     doAction('logout');
+    session_destroy_all();
     clear_site_cookie('uid');
     clear_site_cookie('toolpw');
     clear_site_cookie('pwd');

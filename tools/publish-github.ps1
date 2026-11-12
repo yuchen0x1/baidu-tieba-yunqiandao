@@ -7,6 +7,7 @@ param(
     [string]$SourceRef = "main",
     [string]$OutputDirectory = "",
     [string]$ReleaseNotesFile = "",
+    [string]$SigningPrivateKeyFile = "",
     [ValidateRange(0, 1000)]
     [int]$CleanOldReleases = 0,
     [switch]$DeleteOldTags,
@@ -58,15 +59,54 @@ try {
     New-Item -ItemType Directory -Path $outputRoot -Force | Out-Null
     $package = Join-Path $outputRoot ("tieba-cloud-sign-windows-{0}.zip" -f $Tag)
     $checksum = "$package.sha256"
+    $manifest = Join-Path $outputRoot ("tieba-cloud-sign-update-{0}.json" -f $Tag)
+    $signature = Join-Path $outputRoot ("tieba-cloud-sign-windows-{0}.zip.sig" -f $Tag)
     & git archive --format=zip --prefix="$Repository-$Tag/" --output="$package" "$Tag"
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $package)) {
         throw "Failed to create GitHub release package."
     }
     $hash = (Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash.ToLowerInvariant()
     "{0}  {1}" -f $hash, [IO.Path]::GetFileName($package) | Set-Content -LiteralPath $checksum -Encoding ASCII
+    $normalizedVersion = $Tag.TrimStart('v', 'V')
+    $signatureMetadata = $null
+    if (-not [string]::IsNullOrWhiteSpace($SigningPrivateKeyFile)) {
+        if (-not (Test-Path -LiteralPath $SigningPrivateKeyFile)) {
+            throw "SigningPrivateKeyFile not found: $SigningPrivateKeyFile"
+        }
+        if (-not (Get-Command openssl -ErrorAction SilentlyContinue)) {
+            throw "openssl is required when SigningPrivateKeyFile is supplied."
+        }
+        $signatureRaw = "$signature.raw"
+        & openssl dgst -sha256 -sign $SigningPrivateKeyFile -out $signatureRaw $package
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $signatureRaw)) {
+            throw "Failed to sign release package."
+        }
+        $signatureText = [Convert]::ToBase64String([IO.File]::ReadAllBytes($signatureRaw))
+        [IO.File]::WriteAllText($signature, $signatureText + [Environment]::NewLine, [Text.UTF8Encoding]::new($false))
+        Remove-Item -LiteralPath $signatureRaw -Force
+        $signatureMetadata = [ordered]@{ name = [IO.Path]::GetFileName($signature); algorithm = 'RSA-SHA256'; encoding = 'base64' }
+    }
+    $manifestPayload = [ordered]@{
+        version = $normalizedVersion
+        tag = $Tag
+        channel = 'stable'
+        releaseDate = [DateTime]::UtcNow.ToString('o')
+        mandatory = $false
+        minSupportedVersion = $normalizedVersion
+        releaseNotes = "GitHub Release $Tag"
+        assets = @([ordered]@{
+            name = [IO.Path]::GetFileName($package)
+            sha256 = $hash
+            size = (Get-Item -LiteralPath $package).Length
+        })
+        signature = $signatureMetadata
+    }
+    [IO.File]::WriteAllText($manifest, ($manifestPayload | ConvertTo-Json -Depth 6), [Text.UTF8Encoding]::new($false))
 
     Write-Host "Package: $package"
     Write-Host "Checksum: $checksum"
+    Write-Host "Manifest: $manifest"
+    if ($signatureMetadata) { Write-Host "Signature: $signature" }
     if (-not $Publish) {
         if ($CleanOldReleases -gt 0) {
             Write-Warning "Old-release cleanup only runs after publishing; local packaging made no remote changes."
@@ -87,7 +127,9 @@ try {
     $description = "Publish GitHub Release $Tag for $githubRepository"
     if ($PSCmdlet.ShouldProcess($githubRepository, $description)) {
         if ($existingRelease) {
-            Invoke-Gh -Arguments @('release', 'upload', $Tag, $package, $checksum, '--repo', $githubRepository, '--clobber') | Out-Null
+            $uploadArgs = @('release', 'upload', $Tag, $package, $checksum, $manifest, '--repo', $githubRepository, '--clobber')
+            if ($signatureMetadata) { $uploadArgs = @('release', 'upload', $Tag, $package, $checksum, $manifest, $signature, '--repo', $githubRepository, '--clobber') }
+            Invoke-Gh -Arguments $uploadArgs | Out-Null
         } else {
             # 标题取发布说明首个一级标题并从正文剔除，避免 Release 页标题与目录重复；
             # 说明文件未带一级标题时回退为通用标题。
@@ -107,7 +149,8 @@ try {
                 [IO.File]::WriteAllText($trimmedNotes, $notesContent, [Text.UTF8Encoding]::new($false))
                 $notesPath = $trimmedNotes
             }
-            $createArgs = @('release', 'create', $Tag, $package, $checksum, '--repo', $githubRepository, '--verify-tag', '--title', $releaseTitle)
+            $createArgs = @('release', 'create', $Tag, $package, $checksum, $manifest, '--repo', $githubRepository, '--verify-tag', '--title', $releaseTitle)
+            if ($signatureMetadata) { $createArgs = @('release', 'create', $Tag, $package, $checksum, $manifest, $signature, '--repo', $githubRepository, '--verify-tag', '--title', $releaseTitle) }
             if ($null -ne $notesPath) {
                 $createArgs += @('--notes-file', $notesPath)
             } else {

@@ -52,11 +52,8 @@ final class AutoloadCaseTest extends TestCase
     {
         // 纯函数文件（无类声明），不参与类名回环校验
         $functionOnly = array('loader');
-        // 遗留兼容驱动：class.mysql.php 也声明 wmysql，别名固定优先解析到 mysqli 驱动，
-        // 该文件仅在无 mysqli 的遗留环境被 mysql_autoload.php 显式加载
-        $legacyDrivers = array('mysql');
         foreach ($this->map as $key => $file) {
-            if (in_array($key, $functionOnly, true) || in_array($key, $legacyDrivers, true)) {
+            if (in_array($key, $functionOnly, true)) {
                 continue;
             }
             $declared = $this->declaredClass($file);

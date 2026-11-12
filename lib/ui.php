@@ -139,8 +139,15 @@ function template($file)
  */
 function loadChartAssets($return = false)
 {
-    $ver = SYSTEM_VER . '-g5';
-    $html = '<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js?v=' . $ver . '"></script>';
+    $ver = SYSTEM_VER . '-g6';
+    $localSrc = 'source/js/echarts.min.js?v=' . $ver;
+    $cdnSrc = 'https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.min.js';
+    //本地优先（断网/内网部署也能出图），失败时动态回退 CDN；
+    //本地文件带 SRI（Apache-2.0 许可，见 source/js/echarts.min.js 头部）
+    $sri = 'integrity="sha384-Mx5lkUEQPM1pOJCwFtUICyX45KNojXbkWdYhkKUKsbv391mavbfoAmONbzkgYPzR" crossorigin="anonymous"';
+    $html = '<script src="' . htmlspecialchars($localSrc, ENT_QUOTES, 'UTF-8') . '" ' . $sri . '></script>';
+    //回退：加载失败（404、CSP 拒绝等）时注入 CDN 版本
+    $html .= '<script>window.__echarts_fallback=function(){var s=document.createElement("script");s.src="' . htmlspecialchars($cdnSrc, ENT_QUOTES, 'UTF-8') . '";document.head.appendChild(s);};document.addEventListener("DOMContentLoaded",function(){setTimeout(function(){if(typeof echarts==="undefined"){window.__echarts_fallback();}},50);});</script>';
     if ($return) {
         return $html;
     }

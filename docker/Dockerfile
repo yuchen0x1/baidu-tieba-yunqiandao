@@ -34,8 +34,10 @@ RUN apk add --no-cache \
     && echo -e "max_execution_time = 3600\nupload_max_filesize=128M\npost_max_size=128M\nmemory_limit=1024M\ndate.timezone=${TZ}\nopcache.enable=1\nopcache.memory_consumption=128\nopcache.max_accelerated_files=10000" > /etc/php84/conf.d/99-overrides.ini \
     && echo -e "[global]\nerror_log = /dev/stdout\ndaemonize = no\ninclude=/etc/php84/php-fpm.d/*.conf" > /etc/php84/php-fpm.conf \
     && echo -e "[www]\nuser = caddy\ngroup = caddy\nlisten = 127.0.0.1:9000\nlisten.owner = caddy\nlisten.group = caddy\npm = ondemand\npm.max_children = 75\npm.max_requests = 500\npm.process_idle_timeout = 10s\nclear_env = no\ncatch_workers_output = yes\nchdir = $WORKDIR" > /etc/php84/php-fpm.d/www.conf \
-    && echo -e "{\n    admin off\n}\n:8080\nroot * $WORKDIR\nencode zstd gzip\nlog {\n    level warn\n}\n\n@static path /source/* /favicon.ico /robots.txt\nheader @static Cache-Control \"public, max-age=31536000, immutable\"\n\nheader {\n    X-Content-Type-Options nosniff\n    Referrer-Policy same-origin\n    X-Frame-Options SAMEORIGIN\n}\nphp_fastcgi 127.0.0.1:9000\nfile_server" > /etc/caddy/Caddyfile \
+    && cp $WORKDIR/docker/Caddyfile /etc/caddy/Caddyfile \
+    && sed -i "s#{\\$WORKDIR}#$WORKDIR#g" /etc/caddy/Caddyfile \
     && caddy fmt --overwrite /etc/caddy/Caddyfile \
+    && caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile \
     && rm -rf /var/cache/apk/* /tmp/* \
     && git config --global pull.ff only \
     && mkdir /etc/cont-init.d \

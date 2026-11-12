@@ -1,0 +1,4 @@
+# 测试夹具与源码不通过 Web 暴露
+Require all denied
+Order allow,deny
+Deny from all

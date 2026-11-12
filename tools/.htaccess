@@ -1,0 +1,4 @@
+# 运维/测试脚本不通过 Web 暴露（CLI 专用）
+Require all denied
+Order allow,deny
+Deny from all

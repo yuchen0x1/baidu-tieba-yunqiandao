@@ -318,3 +318,39 @@ if (!function_exists('credential_mask')) {
         return $head . str_repeat('*', min(24, max(8, $len - 8))) . $tail;
     }
 }
+
+if (!function_exists('normalize_forum_keyword')) {
+    /**
+     * 规范化用户可控制的贴吧名/关键词，返回空串表示不合法。
+     *
+     * 为什么需要：贴吧名会从插件配置（AI 回帖、自动回帖、帖子监控、封禁）
+     * 一路传到 misc::getFid() → findFid() 的 SQL 与百度请求。历史上该链路
+     * 只用 trim() 过滤，任何能配置插件的普通用户都可借此注入 SQL。
+     * 这里做两道收敛：去掉控制字符，再按贴吧名的真实字符集白名单校验。
+     *
+     * 允许：汉字、字母、数字、下划线、连字符、加号、间隔号（如「海贼王·剧场版」）。
+     * @param mixed $kw 原始关键词
+     * @param int   $maxLength 最大字符数（贴吧名实测不超过 30，留余量到 60）
+     * @return string 合法时返回规范化后的关键词，否则返回空串
+     */
+    function normalize_forum_keyword($kw, $maxLength = 60)
+    {
+        if (!is_scalar($kw)) {
+            return '';
+        }
+        $kw = (string) $kw;
+        //剥离 NUL、换行、制表等控制字符（含 %00 注入与多语句分隔的常见载体）
+        $kw = preg_replace('/[\x00-\x1F\x7F]+/u', '', $kw);
+        if (!is_string($kw)) {
+            return '';
+        }
+        $kw = trim($kw);
+        if ($kw === '') {
+            return '';
+        }
+        if (mb_strlen($kw, 'UTF-8') > $maxLength) {
+            return '';
+        }
+        return preg_match('/^[\p{Han}A-Za-z0-9_+\-·]{1,' . (int) $maxLength . '}$/u', $kw) === 1 ? $kw : '';
+    }
+}

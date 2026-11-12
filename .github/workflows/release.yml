@@ -31,6 +31,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Ensure tag points to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --no-tags
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" "origin/main"; then
+            echo "Release tags must point to a commit already merged into main." >&2
+            exit 1
+          fi
+
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:

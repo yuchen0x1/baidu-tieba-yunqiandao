@@ -131,6 +131,7 @@ php /var/www/do.php --pw=你的密码 --loop=60     # 自定义间隔（秒，�
 - 网络受限环境可选设置只读 `UPDATE_GITHUB_TOKEN`（仅发送给 `api.github.com`，不落盘、不随资产下载发送）。
 
 项目源码与 Windows 部署包发布在 [GitHub Releases](https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases)；发布流程细节见 [`docs/RELEASE.md`](docs/RELEASE.md)。
+自动更新的架构、签名配置、回滚边界和故障处理见 [`docs/AUTO_UPDATE.md`](docs/AUTO_UPDATE.md)。
 
 ## ⚙️ 配置参考
 
@@ -154,6 +155,8 @@ php /var/www/do.php --pw=你的密码 --loop=60     # 自定义间隔（秒，�
 | `TC_AUTO_CREATE_INSTALL_LOCK` | `false` | 容器启动时自动创建安装锁（首次安装保持 false） |
 | `SSL_CERT_FILE` / `CURL_CA_BUNDLE` | 空 | Windows PHP 指向可信 CA bundle，勿关闭证书校验 |
 | `UPDATE_GITHUB_TOKEN` | 空 | 可选只读 Token，仅发送给 `api.github.com` |
+| `UPDATE_RELEASE_PUBLIC_KEY` | 空 | 可选 PEM 公钥；配置后校验 Release 的 detached `.sig` |
+| `UPDATE_REQUIRE_SIGNATURE` | `false` | 设为 `true` 后没有签名或签名失败会拒绝安装 |
 | `LOOP_RELOAD_FILE` | 空（关闭） | `do.php --loop` 优雅重载标记文件路径 |
 
 ### 后台配置项（数据库选项）
@@ -211,6 +214,7 @@ composer gate        # 一键发布门禁，发布前必须全绿
 - 集成测试只在系统临时目录与自建 `tcs_it_*` 临时数据库工作（用 `TCS_IT_DB_HOST/PORT/USER/PASS` 指定连接），数据库不可达时自动跳过。
 - CI 在 PHP 8.2/8.4 上执行 Composer 校验、依赖审计、语法检查与 PHPUnit，在 MariaDB 11.4 服务容器上运行四条集成链路，构建 Docker 镜像验证健康检查与应用路由，并对临时 tag 做发布脚本打包演练。
 - 工作流：`ci.yml`（质量门禁）、`release.yml`（`v*` tag 触发发布）、`build.yml`（多架构 Docker 镜像，未配置 Docker Hub 凭据时仅构建不推送）。
+- 分支约定：产品更新只合并到 `main`；Release 标签必须指向 `main` 已包含的提交，避免从临时分支发布漂移版本。
 
 **项目结构**
 
@@ -232,6 +236,12 @@ composer gate        # 一键发布门禁，发布前必须全绿
 ├── CHANGELOG.md            # 更新记录
 └── composer.json           # PHP 版本、扩展、脚本和开发依赖
 ```
+
+## ⭐ Star 历史
+
+[![Star History Chart](https://api.star-history.com/svg?repos=yuchen0x1/baidu-tieba-yunqiandao&type=Date)](https://star-history.com/#yuchen0x1/baidu-tieba-yunqiandao&Date)
+
+图表由 [star-history.com](https://star-history.com/) 按 GitHub 公开数据实时生成；如该服务不可用，可点击图表跳转到原站查看。
 
 ## 🤝 致谢与社区
 

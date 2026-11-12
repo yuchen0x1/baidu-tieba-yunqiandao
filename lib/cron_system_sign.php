@@ -94,12 +94,14 @@ function cron_system_sign()
     }
 
     // 用户级签到提醒：扫描启用提醒的用户并推送邮件
+    // 注意：日报改由独立任务 system_daily_report 在指定时间发送（见 lib/cron_system_daily_report.php），
+    // 这里不再调用 Reminder::sendDailySummary()——此前每次签到都发日报，
+    // 用户当天第一批签到完成就收到"每日日报"，此时大部分贴吧还没签。
     if (file_exists(SYSTEM_ROOT . '/lib/class.Reminder.php')) {
         require_once SYSTEM_ROOT . '/lib/class.Reminder.php';
         if ($stat['error'] > 0) {
             Reminder::checkSignFailures(1);
         }
-        Reminder::sendDailySummary();
         doAction('reminders_sent');
     }
 

@@ -48,7 +48,7 @@ class Webhook
                 return array('ok' => true, 'detail' => '事件未订阅');
             }
         }
-        $secret = (string) option::get('webhook_secret');
+        $secret = SecretBox::get('webhook_secret');
 
         $body = json_encode(array(
             'event' => $event,

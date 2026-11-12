@@ -28,7 +28,7 @@ class OAuth
     {
         return option::get('oauth_github_enable') == '1'
             && trim((string) option::get('oauth_github_client_id')) !== ''
-            && trim((string) option::get('oauth_github_client_secret')) !== '';
+            && SecretBox::get('oauth_github_client_secret') !== '';
     }
 
     /**
@@ -146,7 +146,7 @@ class OAuth
         ));
         $res = $client->post(array(
             'client_id' => trim((string) option::get('oauth_github_client_id')),
-            'client_secret' => trim((string) option::get('oauth_github_client_secret')),
+            'client_secret' => trim(SecretBox::get('oauth_github_client_secret')),
             'code' => (string) $code,
         ));
         $json = json_decode((string) $res, true);
@@ -283,7 +283,7 @@ class OAuth
     private static function ensureSession()
     {
         if (session_status() !== PHP_SESSION_ACTIVE) {
-            session_start();
+            session_boot();
         }
     }
 }

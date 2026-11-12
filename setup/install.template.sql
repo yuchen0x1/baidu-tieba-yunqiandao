@@ -45,6 +45,7 @@ CREATE TABLE `{VAR-PREFIX}cron` (
 INSERT INTO `{VAR-PREFIX}cron` (`name`, `orde`, `file`, `no`, `desc`, `freq`, `lastdo`, `log`) VALUES ('system_sign', '0', 'lib/cron_system_sign.php', '0', '每天对所有贴吧进行签到\r\n忽略或卸载此任务会导致停止签到', '0', '0', '');
 INSERT INTO `{VAR-PREFIX}cron` (`name`, `orde`, `file`, `no`, `desc`, `freq`, `lastdo`, `log`) VALUES ('system_sign_retry', '1', 'lib/cron_system_sign_retry.php', '0', '对所有签到失败的贴吧进行复签\r\n忽略或卸载此任务会导致停止复签', '0', '0', '');
 INSERT INTO `{VAR-PREFIX}cron` (`name`, `orde`, `file`, `no`, `desc`, `freq`, `lastdo`, `log`) VALUES ('system_dbbackup', '9', 'lib/cron_system_dbbackup.php', '0', '每日自动备份数据库到 data/backups 目录\r\n启用后需在设置中开启定时备份', '86400', '0', '');
+INSERT INTO `{VAR-PREFIX}cron` (`name`, `orde`, `file`, `no`, `desc`, `freq`, `lastdo`, `log`, `enable`) VALUES ('system_daily_report', '12', 'lib/cron_system_daily_report.php', '0', '每日签到日报（V7.5 新增，替代每次签到触发的日报）\r\n满足时间窗/完成度条件后向启用用户推送当日汇总', '3600', '0', '', '0');
 
 
 
@@ -117,7 +118,7 @@ INSERT INTO `{VAR-PREFIX}options` VALUES ('cron_sign_again', 'a:2:{s:3:\"num\";i
 INSERT INTO `{VAR-PREFIX}options` VALUES ('sign_hour', '0');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('mail_secure', 'none');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('freetable', 'tieba');
-INSERT INTO `{VAR-PREFIX}options` VALUES ('core_version', '7.4.0');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('core_version', '7.5.0');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('core_revision', '');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('vid', '10000');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('update_server', '0');
@@ -180,9 +181,12 @@ CREATE TABLE `{VAR-PREFIX}tieba` (
   `status`  mediumint(8) UNSIGNED NOT NULL DEFAULT '0' ,
   `latest` varchar(10) NOT NULL DEFAULT '0',
   `last_error` text,
+  `claim_owner` varchar(80) DEFAULT NULL,
+  `claimed_at` int(10) unsigned DEFAULT NULL,
   PRIMARY KEY (`id`),
   INDEX `uid` (`uid`) USING BTREE ,
-  INDEX `latest` (`latest`) USING BTREE 
+  INDEX `latest` (`latest`) USING BTREE ,
+  INDEX `claim_expiry` (`claimed_at`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
@@ -364,4 +368,9 @@ INSERT INTO `{VAR-PREFIX}schema_migrations` (`version`, `applied_at`, `descripti
   ('001001', UNIX_TIMESTAMP(), 'V5.13：cron 表调度增强列 + task_runs + api_rate_limits + 新增选项', 'success', UNIX_TIMESTAMP(), UNIX_TIMESTAMP()),
   ('007000', UNIX_TIMESTAMP(), 'V7.0：升级基线校验与调度结构修复（幂等，无破坏性变更）', 'success', UNIX_TIMESTAMP(), UNIX_TIMESTAMP()),
   ('007100', UNIX_TIMESTAMP(), 'V7.0：新增 cron_notify_interval 失败通知去重选项', 'success', UNIX_TIMESTAMP(), UNIX_TIMESTAMP()),
-  ('007200', UNIX_TIMESTAMP(), 'V7.3：签到历史表增加成长经验/签到排名/贴吧等级支持', 'success', UNIX_TIMESTAMP(), UNIX_TIMESTAMP());
+  ('007200', UNIX_TIMESTAMP(), 'V7.3：签到历史表增加成长经验/签到排名/贴吧等级支持', 'success', UNIX_TIMESTAMP(), UNIX_TIMESTAMP()),
+  ('007300', UNIX_TIMESTAMP(), 'V7.5：修复历史贴吧名的 HTML 实体与反斜杠双重转义污染', 'success', UNIX_TIMESTAMP(), UNIX_TIMESTAMP()),
+  ('007301', UNIX_TIMESTAMP(), 'V7.5：签到标记 latest 从日号改为完整日期（强制重签一次）', 'success', UNIX_TIMESTAMP(), UNIX_TIMESTAMP()),
+  ('007302', UNIX_TIMESTAMP(), 'V7.5：敏感配置选项（通知凭据/SMTP/代理/计划任务密码等）加密落库', 'success', UNIX_TIMESTAMP(), UNIX_TIMESTAMP()),
+  ('007303', UNIX_TIMESTAMP(), 'V7.5：补 tieba/users_options/sign_history/login_audit 缺失索引', 'success', UNIX_TIMESTAMP(), UNIX_TIMESTAMP()),
+  ('007500', UNIX_TIMESTAMP(), 'V7.5：签到行增加短期 claim，防止并发重复签到', 'success', UNIX_TIMESTAMP(), UNIX_TIMESTAMP());

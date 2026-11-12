@@ -54,14 +54,27 @@ function auth_cookie_lifetime()
 }
 
 /**
+ * 签到标记值（tieba 表 `latest` 列）的统一格式：完整日期 Y-m-d。
+ *
+ * 历史实现用 date('d') 存日号，跨月同号（1 月 15 日签过、2 月 15 日恢复）
+ * 会被误判为"今日已签"而漏签。自 V7.5 起一律存完整日期，列宽 varchar(10)
+ * 恰好容纳 "2026-11-10"（10 字符），无需改表。
+ *
+ * 插件若需判断"今日是否已签"，请使用本函数取比较值，不要自行拼日期。
+ * @param int|string|null $timestamp 参考时间戳，缺省为当前时间
+ * @return string Y-m-d 格式的日期
+ */
+function sign_marker_today($timestamp = null)
+{
+    return date('Y-m-d', $timestamp === null ? null : (int) $timestamp);
+}
+
+/**
  * Set a cookie with the security attributes supported by the running PHP.
  */
 function set_site_cookie($name, $value = '', $expires = 0)
 {
-    $secure = !empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off';
-    if (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443) {
-        $secure = true;
-    }
+    $secure = function_exists('request_is_https') ? request_is_https() : false;
     if (PHP_VERSION_ID >= 70300) {
         setcookie($name, (string) $value, array(
             'expires' => (int) $expires,
@@ -370,23 +383,65 @@ function CleanUser($id)
 {
 
     global $m;
-    $x = $m->once_fetch_array("SELECT `t` FROM  `" . DB_NAME . "`.`" . DB_PREFIX . "users` WHERE  `id` = {$id} LIMIT 1");
-    $m->query('DELETE FROM `' . DB_NAME . '`.`' . DB_PREFIX . $x['t'] . '` WHERE `' . DB_PREFIX . $x['t'] . '`.`uid` = ' . $id);
+    $id = (int) $id;
+    $x = $m->pquery("SELECT `t` FROM `" . DB_PREFIX . "users` WHERE `id` = ? LIMIT 1", array($id));
+    $row = $x !== false ? $m->fetch_array($x) : false;
+    $userTable = isset($row['t']) ? $row['t'] : '';
+    //二阶标识符：users.t 来自数据库，拼入 SQL 前必须过白名单
+    $userTable = function_exists('safe_table_name') ? safe_table_name($userTable) : 'tieba';
+    $m->pquery('DELETE FROM `' . DB_NAME . '`.`' . DB_PREFIX . $userTable . '` WHERE `uid` = ?', array($id));
 }
 
 /**
  * 删除用户
- * 为节省数据库，捆绑清除贴吧数据
+ * 为节省数据库，捆绑清除贴吧数据、百度凭据、签到历史、OAuth 绑定与通知。
  *
- * @param 用户ID
+ * 隐私合规：百度凭据（BDUSS/STOKEN）必须随之删除，否则注销用户的凭据
+ * 永久留在库中；sign_history 等业务数据同样按 uid 级联清理。
+ * login_audit 保留但脱敏 username（审计价值大于存储开销）。
+ *
+ * @param int $id 用户ID
  */
 function DeleteUser($id)
 {
 
     global $m;
+    $id = (int) $id;
+    if ($id <= 0) {
+        return;
+    }
+
+    //1) 贴吧分表数据
     CleanUser($id);
+
+    //2) 百度账号（含加密 BDUSS/STOKEN）与健康度
+    //先取 pid 清理健康度，再删账号
+    $pids = array();
+    $pidRs = $m->pquery("SELECT `id` FROM `" . DB_PREFIX . "baiduid` WHERE `uid` = ?", array($id));
+    if ($pidRs !== false) {
+        while ($pr = $m->fetch_array($pidRs)) {
+            $pids[] = (int) $pr['id'];
+        }
+    }
+    $m->pquery("DELETE FROM `" . DB_PREFIX . "baiduid` WHERE `uid` = ?", array($id));
+    foreach ($pids as $pid) {
+        $m->pquery("DELETE FROM `" . DB_PREFIX . "baiduid_health` WHERE `pid` = ?", array($pid));
+    }
+
+    //3) 签到历史、通知、成就、OAuth 绑定
+    $m->pquery("DELETE FROM `" . DB_PREFIX . "sign_history` WHERE `uid` = ?", array($id));
+    $m->pquery("DELETE FROM `" . DB_PREFIX . "notice` WHERE `uid` = ?", array($id));
+    $m->pquery("DELETE FROM `" . DB_PREFIX . "achievements` WHERE `uid` = ?", array($id));
+    $m->pquery("DELETE FROM `" . DB_PREFIX . "users_oauth` WHERE `uid` = ?", array($id));
+
+    //4) 用户设置
     option::udel($id);
-    $m->query('DELETE FROM `' . DB_NAME . '`.`' . DB_PREFIX . 'users` WHERE `' . DB_PREFIX . 'users`.`id` = ' . $id);
+
+    //5) 登录审计：保留记录但脱敏用户名（保留安全审计价值）
+    $m->pquery("UPDATE `" . DB_PREFIX . "login_audit` SET `username` = ? WHERE `username` = (SELECT `name` FROM `" . DB_PREFIX . "users` WHERE `id` = ?)", array('deleted:' . $id, $id));
+
+    //6) 最后删用户行
+    $m->pquery('DELETE FROM `' . DB_NAME . '`.`' . DB_PREFIX . 'users` WHERE `id` = ?', array($id));
 }
 
 /**

@@ -678,6 +678,11 @@ h3.former-title::before {
   margin-bottom: 22px;
 }
 
+/* Four-card summaries stay on one row on wide screens and avoid cramped cards on tablets. */
+.metric-grid--four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .metric-card {
   padding: 18px 20px;
   background: var(--color-surface);
@@ -900,6 +905,12 @@ h3.former-title::before {
 
   .app-content-inner {
     padding: 26px 20px 20px;
+  }
+}
+
+@media (max-width: 1199px) {
+  .metric-grid--four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

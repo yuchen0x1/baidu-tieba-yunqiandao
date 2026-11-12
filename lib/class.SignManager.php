@@ -322,7 +322,7 @@ class SignManager
         }
         require_once SYSTEM_ROOT . '/lib/security.php';
         $tables = array_values(array_unique(array_merge($tables, $uid > 0 ? array() : safe_table_names(option::get('fb_tables')))));
-        $day = date('d');
+        $day = date('Y-m-d');
         $signed = $error = $waiting = 0;
         foreach ($tables as $tableName) {
             $table = DB_PREFIX . $tableName;

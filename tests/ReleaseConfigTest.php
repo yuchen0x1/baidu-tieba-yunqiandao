@@ -140,4 +140,45 @@ final class ReleaseConfigTest extends TestCase
             $this->assertStringContainsString("ROLE != 'admin'", $upgrade, '升级入口必须校验管理员身份');
         }
     }
+
+    public function testContainerBlocksRuntimeDataAndDevTools(): void
+    {
+        // data/ 下有数据库备份（含加密 BDUSS、邮箱、Token 哈希）与运行日志。
+        // Caddy 的 root 是站点根，file_server 会把它们当静态文件返回；Apache 的
+        // .htaccess 对 Caddy 无效，因此必须在 Caddyfile 里显式 404。
+        $caddy = $this->read('docker/Caddyfile');
+        foreach (array('/data', '/tools', '/tests', '/docs', '/upgrade-report', '/official-service', '/vendor') as $path) {
+            $this->assertStringContainsString($path . '/*', $caddy, 'Caddyfile 应封禁 ' . $path . '/*');
+        }
+        $this->assertStringContainsString('respond @private 404', $caddy, 'Caddyfile 必须对私密路径返回 404');
+        $this->assertStringContainsString('file_server', $caddy, '应用路由仍需 file_server');
+        $this->assertStringContainsString('php_fastcgi', $caddy);
+
+        // Dockerfile 必须复制仓库内的 Caddyfile，而不是内联 echo 生成（内联版本无法审查、曾被漏掉访问控制）
+        $dockerfile = $this->read('docker/Dockerfile');
+        $this->assertStringContainsString('cp $WORKDIR/docker/Caddyfile /etc/caddy/Caddyfile', $dockerfile);
+        $this->assertStringContainsString('caddy validate', $dockerfile, '构建期应校验 Caddyfile 语法');
+        $this->assertStringNotContainsString('file_server" > /etc/caddy/Caddyfile', $dockerfile);
+    }
+
+    public function testDockerignoreExcludesRuntimeDataAndDevTooling(): void
+    {
+        $ignore = $this->read('.dockerignore');
+        foreach (array('data/log', 'data/backups', 'tools', 'tests', 'upgrade-report', 'docs', 'official-service') as $entry) {
+            $this->assertMatchesRegularExpression('/^' . preg_quote($entry, '/') . '\s*$/m', $ignore, '.dockerignore 应排除 ' . $entry);
+        }
+        // 安装模板是安装流程所需，必须保留
+        $this->assertStringContainsString('!setup/install.template.sql', $ignore, '安装 SQL 模板需在镜像内保留');
+    }
+
+    public function testApacheDeploymentsDenyRuntimeDataAndToolDirs(): void
+    {
+        // 非容器部署（Apache/传统 PHP）依赖 .htaccess；缺一个就等于备份可下载
+        foreach (array('data/.htaccess', 'tools/.htaccess', 'tests/.htaccess') as $file) {
+            $this->assertFileExists(dirname(__DIR__) . '/' . $file, $file . ' 缺失会导致对应目录被 Web 直接访问');
+            $this->assertStringContainsString('Deny from all', $this->read($file), $file . ' 应拒绝全部访问');
+        }
+        $setup = $this->read('setup/.htaccess');
+        $this->assertMatchesRegularExpression('/\.\(sql\|original\\\.php\)/', $setup, 'setup 目录应拒绝 SQL 模板与历史安装器');
+    }
 }

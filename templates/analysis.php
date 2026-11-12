@@ -73,7 +73,7 @@ $fmtTime = function ($ts) {
 </div>
 <?php } else { ?>
 
-<section class="metric-grid" aria-label="分析概览" style="margin:16px 1%">
+<section class="metric-grid metric-grid--four" aria-label="分析概览" style="margin:16px 1%">
     <div class="metric-card">
         <span class="metric-label">总签到</span>
         <strong class="metric-value"><?php echo (int) $overview['total']; ?></strong>

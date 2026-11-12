@@ -18,8 +18,8 @@ class dama
     public static function enabled()
     {
         return option::get('dama_type') === 'chaojiying'
-            && (string) option::get('dama_username') !== ''
-            && (string) option::get('dama_password') !== '';
+            && SecretBox::get('dama_username') !== ''
+            && SecretBox::get('dama_password') !== '';
     }
 
     /**
@@ -50,8 +50,8 @@ class dama
     private static function chaojiying($imageData, $codeType)
     {
         $param = array(
-            'user'      => option::get('dama_username'),
-            'pass2'     => option::get('dama_password'),
+            'user'      => SecretBox::get('dama_username'),
+            'pass2'     => SecretBox::get('dama_password'),
             'softid'    => option::get('dama_softid'),
             'codetype'  => $codeType,
             'file_base64' => base64_encode($imageData),

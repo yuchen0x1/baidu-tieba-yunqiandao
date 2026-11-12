@@ -93,10 +93,11 @@ switch (SYSTEM_PAGE) {
             @option::set('proxy_type', isset($sou['proxy_type']) ? $sou['proxy_type'] : '0');
             @option::set('proxy_host', isset($sou['proxy_host']) ? trim($sou['proxy_host']) : '');
             @option::set('proxy_user', isset($sou['proxy_user']) ? $sou['proxy_user'] : '');
-            @option::set('proxy_pass', isset($sou['proxy_pass']) ? $sou['proxy_pass'] : '');
+            SecretBox::saveFromForm($sou, 'proxy_pass');
             @option::set('dama_type', isset($sou['dama_type']) ? $sou['dama_type'] : 'none');
-            @option::set('dama_username', isset($sou['dama_username']) ? $sou['dama_username'] : '');
-            @option::set('dama_password', isset($sou['dama_password']) ? $sou['dama_password'] : '');
+            //敏感凭据：空提交=保持不变，clear_dama_username/clear_dama_password=1 才清空
+            SecretBox::saveFromForm($sou, 'dama_username');
+            SecretBox::saveFromForm($sou, 'dama_password');
             @option::set('dama_softid', isset($sou['dama_softid']) ? trim($sou['dama_softid']) : '');
             @option::set('health_auto_disable', isset($sou['health_auto_disable']) ? $sou['health_auto_disable'] : '0');
             @option::set('health_fail_max', max(1, min(20, (int) $souGet('health_fail_max', '1'))));
@@ -133,7 +134,7 @@ switch (SYSTEM_PAGE) {
             @option::set('stop_reg', $souGet('stop_reg'));
             @option::set('icp', $souGet('icp'));
             @option::set('bbs_us', $souGet('bbs_us'));
-            @option::set('bbs_pw', $souGet('bbs_pw'));
+            SecretBox::saveFromForm($sou, 'bbs_pw');
             @option::set('mail_mode', $souGet('mail_mode'));
             @option::set('mail_name', $souGet('mail_name'));
             @option::set('mail_yourname', $souGet('mail_yourname'));
@@ -142,36 +143,51 @@ switch (SYSTEM_PAGE) {
             @option::set('mail_auth', $souGet('mail_auth'));
             @option::set('mail_secure', $souGet('mail_secure'));
             @option::set('mail_smtpname', $souGet('mail_smtpname'));
-            isset($sou['mail_smtppw']) and @option::set('mail_smtppw', $souGet('mail_smtppw'));
+            SecretBox::saveFromForm($sou, 'mail_smtppw');
             @option::set('dev', $souGet('dev'));
-            @option::set('cron_pw', $souGet('cron_pw'));
+            SecretBox::saveFromForm($sou, 'cron_pw');
             isset($sou['cron_asyn']) and @option::set('cron_asyn', $souGet('cron_asyn'));
             @option::set('sign_multith', $souGet('sign_multith'));
             @option::set('cktime', $souGet('cktime'));
             @option::set('notify_enable', isset($sou['notify_enable']) && $sou['notify_enable'] == '1' ? 1 : 0);
             @option::set('notify_channel', isset($sou['notify_channel']) ? $sou['notify_channel'] : 'none');
-            @option::set('notify_serverchan_key', isset($sou['notify_serverchan_key']) ? $sou['notify_serverchan_key'] : '');
-            @option::set('notify_telegram_token', isset($sou['notify_telegram_token']) ? $sou['notify_telegram_token'] : '');
+            SecretBox::saveFromForm($sou, 'notify_serverchan_key');
+            SecretBox::saveFromForm($sou, 'notify_telegram_token');
             @option::set('notify_telegram_chatid', isset($sou['notify_telegram_chatid']) ? $sou['notify_telegram_chatid'] : '');
-            @option::set('notify_webhook_url', isset($sou['notify_webhook_url']) ? $sou['notify_webhook_url'] : '');
+            SecretBox::saveFromForm($sou, 'notify_webhook_url');
             @option::set('notify_on_fail', isset($sou['notify_on_fail']) ? 1 : 0);
             @option::set('notify_on_health', isset($sou['notify_on_health']) ? 1 : 0);
-            @option::set('notify_bark_url', isset($sou['notify_bark_url']) ? $sou['notify_bark_url'] : '');
-            @option::set('notify_pushplus_token', isset($sou['notify_pushplus_token']) ? $sou['notify_pushplus_token'] : '');
-            @option::set('notify_dingtalk_webhook', isset($sou['notify_dingtalk_webhook']) ? trim($sou['notify_dingtalk_webhook']) : '');
-            @option::set('notify_dingtalk_secret', isset($sou['notify_dingtalk_secret']) ? trim($sou['notify_dingtalk_secret']) : '');
-            @option::set('notify_wecom_webhook', isset($sou['notify_wecom_webhook']) ? trim($sou['notify_wecom_webhook']) : '');
-            @option::set('notify_feishu_webhook', isset($sou['notify_feishu_webhook']) ? trim($sou['notify_feishu_webhook']) : '');
-            @option::set('notify_wxpusher_token', isset($sou['notify_wxpusher_token']) ? trim($sou['notify_wxpusher_token']) : '');
+            SecretBox::saveFromForm($sou, 'notify_bark_url');
+            SecretBox::saveFromForm($sou, 'notify_pushplus_token');
+            SecretBox::saveFromForm($sou, 'notify_dingtalk_webhook');
+            SecretBox::saveFromForm($sou, 'notify_dingtalk_secret');
+            SecretBox::saveFromForm($sou, 'notify_wecom_webhook');
+            SecretBox::saveFromForm($sou, 'notify_feishu_webhook');
+            SecretBox::saveFromForm($sou, 'notify_wxpusher_token');
             @option::set('notify_wxpusher_uid', isset($sou['notify_wxpusher_uid']) ? trim($sou['notify_wxpusher_uid']) : '');
             @option::set('notify_ntfy_server', isset($sou['notify_ntfy_server']) ? trim($sou['notify_ntfy_server']) : 'https://ntfy.sh');
             @option::set('notify_ntfy_topic', isset($sou['notify_ntfy_topic']) ? trim($sou['notify_ntfy_topic']) : '');
             require_once SYSTEM_ROOT . '/lib/security.php';
             //全局 API Token 只存哈希，防止拖库后直接拿到可用凭据
-            @option::set('api_token', api_token_storable(isset($sou['api_token']) ? $sou['api_token'] : ''));
+            //空提交=保持不变，clear_api_token=1 才清空
+            $apiTokenInput = isset($sou['api_token']) ? trim((string) $sou['api_token']) : '';
+            $apiTokenClear = isset($sou['clear_api_token']) && (string) $sou['clear_api_token'] === '1';
+            if ($apiTokenClear) {
+                @option::set('api_token', '');
+            } elseif ($apiTokenInput !== '') {
+                @option::set('api_token', api_token_storable($apiTokenInput));
+            }
+            //metrics_token 与 api_token 同为哈希存储，仅在 /metrics.php 认证使用
+            $metricsTokenInput = isset($sou['metrics_token']) ? trim((string) $sou['metrics_token']) : '';
+            $metricsTokenClear = isset($sou['clear_metrics_token']) && (string) $sou['clear_metrics_token'] === '1';
+            if ($metricsTokenClear) {
+                @option::set('metrics_token', '');
+            } elseif ($metricsTokenInput !== '') {
+                @option::set('metrics_token', api_token_storable($metricsTokenInput));
+            }
             @option::set('oauth_github_enable', isset($sou['oauth_github_enable']) ? '1' : '0');
             @option::set('oauth_github_client_id', trim((string) (isset($sou['oauth_github_client_id']) ? $sou['oauth_github_client_id'] : '')));
-            @option::set('oauth_github_client_secret', trim((string) (isset($sou['oauth_github_client_secret']) ? $sou['oauth_github_client_secret'] : '')));
+            SecretBox::saveFromForm($sou, 'oauth_github_client_secret');
             @option::set('oauth_auto_register', isset($sou['oauth_auto_register']) ? '1' : '0');
         }
         doAction('admin_set_save');

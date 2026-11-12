@@ -4,7 +4,7 @@
     msg('权限不足！');
 }
 global $m,$i;
-$day = date('d');
+$day = date('Y-m-d');
 if (isset($_GET['ok'])) {
     echo '<div class="cs-alert cs-alert-success"><svg class="cs-alert-icon" aria-hidden="true"><use href="#i-check"/></svg><div class="cs-alert-body">设置保存成功</div></div>';
 }
@@ -44,7 +44,7 @@ $globalRate = ($summary['signed'] + $summary['error']) > 0
     ? round($summary['signed'] / ($summary['signed'] + $summary['error']) * 100, 1) : 0;
 ?>
 
-<section class="metric-grid" style="margin:16px 0">
+<section class="metric-grid metric-grid--four" style="margin:16px 0">
     <div class="metric-card"><span class="metric-label">用户总数</span><strong class="metric-value"><?php echo (int) $uxsCount['c']; ?></strong><span class="metric-note">已注册</span></div>
     <div class="metric-card"><span class="metric-label">百度账号</span><strong class="metric-value"><?php echo (int) $baiduidCount['c']; ?></strong><span class="metric-note">全站绑定</span></div>
     <div class="metric-card"><span class="metric-label">今日成功</span><strong class="metric-value"><?php echo (int) $summary['signed']; ?></strong><span class="metric-note">待签 <?php echo (int) $summary['waiting']; ?> · 出错 <?php echo (int) $summary['error']; ?></span></div>

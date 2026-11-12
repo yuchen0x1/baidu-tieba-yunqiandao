@@ -8,6 +8,7 @@
 define('SYSTEM_ROOT', dirname(__FILE__));
 require SYSTEM_ROOT . '/version.php';
 require_once SYSTEM_ROOT . '/lib/request.php';
+require_once SYSTEM_ROOT . '/lib/session.php';
 define('PLUGIN_ROOT', dirname(__FILE__) . '/plugins/');
 define('SYSTEM_ISCONSOLE', (PHP_SAPI === 'cli') || defined('STDIN'));
 define('SYSTEM_PAGE', request_text_value($_REQUEST, 'mod', 'default'));

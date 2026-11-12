@@ -56,6 +56,10 @@ class ProjectUpdater
 {
     const DEFAULT_TIMEOUT_MS = 8000;
     const GEO_TIMEOUT_MS = 3000;
+    const DOWNLOAD_TIMEOUT_MS = 120000;
+    const DOWNLOAD_RETRIES = 3;
+    const MAX_DOWNLOAD_BYTES = 536870912;
+    const UPDATE_BACKUP_KEEP = 3;
     const REMOTE_HOST_WHITELIST = array('api.github.com', 'github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com');
     const GITHUB_RELEASES_API_URL = 'https://api.github.com/repos/yuchen0x1/baidu-tieba-yunqiandao/releases/latest';
     const GITHUB_RELEASES_PAGE_URL = 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/latest';
@@ -103,6 +107,7 @@ class ProjectUpdater
             'asset_size' => $asset['size'],
             'asset_digest' => $asset['digest'],
             'asset_checksum_url' => self::selectChecksumAsset(isset($payload['assets']) && is_array($payload['assets']) ? $payload['assets'] : array()),
+            'asset_signature_url' => self::selectSignatureAsset(isset($payload['assets']) && is_array($payload['assets']) ? $payload['assets'] : array()),
             'published_at' => isset($payload['published_at']) ? (string) $payload['published_at'] : '',
             'is_prerelease' => !empty($payload['prerelease'])
         );
@@ -186,7 +191,8 @@ class ProjectUpdater
             'prerelease' => false,
             'assets' => array(
                 array('name' => $assetName, 'browser_download_url' => $assetUrl, 'size' => 0, 'digest' => ''),
-                array('name' => $assetName . '.sha256', 'browser_download_url' => $checksumUrl, 'size' => 0, 'digest' => '')
+                array('name' => $assetName . '.sha256', 'browser_download_url' => $checksumUrl, 'size' => 0, 'digest' => ''),
+                array('name' => $assetName . '.sig', 'browser_download_url' => $assetUrl . '.sig', 'size' => 0, 'digest' => '')
             )
         ));
     }
@@ -368,7 +374,7 @@ class ProjectUpdater
      * GitHub API calls are restricted to the official repository paths. Redirects
      * are followed manually so credentials are never forwarded to another host.
      */
-    private static function requestSafeUrl($url, array $headers, $timeoutMs, $isApi)
+    private static function requestSafeUrl($url, array $headers, $timeoutMs, $isApi, $sinkPath = null, $progress = null)
     {
         $currentUrl = (string) $url;
         $token = $isApi ? self::githubToken() : '';
@@ -386,15 +392,26 @@ class ProjectUpdater
             if ($isApi && $redirects === 0 && $host === $initialHost && $host === 'api.github.com' && self::isGitHubReleaseApiEndpoint($currentUrl) && $token !== '') {
                 $requestHeaders[] = 'Authorization: Bearer ' . $token;
             }
+            $sink = null;
+            if ($sinkPath !== null) {
+                $sink = @fopen($sinkPath, 'wb');
+                if ($sink === false) {
+                    return array('body' => false, 'error' => '无法创建更新临时文件', 'status' => 0, 'headers' => array(), 'url' => $currentUrl);
+                }
+            }
+            $downloaded = 0;
             $curl = curl_init($currentUrl);
             if ($curl === false) {
+                if (is_resource($sink)) {
+                    fclose($sink);
+                }
                 return array('body' => false, 'error' => '无法初始化更新连接', 'status' => 0, 'headers' => array(), 'url' => $currentUrl);
             }
             $port = isset($parts['port']) ? (int) $parts['port'] : 443;
             $ip = self::resolveSafeIp($host);
             $resolveAddress = strpos($ip, ':') !== false ? '[' . $ip . ']' : $ip;
             curl_setopt_array($curl, array(
-                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_RETURNTRANSFER => $sink === null,
                 CURLOPT_FOLLOWLOCATION => false,
                 CURLOPT_SSL_VERIFYPEER => true,
                 CURLOPT_SSL_VERIFYHOST => 2,
@@ -419,6 +436,30 @@ class ProjectUpdater
                     return $length;
                 }
             ));
+            if ($sink !== null) {
+                curl_setopt($curl, CURLOPT_WRITEFUNCTION, function ($handle, $chunk) use ($sink, &$downloaded, $progress) {
+                    $length = strlen($chunk);
+                    $downloaded += $length;
+                    if ($downloaded > self::MAX_DOWNLOAD_BYTES) {
+                        return 0;
+                    }
+                    $written = fwrite($sink, $chunk);
+                    if ($written !== $length) {
+                        return 0;
+                    }
+                    if (is_callable($progress)) {
+                        call_user_func($progress, $downloaded, 0);
+                    }
+                    return $written;
+                });
+                curl_setopt($curl, CURLOPT_NOPROGRESS, false);
+                curl_setopt($curl, CURLOPT_XFERINFOFUNCTION, function ($handle, $downloadSize, $downloadedSize) use ($progress) {
+                    if (is_callable($progress)) {
+                        call_user_func($progress, (int) $downloadedSize, (int) $downloadSize);
+                    }
+                    return 0;
+                });
+            }
             $caInfo = self::findCaInfo();
             if ($caInfo !== false) {
                 curl_setopt($curl, CURLOPT_CAINFO, $caInfo);
@@ -428,6 +469,9 @@ class ProjectUpdater
             $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
             $redirectUrl = curl_getinfo($curl, CURLINFO_REDIRECT_URL);
             curl_close($curl);
+            if (is_resource($sink)) {
+                fclose($sink);
+            }
             if ((!is_string($redirectUrl) || $redirectUrl === '') && isset($responseHeaders['location'])) {
                 $redirectUrl = $responseHeaders['location'];
             }
@@ -441,7 +485,10 @@ class ProjectUpdater
                 }
                 continue;
             }
-            return array('body' => $body, 'error' => $error, 'status' => $status, 'headers' => $responseHeaders, 'url' => $currentUrl);
+            if ($sink !== null) {
+                $body = ($body === false || $error !== '') ? false : $sinkPath;
+            }
+            return array('body' => $body, 'error' => $error, 'status' => $status, 'headers' => $responseHeaders, 'url' => $currentUrl, 'downloaded' => $downloaded);
         }
         return array('body' => false, 'error' => '更新服务器重定向次数过多', 'status' => 0, 'headers' => array(), 'url' => $currentUrl);
     }
@@ -670,6 +717,9 @@ class ProjectUpdater
         if (!is_dir(UPDATE_CACHE) && !mkdir(UPDATE_CACHE, 0777, true) && !is_dir(UPDATE_CACHE)) {
             throw new RuntimeException('无法创建更新缓存目录');
         }
+        self::writeUpdateStatus('starting', 0, 0, '正在准备更新');
+        $backupPath = '';
+        $backupFiles = array();
         try {
             $suffix = bin2hex(random_bytes(8));
         } catch (Throwable $e) {
@@ -695,8 +745,14 @@ class ProjectUpdater
             $zipPath = $workDir . '/source.zip';
             $errors = array();
             $downloadedUrl = '';
+            $downloadStartedAt = microtime(true);
             foreach ($candidates as $url) {
-                $res = self::downloadToFile($url, $zipPath);
+                $res = self::downloadToFile($url, $zipPath, (int) (isset($release['asset_size']) ? $release['asset_size'] : 0), function ($downloaded, $total) use ($downloadStartedAt) {
+                    $elapsed = max(0.001, microtime(true) - $downloadStartedAt);
+                    $speed = (int) floor($downloaded / $elapsed);
+                    $eta = $total > 0 && $speed > 0 ? (int) ceil(max(0, $total - $downloaded) / $speed) : null;
+                    self::writeUpdateStatus('downloading', $downloaded, $total, '正在下载更新包', $speed, $eta);
+                });
                 if (!$res['ok']) {
                     $errors[] = '下载失败（HTTP ' . $res['status'] . '）';
                     continue;
@@ -715,6 +771,8 @@ class ProjectUpdater
             }
             // ZIP 魔数只能证明“是个压缩包”，不能证明内容可信：安装前强制校验发布摘要
             self::verifyPackageDigest($zipPath, $release, $downloadedUrl);
+            self::verifyPackageSignature($zipPath, $release);
+            self::writeUpdateStatus('verified', filesize($zipPath), filesize($zipPath), '更新包校验通过，准备备份当前版本');
             $zip = new ZipArchive();
             $opened = $zip->open($zipPath);
             if ($opened !== true) {
@@ -729,16 +787,33 @@ class ProjectUpdater
             if ($root === false) {
                 throw new RuntimeException('更新包目录结构无效');
             }
+            $backupPath = self::createApplicationBackup();
+            $backupFiles = self::listArchiveFiles($backupPath);
             foreach (array('config.php', 'key.php', 'app.conf', 'config.yaml', '.env', 'docker/.env', 'setup/install.lock') as $relative) {
                 $protected = $root . '/' . $relative;
                 if (is_file($protected) && !unlink($protected)) {
                     throw new RuntimeException('无法保护站点文件：' . $relative);
                 }
             }
+            $packageFiles = self::collectRelativeFiles($root);
+            self::writeUpdateStatus('installing', 0, 0, '正在覆盖应用文件');
             if (!function_exists('CopyAll') || CopyAll($root, SYSTEM_ROOT) !== true) {
-                throw new RuntimeException('无法写入更新文件');
+                throw new RuntimeException('无法写入更新文件，已尝试恢复旧版本');
             }
+            self::writeUpdateStatus('completed', 1, 1, '文件更新完成，等待数据库迁移');
             return true;
+        } catch (Throwable $e) {
+            if ($backupPath !== '') {
+                try {
+                    self::removeNewPackageFiles($packageFiles ?? array(), $backupFiles);
+                    self::restoreApplicationBackup($backupPath);
+                    self::writeUpdateStatus('rolled_back', 0, 0, '更新失败，已恢复旧版本');
+                } catch (Throwable $rollbackError) {
+                    throw new RuntimeException($e->getMessage() . '；自动回滚失败：' . $rollbackError->getMessage(), 0, $e);
+                }
+            }
+            self::writeUpdateStatus('failed', 0, 0, '更新失败：' . $e->getMessage());
+            throw $e;
         } finally {
             if (function_exists('DeleteFile')) {
                 DeleteFile($workDir);
@@ -786,6 +861,51 @@ class ProjectUpdater
         return '';
     }
 
+    /**
+     * 从 GitHub Release 资产中选取可选的 detached signature（.sig）。
+     * 签名不会替代 SHA-256；只有部署环境配置公钥时才会强制验证。
+     */
+    private static function selectSignatureAsset(array $assets)
+    {
+        foreach ($assets as $asset) {
+            $name = isset($asset['name']) ? (string) $asset['name'] : '';
+            $url = isset($asset['browser_download_url']) ? trim((string) $asset['browser_download_url']) : '';
+            if (strtolower(pathinfo($name, PATHINFO_EXTENSION)) === 'sig' && self::isAllowedUrl($url)) {
+                return $url;
+            }
+        }
+        return '';
+    }
+
+    public static function signatureConfigured()
+    {
+        $key = getenv('UPDATE_RELEASE_PUBLIC_KEY');
+        return $key !== false && trim((string) $key) !== '';
+    }
+
+    public static function signatureRequired()
+    {
+        $required = getenv('UPDATE_REQUIRE_SIGNATURE');
+        return $required !== false && filter_var($required, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
+     * 返回后台可展示的完整性状态，不泄露公钥内容或任何令牌。
+     */
+    public static function verificationSummary(array $release)
+    {
+        $digest = trim((string) (isset($release['asset_digest']) ? $release['asset_digest'] : ''));
+        $hasDigest = preg_match('/^sha256:[0-9a-fA-F]{64}$/', $digest) === 1
+            || !empty($release['asset_checksum_url']);
+        $hasSignatureAsset = !empty($release['asset_signature_url']);
+        return array(
+            'sha256_available' => $hasDigest,
+            'signature_available' => $hasSignatureAsset,
+            'signature_configured' => self::signatureConfigured(),
+            'signature_required' => self::signatureRequired()
+        );
+    }
+
     private static function isAllowedUrl($url)
     {
         $parts = parse_url((string) $url);
@@ -818,22 +938,209 @@ class ProjectUpdater
      * 下载到文件并做 ZIP 魔数校验，附诊断信息（HTTP 状态/Content-Type/开头字节）
      * @return array {ok, is_zip, status, content_type, snippet}
      */
-    private static function downloadToFile($url, $zipPath)
+    private static function downloadToFile($url, $zipPath, $expectedSize = 0, $progress = null)
     {
-        $response = self::requestSafeUrl($url, array(), 120000, false);
-        $body = $response['body'];
-        $status = $response['status'];
-        $error = $response['error'];
-        $contentType = '';
-        if ($body === false || $error !== '' || $status < 200 || $status >= 300) {
-            return array('ok' => false, 'is_zip' => false, 'status' => $status, 'content_type' => $contentType, 'snippet' => $error);
+        $last = array('ok' => false, 'is_zip' => false, 'status' => 0, 'content_type' => '', 'snippet' => '');
+        for ($attempt = 1; $attempt <= self::DOWNLOAD_RETRIES; $attempt++) {
+            @unlink($zipPath);
+            $response = self::requestSafeUrl($url, array(), self::DOWNLOAD_TIMEOUT_MS, false, $zipPath, $progress);
+            $status = (int) $response['status'];
+            $error = (string) $response['error'];
+            $last = array('ok' => false, 'is_zip' => false, 'status' => $status, 'content_type' => '', 'snippet' => $error);
+            if ($response['body'] === false || $error !== '' || $status < 200 || $status >= 300 || !is_file($zipPath)) {
+                if ($attempt < self::DOWNLOAD_RETRIES) {
+                    usleep($attempt * 250000);
+                    continue;
+                }
+                return $last;
+            }
+            $size = (int) @filesize($zipPath);
+            if ($size <= 0 || $size > self::MAX_DOWNLOAD_BYTES) {
+                $last['snippet'] = '下载文件大小超出安全限制';
+            } elseif ($expectedSize > 0 && $size !== $expectedSize) {
+                $last['snippet'] = '文件大小校验失败（期望 ' . $expectedSize . '，实际 ' . $size . '）';
+            } else {
+                $head = @file_get_contents($zipPath, false, null, 0, 80);
+                $isZip = is_string($head) && strlen($head) >= 2 && substr($head, 0, 2) === 'PK';
+                $last['ok'] = true;
+                $last['is_zip'] = $isZip;
+                $last['snippet'] = $isZip ? '' : strtolower(substr(preg_replace('/\s+/', ' ', strip_tags((string) $head)), 0, 80));
+                return $last;
+            }
+            if ($attempt < self::DOWNLOAD_RETRIES) {
+                usleep($attempt * 250000);
+            }
         }
-        if (file_put_contents($zipPath, $body, LOCK_EX) === false) {
-            return array('ok' => false, 'is_zip' => false, 'status' => $status, 'content_type' => $contentType, 'snippet' => '写入临时文件失败');
+        return $last;
+    }
+
+    private static function writeUpdateStatus($state, $downloaded, $total, $message, $speed = 0, $eta = null)
+    {
+        if (!defined('UPDATE_CACHE')) {
+            return;
         }
-        $isZip = strlen($body) >= 2 && substr($body, 0, 2) === 'PK';
-        $snippet = $isZip ? '' : strtolower(substr(preg_replace('/\s+/', ' ', strip_tags((string) $body)), 0, 80));
-        return array('ok' => true, 'is_zip' => $isZip, 'status' => $status, 'content_type' => $contentType, 'snippet' => $snippet);
+        $total = (int) $total;
+        $downloaded = max(0, (int) $downloaded);
+        $payload = array(
+            'state' => (string) $state,
+            'downloaded_bytes' => $downloaded,
+            'total_bytes' => max(0, $total),
+            'percent' => $total > 0 ? min(100, (int) floor($downloaded * 100 / $total)) : null,
+            'speed_bytes_per_second' => max(0, (int) $speed),
+            'eta_seconds' => $eta === null ? null : max(0, (int) $eta),
+            'message' => (string) $message,
+            'updated_at' => gmdate('c')
+        );
+        $path = rtrim(UPDATE_CACHE, '/\\') . '/update-status.json';
+        $tmp = $path . '.tmp';
+        if (@file_put_contents($tmp, json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX) !== false) {
+            @rename($tmp, $path);
+        }
+    }
+
+    private static function protectedRelativePath($relative)
+    {
+        $relative = trim(str_replace('\\', '/', (string) $relative), '/');
+        if ($relative === '') {
+            return true;
+        }
+        foreach (array('config.php', 'key.php', 'app.conf', 'config.yaml', '.env', 'docker/.env', 'setup/install.lock') as $protected) {
+            if ($relative === $protected) {
+                return true;
+            }
+        }
+        return strpos($relative, 'data/') === 0
+            || strpos($relative, 'setup/update_cache/') === 0
+            || strpos($relative, '.git/') === 0
+            || strpos($relative, 'vendor/') === 0;
+    }
+
+    private static function collectRelativeFiles($root, $prefix = '')
+    {
+        $files = array();
+        $entries = @scandir($root);
+        if (!is_array($entries)) {
+            return $files;
+        }
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+            $relative = ltrim($prefix . '/' . $entry, '/');
+            if (self::protectedRelativePath($relative)) {
+                continue;
+            }
+            $path = $root . '/' . $entry;
+            if (is_link($path)) {
+                continue;
+            }
+            if (is_dir($path)) {
+                $files = array_merge($files, self::collectRelativeFiles($path, $relative));
+            } elseif (is_file($path)) {
+                $files[] = $relative;
+            }
+        }
+        return $files;
+    }
+
+    private static function createApplicationBackup()
+    {
+        $backupDir = SYSTEM_ROOT . '/data/backups';
+        if (!is_dir($backupDir) && !@mkdir($backupDir, 0755, true) && !is_dir($backupDir)) {
+            throw new RuntimeException('无法创建代码回滚备份目录');
+        }
+        try {
+            $backupSuffix = bin2hex(random_bytes(4));
+        } catch (Throwable $e) {
+            $backupSuffix = substr(md5(uniqid('', true)), 0, 8);
+        }
+        $name = 'pre-update-files-' . (defined('SYSTEM_VER') ? preg_replace('/[^0-9A-Za-z._-]/', '_', SYSTEM_VER) : 'unknown') . '-' . date('Ymd_His') . '-' . $backupSuffix . '.zip';
+        $path = $backupDir . '/' . $name;
+        $zip = new ZipArchive();
+        if ($zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            throw new RuntimeException('无法创建代码回滚备份');
+        }
+        foreach (self::collectRelativeFiles(SYSTEM_ROOT) as $relative) {
+            $absolute = SYSTEM_ROOT . '/' . str_replace('/', DIRECTORY_SEPARATOR, $relative);
+            if (!$zip->addFile($absolute, $relative)) {
+                $zip->close();
+                @unlink($path);
+                throw new RuntimeException('代码回滚备份失败：' . $relative);
+            }
+        }
+        if (!$zip->close()) {
+            @unlink($path);
+            throw new RuntimeException('无法写入代码回滚备份');
+        }
+        $files = glob($backupDir . '/pre-update-files-*.zip');
+        if (is_array($files) && count($files) > self::UPDATE_BACKUP_KEEP) {
+            sort($files);
+            foreach (array_slice($files, 0, count($files) - self::UPDATE_BACKUP_KEEP) as $old) {
+                @unlink($old);
+            }
+        }
+        return $path;
+    }
+
+    private static function listArchiveFiles($path)
+    {
+        $files = array();
+        $zip = new ZipArchive();
+        if ($zip->open($path) !== true) {
+            return $files;
+        }
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $name = str_replace('\\', '/', (string) $zip->getNameIndex($i));
+            if ($name !== '' && substr($name, -1) !== '/') {
+                $files[$name] = true;
+            }
+        }
+        $zip->close();
+        return $files;
+    }
+
+    private static function removeNewPackageFiles(array $packageFiles, array $backupFiles)
+    {
+        foreach ($packageFiles as $relative) {
+            $relative = str_replace('\\', '/', (string) $relative);
+            if (isset($backupFiles[$relative]) || self::protectedRelativePath($relative)) {
+                continue;
+            }
+            $path = SYSTEM_ROOT . '/' . str_replace('/', DIRECTORY_SEPARATOR, $relative);
+            if (is_file($path) || is_link($path)) {
+                @unlink($path);
+            }
+        }
+    }
+
+    private static function restoreApplicationBackup($path)
+    {
+        try {
+            $restoreSuffix = bin2hex(random_bytes(6));
+        } catch (Throwable $e) {
+            $restoreSuffix = substr(md5(uniqid('', true)), 0, 12);
+        }
+        $restoreDir = rtrim(UPDATE_CACHE, '/\\') . '/rollback_' . $restoreSuffix;
+        if (!@mkdir($restoreDir, 0777, true) && !is_dir($restoreDir)) {
+            throw new RuntimeException('无法创建回滚临时目录');
+        }
+        try {
+            $zip = new ZipArchive();
+            if ($zip->open($path) !== true || !function_exists('safe_zip_extract') || !safe_zip_extract($zip, $restoreDir)) {
+                if (isset($zip)) {
+                    $zip->close();
+                }
+                throw new RuntimeException('代码回滚备份无法解析');
+            }
+            $zip->close();
+            if (!function_exists('CopyAll') || CopyAll($restoreDir, SYSTEM_ROOT) !== true) {
+                throw new RuntimeException('旧版本文件恢复失败');
+            }
+        } finally {
+            if (function_exists('DeleteFile')) {
+                DeleteFile($restoreDir);
+            }
+        }
     }
 
     /**
@@ -868,6 +1175,51 @@ class ProjectUpdater
         if (!is_string($actual) || !hash_equals($expected, $actual)) {
             throw new RuntimeException('更新包 SHA-256 校验失败（期望 ' . $expected . '，实际 ' . ($actual === false ? '无法计算' : $actual) . '），已拒绝安装，原程序未被修改');
         }
+    }
+
+    /**
+     * 使用部署环境提供的 PEM 公钥校验 detached RSA/ECDSA SHA-256 签名。
+     * 没有配置公钥时保持兼容旧 Release；配置 UPDATE_REQUIRE_SIGNATURE=true
+     * 后，缺少签名或校验失败会拒绝安装。
+     */
+    public static function verifyPackageSignature($zipPath, array $release)
+    {
+        $publicKey = getenv('UPDATE_RELEASE_PUBLIC_KEY');
+        $publicKey = $publicKey === false ? '' : trim((string) $publicKey);
+        if (strpos($publicKey, '\\n') !== false) {
+            $publicKey = str_replace('\\n', "\n", $publicKey);
+        }
+        if ($publicKey === '') {
+            if (self::signatureRequired()) {
+                throw new RuntimeException('已要求数字签名，但未配置 UPDATE_RELEASE_PUBLIC_KEY，已拒绝安装');
+            }
+            return false;
+        }
+        $signatureUrl = isset($release['asset_signature_url']) ? trim((string) $release['asset_signature_url']) : '';
+        if ($signatureUrl === '' || !self::isAllowedUrl($signatureUrl)) {
+            throw new RuntimeException('Release 未提供可信的数字签名附件，已拒绝安装');
+        }
+        $res = self::downloadToString($signatureUrl);
+        if (!$res['ok']) {
+            throw new RuntimeException('数字签名附件下载失败，已拒绝安装');
+        }
+        $encoded = trim((string) $res['body']);
+        $signature = base64_decode($encoded, true);
+        if ($signature === false) {
+            // 允许发布脚本直接上传二进制 .sig；文本 base64 仍是推荐格式。
+            $signature = (string) $res['body'];
+        }
+        $content = @file_get_contents($zipPath);
+        if (!is_string($content)) {
+            throw new RuntimeException('无法读取更新包进行数字签名校验');
+        }
+        $verified = function_exists('openssl_verify')
+            ? openssl_verify($content, $signature, $publicKey, OPENSSL_ALGO_SHA256)
+            : 0;
+        if ($verified !== 1) {
+            throw new RuntimeException('更新包数字签名校验失败，已拒绝安装，原程序未被修改');
+        }
+        return true;
     }
 
     private static function downloadToString($url)

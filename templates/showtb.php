@@ -2,7 +2,7 @@
     die('Insufficient Permissions');
 }
 global $m,$i;
-$day = date('d');
+$day = date('Y-m-d');
 if (isset($_GET['ok'])) {
     echo '<div class="cs-alert cs-alert-success"><svg class="cs-alert-icon" aria-hidden="true"><use href="#i-check"/></svg><div class="cs-alert-body">设置保存成功</div></div>';
 }
@@ -14,7 +14,7 @@ if (isset($_GET['restore_msg'])) {
 }
 
 // 一键复签失败贴吧表单
-$todayDay = date('d');
+$todayDay = date('Y-m-d');
 $failedCount = 0;
 if (!empty($i['user']['bduss'])) {
     $fcRow = $m->once_fetch_array("SELECT COUNT(*) AS c FROM `" . DB_NAME . "`.`" . DB_PREFIX . TABLE . "` WHERE `uid` = " . (int) UID . " AND `no` = 0 AND `latest` = '" . $m->real_escape_string($todayDay) . "' AND `status` != 0");

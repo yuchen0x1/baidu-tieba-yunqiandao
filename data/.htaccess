@@ -1,0 +1,9 @@
+# 禁止通过 Web 访问运行期数据（日志与数据库备份）
+#
+# 这里存放 dbbackup_*.sql、pre-upgrade_*.sql 与 system.log：
+# 备份含加密 BDUSS、用户邮箱、API Token 哈希与全部业务数据。
+# Apache 读取 .htaccess；Nginx/Caddy 请按 README「部署安全」一节配置等价规则。
+
+Require all denied
+Order allow,deny
+Deny from all

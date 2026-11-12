@@ -31,7 +31,7 @@ if (file_exists(SYSTEM_ROOT . '/lib/class.Achievement.php')) {
 // 今日失败贴吧数（供快速复签卡片使用）
 $todayFailedCount = 0;
 if (defined('TABLE') && !empty($i['user']['bduss'])) {
-    $todayDay = date('d');
+    $todayDay = date('Y-m-d');
     $fcRow = $m->once_fetch_array("SELECT COUNT(*) AS c FROM `" . DB_NAME . "`.`" . DB_PREFIX . TABLE . "` WHERE `uid` = " . (int) UID . " AND `no` = 0 AND `latest` = '" . $m->real_escape_string($todayDay) . "' AND `status` != 0");
     $todayFailedCount = (int) ($fcRow['c'] ?? 0);
 }
@@ -80,7 +80,7 @@ $dashGreet = $dashHour < 6 ? '夜深了' : ($dashHour < 12 ? '早上好' : ($das
 </div>
 <?php } ?>
 
-<section class="metric-grid" aria-label="账号概览">
+<section class="metric-grid metric-grid--four" aria-label="账号概览">
     <div class="metric-card">
         <span class="metric-label">已绑定百度账号</span>
         <strong class="metric-value" id="baiduid_used"><?php echo $accountCount; ?></strong>

@@ -15,6 +15,14 @@ if (!defined('SYSTEM_VER')) {
  */
 final class ApiContractTest extends TestCase
 {
+    public function testIncompletePluginIndexHasNoActivePlugins(): void
+    {
+        $this->assertSame(array(), plugin_active_ids(array()));
+        $this->assertSame(array(), plugin_active_ids(array('actived' => null)));
+        $this->assertSame(array(), plugin_active_ids(array('actived' => 'not-an-array')));
+        $this->assertSame(array('ver4_like'), plugin_active_ids(array('actived' => array('ver4_like'))));
+    }
+
     // ---------- 版本标识 ----------
 
     public function testContractVersionIsStableAndSemverLike(): void

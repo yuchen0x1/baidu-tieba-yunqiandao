@@ -13,6 +13,15 @@ function valid_plugin_id($plugin)
     return is_string($plugin) && preg_match('/^[A-Za-z0-9_\-]+$/', $plugin) && strpos($plugin, '..') === false;
 }
 
+/** Return the activated plugin ids from a possibly incomplete plugin index. */
+function plugin_active_ids($pluginIndex)
+{
+    if (!is_array($pluginIndex) || !isset($pluginIndex['actived']) || !is_array($pluginIndex['actived'])) {
+        return array();
+    }
+    return $pluginIndex['actived'];
+}
+
 /**
  * 安全提取插件 ZIP：强制单根目录，剥离仓库根目录后提取到插件标识目录。
  * 兼容 Gitee/GitHub 的 repository-main 归档结构，同时拒绝 Zip Slip 与覆盖既有插件。
@@ -354,7 +363,10 @@ function loadplugins()
     if (defined('SYSTEM_PLUGINS_LOADED')) {
         return;
     }
-    foreach ($i['plugins']['actived'] as $value) {
+    //测试、CLI 工具和健康检查等最小运行环境可能不会初始化完整的
+    //全局插件索引；此时应视为没有激活插件，而不是发出 warning。
+    $activePlugins = plugin_active_ids(isset($i['plugins']) ? $i['plugins'] : null);
+    foreach ($activePlugins as $value) {
         if (file_exists(SYSTEM_ROOT . '/plugins/' . $value . '/' . $value . '.php') && !is_dir(SYSTEM_ROOT . '/plugins/' . $value . '/' . $value . '.php')) {
             include SYSTEM_ROOT . '/plugins/' . $value . '/' . $value . '.php';
         }
@@ -668,8 +680,16 @@ function getOldPluginData($pluginFile)
     );
 }
 
-foreach ($i['plugins']['actived'] as $pluginInfo) {
-    $i['plugins']['desc'][$pluginInfo] = getPluginInfo($pluginInfo);
+if (isset($i['plugins']) && is_array($i['plugins'])) {
+    $activePlugins = plugin_active_ids($i['plugins']);
+    if ($activePlugins !== array()) {
+        if (!isset($i['plugins']['desc']) || !is_array($i['plugins']['desc'])) {
+            $i['plugins']['desc'] = array();
+        }
+        foreach ($activePlugins as $pluginInfo) {
+            $i['plugins']['desc'][$pluginInfo] = getPluginInfo($pluginInfo);
+        }
+    }
 }
 
 loadplugins();

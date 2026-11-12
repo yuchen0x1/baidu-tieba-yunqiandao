@@ -14,6 +14,18 @@ class LoginGuard
     const MAX_FAIL = 5;
     const WINDOW = 900;
     const LOCK = 900;
+    /** 同一 IP 在窗口内的失败上限（防多账号喷洒） */
+    const IP_MAX_FAIL = 20;
+    /** IP 级锁定时长（秒） */
+    const IP_LOCK = 900;
+    /** 2FA 失败上限（同一 UID 在窗口内） */
+    const TOTP_MAX_FAIL = 5;
+    /** 2FA 失败窗口（秒） */
+    const TOTP_WINDOW = 600;
+    /** 2FA 锁定时长（秒） */
+    const TOTP_LOCK = 900;
+    /** 2FA 失败计数的选项键前缀 */
+    const TOTP_OPTION_PREFIX = 'totp_fail_';
 
     /**
      * 确保审计表存在并返回表名
@@ -89,6 +101,90 @@ class LoginGuard
         }
         $unlockAt = (int) $row['last'] + self::LOCK;
         return max(0, $unlockAt - time());
+    }
+
+    /**
+     * IP 级限流：同一 IP 在窗口内失败超过 IP_MAX_FAIL 次即锁定 IP_LOCK 秒。
+     * 防止攻击者换用户名绕过账号级限流（喷洒多账号）。
+     * @return int 剩余锁定秒数; 0 表示未锁定
+     */
+    public static function isIpLocked($ip = null)
+    {
+        global $m;
+        $table = self::table();
+        if ($ip === null) {
+            $ip = self::clientIp();
+        }
+        $ip = $m->real_escape_string(substr((string) $ip, 0, 45));
+        $since = time() - self::WINDOW;
+        $row = $m->once_fetch_array("SELECT COUNT(*) AS c, MAX(ts) AS last FROM `{$table}` WHERE `success` = 0 AND `ip` = '{$ip}' AND `ts` > {$since};");
+        if (empty($row) || (int) $row['c'] < self::IP_MAX_FAIL) {
+            return 0;
+        }
+        $unlockAt = (int) $row['last'] + self::IP_LOCK;
+        return max(0, $unlockAt - time());
+    }
+
+    /**
+     * 记录一次 2FA 失败（状态存 options 表，键 totap_fail_<uid>）。
+     * 10 分钟窗口内同一 UID 失败 ≥ 5 次即锁定 15 分钟。
+     */
+    public static function record2faFailure($uid)
+    {
+        $uid = (int) $uid;
+        if ($uid <= 0) {
+            return;
+        }
+        $key = self::TOTP_OPTION_PREFIX . $uid;
+        $stored = (string) option::get($key);
+        $data = $stored !== '' ? json_decode($stored, true) : null;
+        if (!is_array($data) || !isset($data['window_start']) || (time() - (int) $data['window_start']) > self::TOTP_WINDOW) {
+            $data = array('count' => 0, 'window_start' => time());
+        }
+        $data['count'] = (int) $data['count'] + 1;
+        option::set($key, json_encode($data));
+    }
+
+    /**
+     * 判断 2FA 是否被锁定。
+     * @return int 剩余锁定秒数; 0 表示未锁定
+     */
+    public static function is2faLocked($uid)
+    {
+        $uid = (int) $uid;
+        if ($uid <= 0) {
+            return 0;
+        }
+        $key = self::TOTP_OPTION_PREFIX . $uid;
+        $stored = (string) option::get($key);
+        $data = $stored !== '' ? json_decode($stored, true) : null;
+        if (!is_array($data) || empty($data['count']) || empty($data['window_start'])) {
+            return 0;
+        }
+        $windowAge = time() - (int) $data['window_start'];
+        if ($windowAge > self::TOTP_WINDOW) {
+            //窗口已过期，重置计数
+            option::set($key, '');
+            return 0;
+        }
+        if ((int) $data['count'] < self::TOTP_MAX_FAIL) {
+            return 0;
+        }
+        //锁定：从最后一次失败时刻起算
+        $unlockAt = (int) $data['window_start'] + self::TOTP_WINDOW + self::TOTP_LOCK;
+        return max(0, $unlockAt - time());
+    }
+
+    /**
+     * 2FA 校验成功后调用：清零失败计数。
+     */
+    public static function clear2faFailures($uid)
+    {
+        $uid = (int) $uid;
+        if ($uid <= 0) {
+            return;
+        }
+        option::set(self::TOTP_OPTION_PREFIX . $uid, '');
     }
 
     /**

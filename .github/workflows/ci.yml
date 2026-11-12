@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   php:
     name: PHP ${{ matrix.php }} checks
@@ -158,6 +161,10 @@ jobs:
           if (-not $pkg) { throw "未生成发布包" }
           $checksum = "$($pkg.FullName).sha256"
           if (-not (Test-Path $checksum)) { throw "未生成 SHA-256 校验文件" }
+          $manifest = Get-ChildItem "$env:RUNNER_TEMP\pkg\*.json" | Select-Object -First 1
+          if (-not $manifest) { throw "未生成更新清单" }
+          $metadata = Get-Content $manifest.FullName -Raw | ConvertFrom-Json
+          if ($metadata.channel -ne 'stable' -or $metadata.assets.Count -lt 1) { throw "更新清单字段不完整" }
           $expected = ((Get-Content $checksum -Raw).Trim() -split '\s+')[0].ToLowerInvariant()
           $actual = (Get-FileHash $pkg.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($expected -ne $actual) { throw "SHA-256 校验不一致：$expected vs $actual" }

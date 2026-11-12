@@ -180,6 +180,44 @@ final class UpdaterTest extends TestCase
         );
     }
 
+    public function testSignatureAssetAndVerificationSummaryAreExposed(): void
+    {
+        $payload = $this->payload();
+        $payload['assets'][] = array(
+            'name' => 'package.zip.sig',
+            'browser_download_url' => 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/v5.08/package.zip.sig'
+        );
+        $release = ProjectUpdater::parseRelease($payload);
+        $this->assertSame(
+            'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/v5.08/package.zip.sig',
+            $release['asset_signature_url']
+        );
+        $summary = ProjectUpdater::verificationSummary($release);
+        $this->assertTrue($summary['sha256_available']);
+        $this->assertTrue($summary['signature_available']);
+    }
+
+    public function testRequiredSignatureWithoutPublicKeyIsRejected(): void
+    {
+        $previousKey = getenv('UPDATE_RELEASE_PUBLIC_KEY');
+        $previousRequired = getenv('UPDATE_REQUIRE_SIGNATURE');
+        putenv('UPDATE_RELEASE_PUBLIC_KEY');
+        putenv('UPDATE_REQUIRE_SIGNATURE=true');
+        try {
+            $path = $this->tempPackage('signed-package');
+            try {
+                $this->expectException(RuntimeException::class);
+                $this->expectExceptionMessage('未配置 UPDATE_RELEASE_PUBLIC_KEY');
+                ProjectUpdater::verifyPackageSignature($path, array());
+            } finally {
+                @unlink($path);
+            }
+        } finally {
+            $previousKey === false ? putenv('UPDATE_RELEASE_PUBLIC_KEY') : putenv('UPDATE_RELEASE_PUBLIC_KEY=' . $previousKey);
+            $previousRequired === false ? putenv('UPDATE_REQUIRE_SIGNATURE') : putenv('UPDATE_REQUIRE_SIGNATURE=' . $previousRequired);
+        }
+    }
+
     public function testPackageWithMatchingDigestIsAccepted(): void
     {
         $content = 'PK' . str_repeat('package-bytes', 32);

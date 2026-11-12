@@ -7,7 +7,7 @@ require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
 SignManager::ensureTables();
 
 $summary = SignManager::signSummary(UID);
-$day = date('d');
+$day = date('Y-m-d');
 $accounts = array();
 $accRes = $m->query("SELECT b.`id`, b.`name`, b.`portrait`, b.`proxy`,
     IFNULL(h.`status`, 'unknown') AS hstatus, IFNULL(h.`fail_count`, 0) AS hfail,

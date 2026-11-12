@@ -56,7 +56,7 @@ if (is_writable(SYSTEM_ROOT . '/setup')) {
     ?><div id="comsys2">
 	<div class="alert alert-info"><span id="upd_info">正在检查更新......</span><br/><br/>
 	<div class="progress progress-striped active">
-	<div class="progress-bar progress-bar-success" id="upd_prog" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" style="width: 30%">
+	<div class="progress-bar progress-bar-success progress-bar-striped active" id="upd_prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" style="width: 100%">
 	<span class="sr-only">正在检查更新</span></div></div></div>
 </div>
 
@@ -83,10 +83,39 @@ if (is_writable(SYSTEM_ROOT . '/setup')) {
 
 <script type="text/javascript">
 function waitup() {
-    $("#comsys").html('<div class="alert alert-warning">开始更新，请不要离开此页面...</div>');
+    $("#comsys").html('<div class="alert alert-warning">开始下载、校验并安装更新，请不要关闭页面。服务器会在校验通过后才覆盖文件，网络较慢时页面可能等待数分钟。</div>');
+    pollUpdateStatus();
 }
 function update() {
 }
+function pollUpdateStatus() {
+    $.ajax({
+        url: 'ajax.php?mod=admin:update:status',
+        type: 'GET',
+        dataType: 'json',
+        timeout: 5000,
+        success: function(status) {
+            if (!status || !status.state || status.state === 'idle') {
+                return;
+            }
+            var detail = status.message || '更新处理中';
+            if (status.percent !== null && status.percent !== undefined) {
+                detail += '（' + status.percent + '%）';
+            }
+            if (status.speed_bytes_per_second > 0) {
+                detail += '，速度约 ' + (status.speed_bytes_per_second / 1048576).toFixed(2) + ' MB/s';
+            }
+            if (status.eta_seconds !== null && status.eta_seconds !== undefined) {
+                detail += '，预计剩余 ' + status.eta_seconds + ' 秒';
+            }
+            $("#upd_info").text(detail);
+            if (status.state === 'starting' || status.state === 'downloading' || status.state === 'verified' || status.state === 'installing') {
+                window.setTimeout(pollUpdateStatus, 1500);
+            }
+        }
+    });
+}
+pollUpdateStatus();
 if(<?php echo $writable; ?>==1){
     $.ajax({
      async:true,
@@ -98,16 +127,13 @@ if(<?php echo $writable; ?>==1){
      dataType: 'html',
       timeout: 90000,
     success: function(data){
-     $("#upd_prog").css({'width':'70%'});
        $("#comsys3").html(data);
       $("#upd_info").html('完毕');
-     $("#upd_prog").css({'width':'100%'});
       $("#comsys2").delay(1000).slideUp(500);
      },
       error: function(xhr){
       console.log(xhr);
          $("#upd_info").html('检查更新失败！');
-        $("#upd_prog").css({'width':'0%'});
       var detail = xhr && xhr.responseText ? xhr.responseText : '<div class="alert alert-danger">检查更新失败：无法连接到更新服务器<br/>错误已经记录到控制台，打开控制台查看详细<br/>你可以尝试手动更新</div><br/>';
       $("#comsys").html(detail);
    }

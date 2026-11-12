@@ -1,0 +1,25 @@
+{
+  "status": "PARTIAL",
+  "phase": "implementation_and_verification",
+  "updated_at": "2026-11-12",
+  "completed": [
+    "项目身份识别与工作树隔离检查",
+    "现有 v7.5 安全升级审计",
+    "GitHub 开源生态初筛与 5 个项目源码级 README 深读",
+    "option::set 参数化与原始值缓存修复",
+    "签到行短期 claim 迁移与业务接入",
+    "新增 claim/option 回归测试",
+    "PHPUnit、lint、secret scan、release gate 验证"
+  ],
+  "blocked_or_deferred": [
+    "数据库集成链路：当前环境未提供可达 MariaDB/MySQL，因此门禁为 SKIP",
+    "Docker 冒烟与浏览器 UI 回归：当前批次未启动容器或 Playwright",
+    "完整多项目总控：当前只发现并处理一个项目根目录"
+  ],
+  "next": [
+    "在隔离 MariaDB 上执行 007500 迁移和并发调度演练",
+    "验证所有动态贴吧分表的 claim 列与索引",
+    "继续处理 option::add/uset 等旧式转义 API",
+    "补浏览器级签到工作台回归"
+  ]
+}

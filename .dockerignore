@@ -7,3 +7,25 @@ mysql
 vendor
 setup/update_cache
 setup/install.lock
+
+# 运行期数据与备份：绝不能进镜像（Caddy 的 root 是站点根，file_server 会直接对外提供）
+data/log
+data/backups
+data/cache
+*.sql
+!setup/install.template.sql
+!setup/template.table.sql
+!setup/uninst.template.sql
+
+# 开发与运维工具：不进运行时镜像（lint/secret-scan/migrate/集成测试只用于构建机）
+tests
+tools
+upgrade-report
+docs
+
+# 官方服务参考实现：只部署在私有基础设施，不随实例镜像分发
+official-service
+
+# 发布与本地痕迹
+.phpunit.result.cache
+.gitattributes

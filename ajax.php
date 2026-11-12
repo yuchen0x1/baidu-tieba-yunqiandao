@@ -28,7 +28,7 @@ function baiduid_groups_save($uid, array $map)
 switch (SYSTEM_PAGE) {
     case 'ajax:status':
         global $m,$i;
-        $today = date('d');
+        $today = date('Y-m-d');
         $count = array(
             'userSigned'  => 0,
             'userWaiting' => 0,
@@ -100,8 +100,15 @@ switch (SYSTEM_PAGE) {
         try {
             $release = ProjectUpdater::fetchLatestRelease();
             $status = ProjectUpdater::buildStatus(SYSTEM_VER, $release);
+            $verification = ProjectUpdater::verificationSummary($release);
             $tip = isset($_GET['ok']) ? '<b>更新成功，下面是最新版本信息。</b><hr/>' : '';
             $tip .= '<div><b>当前版本：</b>V' . htmlspecialchars($status['current_version'], ENT_QUOTES, 'UTF-8') . '　<b>最新正式版本：</b>V' . htmlspecialchars($status['latest_version'], ENT_QUOTES, 'UTF-8') . '</div>';
+            if (!empty($release['published_at'])) {
+                $tip .= '<div><b>发布时间：</b>' . htmlspecialchars(substr($release['published_at'], 0, 10), ENT_QUOTES, 'UTF-8') . '</div>';
+            }
+            if (!empty($release['asset_size'])) {
+                $tip .= '<div><b>部署包大小：</b>' . htmlspecialchars(number_format(((int) $release['asset_size']) / 1048576, 2), ENT_QUOTES, 'UTF-8') . ' MB</div>';
+            }
             $tip .= '<div class="text-right"><a href="' . htmlspecialchars($release['release_url'], ENT_QUOTES, 'UTF-8') . '" target="_blank" class="btn btn-default">查看 Release</a> ';
             if ($release['asset_download_url'] !== '') {
                 $tip .= '<a href="' . htmlspecialchars($release['asset_download_url'], ENT_QUOTES, 'UTF-8') . '" target="_blank" class="btn btn-default">下载 Windows 包</a> ';
@@ -118,6 +125,13 @@ switch (SYSTEM_PAGE) {
             if ($release['asset_digest'] !== '') {
                 $tip .= '<hr/><small>Windows 包校验值：' . htmlspecialchars($release['asset_digest'], ENT_QUOTES, 'UTF-8') . '</small>';
             }
+            $tip .= '<hr/><small>完整性策略：SHA-256 ' . ($verification['sha256_available'] ? '可用并强制校验' : '缺失，无法在线覆盖安装') . '；数字签名 ';
+            if ($verification['signature_configured']) {
+                $tip .= $verification['signature_available'] ? '已配置并将在安装前校验' : '已配置公钥但 Release 缺少签名（将拒绝安装）';
+            } else {
+                $tip .= $verification['signature_available'] ? 'Release 提供但本站未配置公钥' : '未启用（可通过 UPDATE_RELEASE_PUBLIC_KEY 启用）';
+            }
+            $tip .= '</small>';
             echo '<div class="panel panel-default" style="background-color: #F9F9F9;"><div class="panel-body">' . $tip . '</div></div>';
             // 历史更新日志：拉取失败时静默跳过，不影响主检查结果
             try {
@@ -158,6 +172,28 @@ switch (SYSTEM_PAGE) {
             error_log('在线更新检查失败：' . $e->getMessage());
             echo '<div class="alert alert-danger"><b>检查更新失败：</b>暂时无法连接更新服务器，请稍后重试或打开项目 Release 页面手动更新。</div>';
         }
+        break;
+
+    case 'admin:update:status':
+        header('Content-Type: application/json; charset=utf-8');
+        $statusPath = rtrim(UPDATE_CACHE, '/\\') . '/update-status.json';
+        $statusPayload = array(
+            'state' => 'idle',
+            'downloaded_bytes' => 0,
+            'total_bytes' => 0,
+            'percent' => null,
+            'speed_bytes_per_second' => 0,
+            'eta_seconds' => null,
+            'message' => '暂无进行中的更新',
+            'updated_at' => null
+        );
+        if (is_file($statusPath)) {
+            $decoded = json_decode((string) @file_get_contents($statusPath), true);
+            if (is_array($decoded)) {
+                $statusPayload = array_merge($statusPayload, array_intersect_key($decoded, $statusPayload));
+            }
+        }
+        echo json_encode($statusPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         break;
 
     case 'admin:update:updnow':
@@ -214,7 +250,7 @@ switch (SYSTEM_PAGE) {
                 die;
             }
             $signMode = safe_sign_modes(option::get('sign_mode'));
-            $todayD = date('d');
+            $todayD = date('Y-m-d');
             $remaining = 15;
             foreach ($i['table'] as $sgTable) {
                 if ($remaining <= 0) {

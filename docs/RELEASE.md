@@ -23,7 +23,7 @@ git tag "$tag"
 git push origin "$tag"
 ```
 
-推送 `v*` tag 会触发 `.github/workflows/release.yml`：先运行语法/安全扫描、Secret 扫描、PHPUnit 以及基于 MariaDB 的迁移、调度、API 与备份恢复集成检查；全部通过后，再将 tag 中的源码打包为 Windows ZIP、生成 SHA-256 校验文件，并创建 GitHub Release。工作流使用仓库 `GITHUB_TOKEN` 及 `contents: write` 权限，无需个人访问令牌或仓库变量。
+推送 `v*` tag 会触发 `.github/workflows/release.yml`：先运行语法/安全扫描、Secret 扫描、PHPUnit 以及基于 MariaDB 的迁移、调度、API 与备份恢复集成检查；全部通过后，再将 tag 中的源码打包为 Windows ZIP、生成 SHA-256 校验文件和更新清单 JSON，并创建 GitHub Release。工作流还会确认 tag 的提交已经位于 `origin/main` 历史中。工作流使用仓库 `GITHUB_TOKEN` 及 `contents: write` 权限，无需个人访问令牌或仓库变量。
 
 如需本地打包或手动发布，请安装并登录有目标仓库 Release 写权限的 [GitHub CLI](https://cli.github.com/)，然后运行：
 
@@ -42,6 +42,8 @@ if (Test-Path -LiteralPath $notes) {
 tools/publish-github.ps1 @arguments
 ```
 
+如已有受控的 RSA 私钥文件，可额外传入 `-SigningPrivateKeyFile <path>`；脚本会生成 base64 编码的 `.sig` 资产并把算法写入更新清单。私钥路径只应指向发布机或临时 CI Secret 文件，绝不能提交仓库。未提供私钥时只发布 SHA-256 校验文件，不会伪造签名。
+
 省略 `ReleaseNotesFile` 时由 GitHub 自动生成发布说明。不带 `-Publish` 时，脚本只在本地生成 ZIP 和 `.sha256` 文件，不执行远端操作。脚本要求数字版本 tag 已存在，且工作区没有已跟踪文件改动。
 
 以下清理参数不属于常规发布步骤，使用前应先审核保留策略：
@@ -54,9 +56,9 @@ tools/publish-github.ps1 @arguments
 ## 三、发布后验证
 
 1. 打开 <https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases>，核对 tag、发布说明、Windows ZIP 和 `.sha256` 附件。
-2. 下载 ZIP 与校验文件，验证 SHA-256，并在临时测试环境验证 Windows 部署包。
+2. 下载 ZIP、`.sha256` 和 `tieba-cloud-sign-update-*.json`，验证 SHA-256，并在临时测试环境验证 Windows 部署包。
 3. 在测试环境运行旧版本，从后台「系统更新」确认能检测到 GitHub `latest` Release。执行在线更新后，更新器应下载 Release 资产，校验 GitHub Release API 的 `digest` 或同一 Release 的 `.sha256` 摘要，校验通过后完成覆盖安装，并保留站点配置。
-4. 确认缺少可信 SHA-256 摘要、摘要不一致或只有源码归档时，更新器会拒绝在线覆盖安装，原程序保持不变；此时应从 Release 页面手动下载安装。
+4. 确认缺少可信 SHA-256 摘要、摘要不一致或只有源码归档时，更新器会拒绝在线覆盖安装，原程序保持不变；配置 `UPDATE_RELEASE_PUBLIC_KEY` 后还应验证 `.sig` 签名，`UPDATE_REQUIRE_SIGNATURE=true` 时缺少签名也必须拒绝；此时可从 Release 页面手动下载安装。
 5. 在需要提高 GitHub API 限额的环境中，可设置只读 `UPDATE_GITHUB_TOKEN` 后重试。令牌仅发送给 `api.github.com`，不要写入配置文件或提交到 Git。
 
 ## 四、常见问题与回滚

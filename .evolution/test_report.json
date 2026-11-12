@@ -1,0 +1,15 @@
+{
+  "tested_at": "2026-11-12",
+  "environment": {"php": "8.3.36", "phpunit": "11.5.56", "composer_command": "不可用（未安装 composer CLI，vendor 已存在）"},
+  "results": [
+    {"name": "PHP syntax", "status": "PASS", "detail": "新增与修改 PHP 文件均无语法错误"},
+    {"name": "PHPUnit", "status": "PASS", "detail": "167 tests, 839 assertions, 3 skipped, 0 failures"},
+    {"name": "lint", "status": "PASS_WITH_WARNINGS", "detail": "228 files passed; 9 existing advisory warnings"},
+    {"name": "secret scan", "status": "PASS", "detail": "319 tracked files, no suspected secrets"},
+    {"name": "release gate", "status": "PASS_WITH_SKIP", "detail": "6 pass, 1 skip, 0 fail"},
+    {"name": "database integration", "status": "SKIPPED", "detail": "No reachable MariaDB/MySQL or TCS_IT_DB_* configuration"},
+    {"name": "Docker smoke", "status": "NOT_RUN", "detail": "Container daemon not started in this run"},
+    {"name": "browser UI regression", "status": "NOT_RUN", "detail": "Playwright/browser environment not started in this run"}
+  ],
+  "release_decision": "本地单元与静态门禁通过；数据库集成、Docker 和浏览器验证完成前，不宣称生产发布就绪。"
+}

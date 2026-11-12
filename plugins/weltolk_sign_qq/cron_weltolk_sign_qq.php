@@ -39,7 +39,8 @@ function cron_weltolk_sign_qq()
                 while ($tieba = $m->fetch_array($query)) {
                     $tieba_count++;
                     $status = true;
-                    if ((date("Y-m-") . $tieba[$zt] == date("Y-m-j", strtotime("-1 day"))) || empty($tieba[$zt])) {
+                    //latest 自 V7.5 起存完整日期（Y-m-d），不再拼接"年月+日号"
+                    if (((string) $tieba[$zt] === date('Y-m-d', strtotime('-1 day'))) || empty($tieba[$zt])) {
                         $style_prefix = '--';
                         $status_str = '还未签到';
                         $msg = '该贴吧尚未签到！';

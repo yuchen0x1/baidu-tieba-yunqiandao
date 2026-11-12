@@ -97,56 +97,56 @@ class Notify
 
         switch (option::get('notify_channel')) {
             case 'serverchan':
-                $key = option::get('notify_serverchan_key');
+                $key = SecretBox::get('notify_serverchan_key');
                 if (empty($key)) {
                     return array('ok' => false, 'detail' => '未配置 Server酱 SendKey');
                 }
                 return self::sendServerChan($key, $title, $content);
             case 'telegram':
-                $token = option::get('notify_telegram_token');
+                $token = SecretBox::get('notify_telegram_token');
                 $chatId = option::get('notify_telegram_chatid');
                 if (empty($token) || empty($chatId)) {
                     return array('ok' => false, 'detail' => '未配置 Telegram Bot Token / Chat ID');
                 }
                 return self::sendTelegram($token, $chatId, $title, $content);
             case 'webhook':
-                $url = option::get('notify_webhook_url');
+                $url = SecretBox::get('notify_webhook_url');
                 if (empty($url)) {
                     return array('ok' => false, 'detail' => '未配置 Webhook URL');
                 }
                 return self::sendWebhook($url, $title, $content);
             case 'bark':
-                $barkUrl = option::get('notify_bark_url');
+                $barkUrl = SecretBox::get('notify_bark_url');
                 if (empty($barkUrl)) {
                     return array('ok' => false, 'detail' => '未配置 Bark URL');
                 }
                 return self::sendBark($barkUrl, $title, $content);
             case 'pushplus':
-                $ppToken = option::get('notify_pushplus_token');
+                $ppToken = SecretBox::get('notify_pushplus_token');
                 if (empty($ppToken)) {
                     return array('ok' => false, 'detail' => '未配置 PushPlus Token');
                 }
                 return self::sendPushPlus($ppToken, $title, $content);
             case 'dingtalk':
-                $dtUrl = option::get('notify_dingtalk_webhook');
+                $dtUrl = SecretBox::get('notify_dingtalk_webhook');
                 if (empty($dtUrl)) {
                     return array('ok' => false, 'detail' => '未配置钉钉机器人 Webhook');
                 }
-                return self::sendDingTalk($dtUrl, option::get('notify_dingtalk_secret'), $title, $content);
+                return self::sendDingTalk($dtUrl, SecretBox::get('notify_dingtalk_secret'), $title, $content);
             case 'wecom':
-                $wcUrl = option::get('notify_wecom_webhook');
+                $wcUrl = SecretBox::get('notify_wecom_webhook');
                 if (empty($wcUrl)) {
                     return array('ok' => false, 'detail' => '未配置企业微信机器人 Webhook');
                 }
                 return self::sendWeCom($wcUrl, $title, $content);
             case 'feishu':
-                $fsUrl = option::get('notify_feishu_webhook');
+                $fsUrl = SecretBox::get('notify_feishu_webhook');
                 if (empty($fsUrl)) {
                     return array('ok' => false, 'detail' => '未配置飞书机器人 Webhook');
                 }
                 return self::sendFeiShu($fsUrl, $title, $content);
             case 'wxpusher':
-                $xpToken = option::get('notify_wxpusher_token');
+                $xpToken = SecretBox::get('notify_wxpusher_token');
                 $xpUid = option::get('notify_wxpusher_uid');
                 if (empty($xpToken) || empty($xpUid)) {
                     return array('ok' => false, 'detail' => '未配置 WxPusher AppToken / UID');

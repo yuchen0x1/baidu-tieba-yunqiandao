@@ -22,6 +22,12 @@ class Logger
     /** 静默模式：为 true 时不写 error_log（供测试等无 stderr 场景使用） */
     public static $quiet = false;
 
+    /** 日志轮转阈值：超过 10MB 自动归档（避免无限增长） */
+    const ROTATE_BYTES = 10485760;
+
+    /** 保留归档份数（system.log.1 ~ system.log.N） */
+    const ROTATE_KEEP = 3;
+
     /**
      * 追加一行结构化日志
      * @param string $level   debug/info/warn/error
@@ -37,6 +43,11 @@ class Logger
         $dir = SYSTEM_ROOT . self::LOG_DIR;
         if (!is_dir($dir)) {
             @mkdir($dir, 0755, true);
+        }
+        //日志轮转：超过阈值时归档旧日志，避免无限增长
+        $logFile = $dir . '/system.log';
+        if (is_file($logFile) && filesize($logFile) >= self::ROTATE_BYTES) {
+            self::rotate($logFile);
         }
         if (self::$requestId === '') {
             self::$requestId = substr(str_replace('.', '', uniqid('r', true)), 0, 12);
@@ -76,5 +87,29 @@ class Logger
     public static function error($message, $context = array())
     {
         self::write('error', $message, $context);
+    }
+
+    /**
+     * 归档当前日志：system.log → system.log.1 → system.log.2 → ...
+     * 超出保留份数的最老归档被删除。
+     * @param string $logFile 当前日志文件完整路径
+     */
+    private static function rotate($logFile)
+    {
+        //删除最老的归档
+        $oldest = $logFile . '.' . self::ROTATE_KEEP;
+        if (is_file($oldest)) {
+            @unlink($oldest);
+        }
+        //逐级滚动 system.log.2 → .3, .1 → .2
+        for ($i = self::ROTATE_KEEP - 1; $i >= 1; $i--) {
+            $from = $logFile . '.' . $i;
+            $to = $logFile . '.' . ($i + 1);
+            if (is_file($from)) {
+                @rename($from, $to);
+            }
+        }
+        //当前日志归档为 system.log.1
+        @rename($logFile, $logFile . '.1');
     }
 }

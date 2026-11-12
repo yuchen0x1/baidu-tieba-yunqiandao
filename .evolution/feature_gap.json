@@ -1,0 +1,11 @@
+{
+  "updated_at": "2026-11-12",
+  "items": [
+    {"class": "A", "priority": "P1", "feature": "签到行级并发 claim", "before": false, "after": true, "reference": ["dagucloud/dagu", "temporalio/temporal"], "implementation": "claim_owner/claimed_at + 原子 UPDATE + TTL 回收", "test": "SignClaimTest + PHPUnit", "status": "COMPLETED"},
+    {"class": "A", "priority": "P1", "feature": "签到结果 claim 释放", "before": false, "after": true, "reference": ["healthchecks/healthchecks"], "implementation": "成功/失败/不可识别结果均释放或超时回收", "test": "静态审计；需 DB 集成演练", "status": "PARTIAL"},
+    {"class": "B", "priority": "P2", "feature": "option 原始值一致性", "before": false, "after": true, "reference": ["laravel/horizon"], "implementation": "option::set 改 pquery，缓存原始 name/value", "test": "SecurityHardeningTest", "status": "COMPLETED"},
+    {"class": "B", "priority": "P2", "feature": "任务运行生命周期与可观测性", "before": true, "after": true, "reference": ["spatie/laravel-schedule-monitor", "healthchecks/healthchecks"], "implementation": "现有 cron_log/task_runs/sign_history 已覆盖主要路径；后续补异常与延迟指标", "test": "现有 PHPUnit + 待 DB 集成", "status": "PARTIAL"},
+    {"class": "C", "priority": "P3", "feature": "可视化趋势与失败分析", "before": true, "after": true, "reference": ["apache/echarts", "laravel/horizon"], "implementation": "现有 ECharts 本地化与分析页", "test": "浏览器回归待执行", "status": "PARTIAL"},
+    {"class": "D", "priority": "P4", "feature": "通用 DAG/拖拽工作流编排", "before": false, "after": false, "reference": ["n8n-io/n8n", "apache/airflow"], "implementation": "与贴吧签到领域边界不匹配，本阶段放弃", "test": "不适用", "status": "DEFERRED"}
+  ]
+}
