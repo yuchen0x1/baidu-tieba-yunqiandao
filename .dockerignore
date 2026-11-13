@@ -29,3 +29,4 @@ official-service
 # 发布与本地痕迹
 .phpunit.result.cache
 .gitattributes
+.evolution

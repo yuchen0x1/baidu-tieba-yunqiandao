@@ -1,175 +1,96 @@
-﻿<?php if (!defined('SYSTEM_ROOT')) {
-    die('Insufficient Permissions');
-}  if (ROLE != 'admin') {
-    msg('权限不足!');
-}
-global $m,$i;
-$cron  = '';
-foreach ($i['cron'] as $cs) {
-    if ($cs['freq'] == '-1') {
-        $freq = '一次性任务';
-    } elseif ($cs['freq'] == '0') {
-        $freq = '始终运行的任务';
-    } else {
-        $freq = '执行间隔：' . htmlspecialchars($cs['freq'], ENT_QUOTES, 'UTF-8') . ' 秒';
-    }
-
-    if (!empty($cs['lastdo'])) {
-        $lastdo = date('Y-m-d H:i:s', $cs['lastdo']);
-    } else {
-        $lastdo = '从未运行';
-    }
-
-    // V5.13：启用状态（兼容旧 no 与新 enable；未迁移库无 enable 列时视为启用）
-    $enabled = ((int) $cs['no'] !== 1 && (!isset($cs['enable']) || (int) $cs['enable'] !== 0));
-    if ($enabled) {
-        $status = '<span class="cs-badge cs-badge-success">启用</span>';
-        $status .= ' | <a href="setting.php?mod=admin:cron&dis=' . htmlspecialchars($cs['name'], ENT_QUOTES, 'UTF-8') . '">禁用</a>';
-    } else {
-        $status = '<span class="cs-badge cs-badge-neutral">已禁用</span> | <a href="setting.php?mod=admin:cron&act=' . htmlspecialchars($cs['name'], ENT_QUOTES, 'UTF-8') . '">启用</a>';
-    }
-    // V5.13：最近执行状态徽标
-    $ls = isset($cs['last_status']) ? $cs['last_status'] : '';
-    $badge = '';
-    if ($ls === 'success') {
-        $badge = '<span class="cs-text-success">[上次成功]</span> ';
-    } elseif ($ls === 'error') {
-        $badge = '<span class="cs-text-danger">[上次失败]</span> ';
-    } elseif ($ls === 'running') {
-        $badge = '<span class="cs-text-info">[运行中]</span> ';
-    }
-    // V5.13：下次执行时间
-    $nextrun = isset($cs['nextrun']) ? (int) $cs['nextrun'] : 0;
-    if ($cs['freq'] == '-1') {
-        $nextText = '一次性，执行后删除';
-    } elseif ($cs['freq'] == '0' || $nextrun === 0) {
-        $nextText = '尽快（始终执行）';
-    } else {
-        $nextText = date('Y-m-d H:i:s', $nextrun);
-    }
-    // V5.13：上次耗时
-    $dur = isset($cs['last_duration']) ? (int) $cs['last_duration'] : 0;
-    $durText = $dur > 0 ? ($dur >= 1000 ? number_format($dur / 1000, 2) . ' 秒' : $dur . ' 毫秒') : '—';
-
-    $status .= '<br/><a href="setting.php?mod=admin:cron&run=' . htmlspecialchars($cs['name'], ENT_QUOTES, 'UTF-8') . '">运行</a>';
-    if ($ls === 'error' || (isset($cs['retry']) && (int) $cs['retry'] > 0)) {
-        $status .= ' | <a href="setting.php?mod=admin:cron&retry=' . htmlspecialchars($cs['name'], ENT_QUOTES, 'UTF-8') . '">重试</a>';
-    }
-    $status .= ' | <a href="index.php?mod=admin:editcron&edit=' . htmlspecialchars($cs['name'], ENT_QUOTES, 'UTF-8') . '">编辑</a>';
-    $status .= ' | <a href="setting.php?mod=admin:cron&uninst=' . htmlspecialchars($cs['name'], ENT_QUOTES, 'UTF-8') . '" class="cs-text-danger" onclick="return confirm(\'你想要卸载此计划任务吗？\');">卸载</a>';
-    if (empty($cs['log'])) {
-        $status .= '<br/>没有日志可查看';
-    } else {
-        $status .= '<br/><a href="javascript:;" data-log="' . htmlspecialchars($cs['log'], ENT_QUOTES, 'UTF-8') . '" onclick="alert(this.getAttribute(\'data-log\'));">点击查看此任务的日志</a>';
-    }
-    $status .= '<br/>运行顺序：<span style="cursor:grab" class="cron-drag-handle" title="拖拽调整顺序"><svg class="icon-inline" aria-hidden="true" style="width:13px;height:13px;vertical-align:-2px;color:var(--color-muted-light)"><use href="#i-list"/></svg></span> <input required class="form-control input-sm cron-order-input" style="width:30%; display:inline" type="number" name="order[' . htmlspecialchars($cs['name'], ENT_QUOTES, 'UTF-8') . ']" value="' . htmlspecialchars($cs['orde'], ENT_QUOTES, 'UTF-8') . '">';
-    $cron .= '<input type="hidden" value="' . htmlspecialchars($cs['name'], ENT_QUOTES, 'UTF-8') . '" name="ids[]"><tr><td style="width:30%"><b>' . htmlspecialchars($cs['name'], ENT_QUOTES, 'UTF-8') . '</b><br/>' . htmlspecialchars($cs['file'], ENT_QUOTES, 'UTF-8') . '<br/>' . str_replace(array("\n", "\r\n"), '<br/>', htmlspecialchars($cs['desc'] ? $cs['desc'] : '', ENT_QUOTES, 'UTF-8')) . '</td><td style="width:30%">' . $badge . $freq . '<br/>上次执行：' . $lastdo . '<br/>下次执行：' . $nextText . '<br/>上次耗时：' . $durText . '</td><td style="width:40%">' . $status . '</td></tr>';
-}
-
-if (isset($_GET['ok'])) {
-    echo '<div class="alert alert-success">计划任务操作成功</div>';
-}
-
-$count = $m->once_fetch_array("SELECT COUNT(*) AS c FROM `" . DB_NAME . "`.`" . DB_PREFIX . "cron`");
-
-// V5.13：最近任务运行历史
-$runs = cron::recentRuns(20);
-$runRows = '';
-foreach ($runs as $r) {
-    $rs = $r['status'];
-    $statusClass = 'cs-badge-neutral';
-    if ($rs === 'success') {
-        $statusClass = 'cs-badge-success';
-    } elseif ($rs === 'error' || $rs === 'skipped') {
-        $statusClass = 'cs-badge-danger';
-    } elseif ($rs === 'running') {
-        $statusClass = 'cs-badge-info';
-    }
-    $durText2 = (int) $r['duration_ms'] > 0 ? ((int) $r['duration_ms'] >= 1000 ? number_format($r['duration_ms'] / 1000, 2) . ' 秒' : $r['duration_ms'] . ' 毫秒') : '—';
-    $timeText = !empty($r['started_at']) ? date('Y-m-d H:i:s', $r['started_at']) : '—';
-    $runRows .= '<tr><td>' . htmlspecialchars($r['name'], ENT_QUOTES, 'UTF-8') . '</td><td><span class="cs-badge ' . $statusClass . '">' . htmlspecialchars($rs, ENT_QUOTES, 'UTF-8') . '</span></td><td>' . htmlspecialchars($timeText, ENT_QUOTES, 'UTF-8') . '</td><td>' . $durText2 . '</td><td style="max-width:380px;word-break:break-all;">' . htmlspecialchars($r['message'], ENT_QUOTES, 'UTF-8') . '</td></tr>';
-}
+<?php
+if (!defined('SYSTEM_ROOT')) { die('Insufficient Permissions'); }
+if (ROLE !== 'admin') { msg('权限不足!'); }
+global $i;
+$cronEscape = static function ($v) { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8'); };
+$cronTasks = $i['cron'] ?? array();
+$cronNow = time();
+$cronEnabled = count(array_filter($cronTasks, array('cron', 'isEnabled')));
+$cronFailed = count(array_filter($cronTasks, static function ($row) { return ($row['last_status'] ?? '') === 'error'; }));
+$historyName = substr(request_scalar_value($_GET, 'task'), 0, 40);
+$historyStatus = request_scalar_value($_GET, 'status');
+if (!in_array($historyStatus, array('success', 'error', 'skipped', 'running'), true)) { $historyStatus = ''; }
+$historyDays = (int) request_scalar_value($_GET, 'days', '7');
+if (!in_array($historyDays, array(0, 1, 7, 30), true)) { $historyDays = 7; }
+$history = cron::runHistory(array('name' => $historyName, 'status' => $historyStatus, 'since' => $historyDays ? $cronNow - $historyDays * 86400 : 0), (int) request_scalar_value($_GET, 'page', '1'));
+$historyLink = static function ($page) use ($historyName, $historyStatus, $historyDays) {
+    return 'index.php?' . http_build_query(array('mod' => 'admin:cron', 'task' => $historyName, 'status' => $historyStatus, 'days' => $historyDays, 'page' => $page)) . '#cron-history';
+};
+$cronLabels = array('success' => '成功', 'error' => '失败', 'skipped' => '跳过', 'running' => '开始执行');
+$cronClasses = array('success' => 'success', 'error' => 'danger', 'skipped' => 'neutral', 'running' => 'info');
+$cronDuration = static function ($ms) { return (int) $ms >= 1000 ? number_format($ms / 1000, 2) . ' 秒' : (int) $ms . ' 毫秒'; };
 ?>
-<section class="dashboard-hero" style="margin-top:16px">
-    <div class="eyebrow hero-eyebrow">OPERATIONS · 调度</div>
-    <h1>计划任务</h1>
-    <p>需将根目录下 do.php 加入主机计划任务（建议每分钟），以下任务才会被调度执行。列表支持拖拽调整运行顺序。</p>
-    <div class="dashboard-hero-meta">
-        <span class="hero-tag">任务 <?php echo $count['c']; ?> 个</span>
-    </div>
+<link rel="stylesheet" href="source/css/cron.css?v=<?php echo SYSTEM_VER; ?>">
+<section class="dashboard-hero">
+    <h2>调度概览</h2>
+    <p>查看自动签到与维护任务的执行状态，定位失败并安排重试。需每分钟触发 do.php，或启动常驻调度。</p>
+    <div class="dashboard-hero-meta"><span class="hero-tag">共 <?php echo count($cronTasks); ?> 项</span><span class="hero-tag">已启用 <?php echo $cronEnabled; ?> 项</span><span class="hero-tag">最近失败 <?php echo $cronFailed; ?> 项</span></div>
     <div class="hero-actions">
-        <a href="index.php?mod=admin:editcron" class="cs-btn cs-btn-primary cs-btn-sm">+ 添加新计划任务</a>
-        <form action="setting.php?mod=admin:cron&runall" method="post" style="display:inline;">
-            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
-            <button type="submit" class="cs-btn cs-btn-secondary cs-btn-sm">运行全部计划任务</button>
-        </form>
+        <a href="index.php?mod=admin:editcron" class="cs-btn cs-btn-primary cs-btn-sm">添加任务</a>
+        <button type="submit" form="cron-action-form" formaction="setting.php?mod=admin:cron&amp;runall" class="cs-btn cs-btn-secondary cs-btn-sm">运行到期任务</button>
+        <a href="index.php?mod=admin:cron" class="cs-btn cs-btn-secondary cs-btn-sm">刷新状态</a>
     </div>
 </section>
-<form action="setting.php?mod=admin:cron&xorder" method="post">
-<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
-<div class="table-responsive">
-<table class="cs-table">
-   <thead>
-        <tr>
-           <th>任务描述/文件</th>
-           <th>其他信息</th>
-          <th>状态/操作</th>
-     </tr>
-  </thead>
-   <tbody>
-        <?php echo $cron ?>
-    </tbody>
-</table>
+<?php if (isset($_GET['run_failed'])) { ?><div class="alert alert-warning" role="alert">任务未执行成功，可能正在运行或发生异常。请查看运行历史；重试不会中断正在执行的任务。</div>
+<?php } elseif (isset($_GET['ok'])) { ?><div class="alert alert-success" role="status">计划任务操作已完成。</div><?php } ?>
+<form id="cron-action-form" action="setting.php?mod=admin:cron" method="post"><input type="hidden" name="csrf_token" value="<?php echo $cronEscape(csrf_token()); ?>"></form>
+<div class="cron-toolbar">
+    <label for="cron-search">查找任务<input id="cron-search" type="search" class="form-control" placeholder="任务名、描述或文件"></label>
+    <label for="cron-filter">任务状态<select id="cron-filter" class="form-control"><option value="all">全部任务</option><option value="enabled">已启用</option><option value="disabled">已禁用</option><option value="error">最近失败</option><option value="running">运行中</option><option value="due">已到期</option></select></label>
+    <span id="cron-result-count" role="status" aria-live="polite"><?php echo count($cronTasks); ?> 项任务</span>
 </div>
-<input type="submit" class="cs-btn cs-btn-primary" value="提交更改">
+<form action="setting.php?mod=admin:cron&amp;xorder" method="post" id="cron-order-form">
+<input type="hidden" name="csrf_token" value="<?php echo $cronEscape(csrf_token()); ?>">
+<div class="table-responsive"><table class="cs-table cron-table">
+<thead><tr><th scope="col">任务与说明</th><th scope="col">执行情况</th><th scope="col">操作与顺序</th></tr></thead>
+<tbody id="cron-task-list">
+<?php foreach ($cronTasks as $cs) {
+    $enabled = cron::isEnabled($cs); $running = !empty($cs['running']); $lastStatus = $cs['last_status'] ?? '';
+    $due = $enabled && ((int) $cs['freq'] === -1 || (int) ($cs['nextrun'] ?? 0) <= $cronNow);
+    $taskUrl = 'setting.php?mod=admin:cron&';
+?>
+<tr data-cron-task data-enabled="<?php echo (int) $enabled; ?>" data-running="<?php echo (int) $running; ?>" data-status="<?php echo $cronEscape($lastStatus); ?>" data-due="<?php echo (int) $due; ?>">
+<td class="cron-description"><strong><?php echo $cronEscape($cs['name']); ?></strong><div class="cron-file"><?php echo $cronEscape($cs['file']); ?></div><p><?php echo nl2br($cronEscape($cs['desc'] ?? '')); ?></p></td>
+<td><span class="cs-badge cs-badge-<?php echo $enabled ? 'success' : 'neutral'; ?>"><?php echo $enabled ? '已启用' : '已禁用'; ?></span>
+<?php if ($running) { ?><span class="cs-badge cs-badge-info">运行中</span><?php } elseif ($lastStatus) { ?><span class="cs-badge cs-badge-<?php echo $cronClasses[$lastStatus] ?? 'neutral'; ?>">上次<?php echo $cronLabels[$lastStatus] ?? $cronEscape($lastStatus); ?></span><?php } ?>
+<dl class="cron-details">
+<dt>执行间隔</dt><dd><?php echo (int) $cs['freq'] === -1 ? '一次性任务' : ((int) $cs['freq'] === 0 ? '每轮调度' : (int) $cs['freq'] . ' 秒'); ?></dd>
+<dt>上次执行</dt><dd><?php echo empty($cs['lastdo']) ? '从未运行' : date('Y-m-d H:i:s', (int) $cs['lastdo']); ?></dd>
+<dt>下次执行</dt><dd><?php echo !$enabled ? '已暂停' : ($running ? '等待当前执行结束' : ($due ? '下一轮调度' : date('Y-m-d H:i:s', (int) $cs['nextrun']))); ?></dd>
+<dt>上次耗时</dt><dd><?php echo $cronDuration($cs['last_duration'] ?? 0); ?></dd>
+<dt>重试进度</dt><dd><?php echo (int) ($cs['retry'] ?? 0); ?> / <?php echo (int) ($cs['max_retry'] ?? option::get('cron_max_retry')); ?></dd>
+</dl></td>
+<td><div class="cron-actions">
+<button type="submit" form="cron-action-form" formaction="<?php echo $cronEscape($taskUrl . 'run=' . urlencode($cs['name'])); ?>" class="cs-btn cs-btn-secondary cs-btn-sm" <?php echo $running ? 'disabled' : ''; ?> aria-label="<?php echo $cronEscape('运行 ' . $cs['name']); ?>">运行</button>
+<?php if ($lastStatus === 'error' || !empty($cs['retry'])) { ?><button type="submit" form="cron-action-form" formaction="<?php echo $cronEscape($taskUrl . 'retry=' . urlencode($cs['name'])); ?>" class="cs-btn cs-btn-secondary cs-btn-sm" <?php echo $running ? 'disabled' : ''; ?>>重试</button><?php } ?>
+<button type="submit" form="cron-action-form" formaction="<?php echo $cronEscape($taskUrl . ($enabled ? 'dis=' : 'act=') . urlencode($cs['name'])); ?>" class="cs-btn cs-btn-ghost cs-btn-sm"><?php echo $enabled ? '禁用' : '启用'; ?></button>
+<a class="cs-btn cs-btn-ghost cs-btn-sm" href="index.php?mod=admin:editcron&amp;edit=<?php echo urlencode($cs['name']); ?>">编辑</a>
+<button type="submit" form="cron-action-form" formaction="<?php echo $cronEscape($taskUrl . 'uninst=' . urlencode($cs['name'])); ?>" class="cs-btn cs-btn-ghost cs-btn-sm cs-text-danger" data-confirm="卸载后此任务将停止调度，已有运行历史会保留。确认卸载？" <?php echo $running ? 'disabled' : ''; ?>>卸载</button>
+<a class="cs-btn cs-btn-ghost cs-btn-sm" href="<?php echo $cronEscape('index.php?mod=admin:cron&task=' . urlencode($cs['name']) . '#cron-history'); ?>">运行历史</a>
+</div><label class="cron-order-label">运行顺序 <input type="number" name="order[<?php echo $cronEscape($cs['name']); ?>]" value="<?php echo (int) $cs['orde']; ?>" class="form-control cron-order-input" required></label>
+<?php if (!empty($cs['log'])) { ?><details class="cron-log"><summary>最近日志</summary><pre><?php echo $cronEscape($cs['log']); ?></pre></details><?php } ?></td></tr>
+<?php } ?>
+</tbody></table></div>
+<p id="cron-empty" class="cron-empty" <?php echo $cronTasks ? 'hidden' : ''; ?>>没有符合条件的任务。可调整搜索条件，或添加新任务。</p>
+<?php if ($cronTasks) { ?><button type="submit" class="cs-btn cs-btn-primary cs-btn-sm">保存运行顺序</button><span class="cron-hint">可拖动任务行，或输入数字后保存。</span><?php } ?>
 </form>
-<br/>
-<details style="margin:0 1%">
-<summary style="cursor:pointer;font-weight:600;font-size:14px">最近任务运行历史（V5.13）—— 默认折叠</summary>
-<div class="table-responsive" style="margin-top:10px">
-<table class="cs-table">
-   <thead>
-        <tr>
-           <th>任务名</th>
-           <th>状态</th>
-           <th>开始时间</th>
-           <th>耗时</th>
-           <th>日志</th>
-     </tr>
-  </thead>
-   <tbody>
-        <?php echo $runRows ? $runRows : '<tr><td colspan="5">暂无运行记录</td></tr>' ?>
-    </tbody>
-</table>
-</div>
-</details>
-<script>
-(function () {
-    var tbody = document.querySelector('form[action*="xorder"] table tbody');
-    if (!tbody) { return; }
-    var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
-    rows.forEach(function (row) { row.setAttribute('draggable', 'true'); });
-    var dragRow = null;
-    tbody.addEventListener('dragstart', function (e) {
-        dragRow = e.target.closest('tr');
-        if (dragRow) { e.dataTransfer.effectAllowed = 'move'; }
-    });
-    tbody.addEventListener('dragover', function (e) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-    });
-    tbody.addEventListener('drop', function (e) {
-        e.preventDefault();
-        var target = e.target.closest('tr');
-        if (!dragRow || !target || dragRow === target) { return; }
-        var rect = target.getBoundingClientRect();
-        var before = e.clientY < rect.top + rect.height / 2;
-        tbody.insertBefore(dragRow, before ? target : target.nextSibling);
-        dragRow = null;
-        Array.prototype.slice.call(tbody.querySelectorAll('tr')).forEach(function (row, i) {
-            var input = row.querySelector('input[name^="order["]');
-            if (input) { input.value = i + 1; }
-        });
-    });
-})();
-</script>
+<section id="cron-history" class="cron-history" aria-labelledby="cron-history-title">
+<h2 id="cron-history-title">运行历史</h2><p class="cron-hint">“开始执行”是启动事件，结束结果另记一条。当前是否运行请以上方列表为准。</p>
+<form method="get" action="index.php#cron-history" class="cron-toolbar">
+<input type="hidden" name="mod" value="admin:cron">
+<label for="history-task">任务名<input id="history-task" name="task" class="form-control" value="<?php echo $cronEscape($historyName); ?>" maxlength="40" placeholder="全部任务" list="cron-task-names"></label>
+<datalist id="cron-task-names"><?php foreach ($cronTasks as $cs) { ?><option value="<?php echo $cronEscape($cs['name']); ?>"><?php } ?></datalist>
+<label for="history-status">结果<select id="history-status" name="status" class="form-control"><option value="">全部结果</option><?php foreach ($cronLabels as $value => $label) { ?><option value="<?php echo $value; ?>" <?php echo $historyStatus === $value ? 'selected' : ''; ?>><?php echo $label; ?></option><?php } ?></select></label>
+<label for="history-days">时间<select id="history-days" name="days" class="form-control"><?php foreach (array(1 => '最近一天', 7 => '最近七天', 30 => '最近三十天', 0 => '全部时间') as $value => $label) { ?><option value="<?php echo $value; ?>" <?php echo $historyDays === $value ? 'selected' : ''; ?>><?php echo $label; ?></option><?php } ?></select></label>
+<button type="submit" class="cs-btn cs-btn-secondary cs-btn-sm">查询历史</button></form>
+<p class="cron-mobile-hint">左右滑动表格可查看完整时间与日志。</p>
+<div class="table-responsive" role="region" aria-label="任务运行历史表格，可横向滚动" tabindex="0"><table class="cs-table cron-history-table"><thead><tr><th scope="col">任务名</th><th scope="col">结果</th><th scope="col">开始 / 结束</th><th scope="col">耗时</th><th scope="col">日志</th></tr></thead><tbody>
+<?php foreach ($history['rows'] as $run) { ?><tr><td><?php echo $cronEscape($run['name']); ?></td><td><span class="cs-badge cs-badge-<?php echo $cronClasses[$run['status']] ?? 'neutral'; ?>"><?php echo $cronLabels[$run['status']] ?? $cronEscape($run['status']); ?></span></td>
+<td><?php echo empty($run['started_at']) ? '旧记录未保存开始时间' : date('Y-m-d H:i:s', (int) $run['started_at']); ?><br><span class="cron-hint"><?php echo date('Y-m-d H:i:s', (int) $run['finished_at']); ?></span></td><td><?php echo $cronDuration($run['duration_ms']); ?></td><td class="cron-history-message"><?php echo $cronEscape($run['message']); ?></td></tr><?php } ?>
+<?php if (!$history['rows']) { ?><tr><td colspan="5" class="cron-empty">暂无符合条件的记录。可扩大时间范围或清空任务名后重试。</td></tr><?php } ?>
+</tbody></table></div>
+<nav class="cron-pagination" aria-label="运行历史分页"><span role="status">共 <?php echo $history['total']; ?> 条 · 第 <?php echo $history['page']; ?> / <?php echo $history['pages']; ?> 页</span>
+<?php if ($history['page'] > 1) { ?><a class="cs-btn cs-btn-secondary cs-btn-sm" href="<?php echo $cronEscape($historyLink($history['page'] - 1)); ?>">上一页</a><?php } ?>
+<?php if ($history['page'] < $history['pages']) { ?><a class="cs-btn cs-btn-secondary cs-btn-sm" href="<?php echo $cronEscape($historyLink($history['page'] + 1)); ?>">下一页</a><?php } ?>
+</nav></section>
+<script src="source/js/cron.js?v=<?php echo SYSTEM_VER; ?>" defer></script>

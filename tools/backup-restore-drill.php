@@ -73,7 +73,7 @@ try {
 
     // ---------- 播种代表性数据（含中文、引号、反斜杠、序列化值） ----------
     $conn->select_db($dbSource);
-    $expectedGroups = array('g1' => array('name' => '分组"一', 'pid' => array(5)));
+    $expectedGroups = array('g1' => array('name' => '分组"一😀', 'pid' => array(5)));
     $seeds = array(
         "INSERT INTO `{$prefix}users` (`name`, `pw`, `email`, `role`, `t`) VALUES ('管理员\"A', 'bcrypt~hash\\\\x', 'drill@example.test', 'admin', 'tieba')",
         "INSERT INTO `{$prefix}baiduid` (`uid`, `bduss`, `stoken`, `name`, `portrait`) VALUES (1, 'BDUSS\\\"含引\\\\slash', '', '百度\"吧友', 'p_or trait')",
@@ -129,7 +129,9 @@ PHP;
 
     // ---------- 恢复到全新空库 ----------
     $conn->query("CREATE DATABASE `{$dbRestore}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+    $conn->set_charset('latin1'); // 模拟导入工具使用不同默认连接编码。
     check('备份可完整重放恢复', it_import_sql($conn, $dbRestore, $dump, ''));
+    $conn->set_charset('utf8mb4');
 
     // ---------- 逐表指纹比对 ----------
     $conn->select_db($dbSource);

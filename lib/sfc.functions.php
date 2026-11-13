@@ -621,7 +621,9 @@ function dataBak($table)
         return false;
     }
     global $m;
-    $sql = "DROP TABLE IF EXISTS `$table`;\n";
+    // 转储由 utf8mb4 应用连接生成。显式声明编码，避免导入端默认 latin1 导致
+    // 中文/emoji 变形甚至因字符数膨胀而恢复失败；手动、定时与更新前备份均复用此处。
+    $sql = "SET NAMES utf8mb4;\nDROP TABLE IF EXISTS `$table`;\n";
     $createtable = $m->query("SHOW CREATE TABLE $table");
     $create = $m->fetch_row($createtable);
     $sql .= $create[1] . ";\n\n";

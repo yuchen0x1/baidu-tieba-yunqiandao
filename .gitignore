@@ -14,6 +14,7 @@ docker/.env
 vendor/
 
 .phpunit.result.cache
+.evolution/runtime/
 
 # 运行产物（不入库）
 data/log/

@@ -12,7 +12,7 @@ $iterator = new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
         static function (SplFileInfo $file) use ($root) {
             if ($file->isDir()) {
-                return !in_array($file->getFilename(), array('.git', 'vendor'), true);
+                return !in_array($file->getFilename(), array('.git', 'vendor', '.evolution'), true);
             }
             return strtolower($file->getExtension()) === 'php';
         }

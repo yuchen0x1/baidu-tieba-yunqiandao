@@ -1,0 +1,59 @@
+{
+  "date": "2026-11-13",
+  "method": "GitHub connector repository metadata and primary source files; design reference only, no competitor code imported",
+  "projects": [
+    {
+      "name": "MoeNetwork/Tieba-Cloud-Sign",
+      "url": "https://github.com/MoeNetwork/Tieba-Cloud-Sign",
+      "branch": "master",
+      "pushed_at": "2026-10-22T01:41:06Z",
+      "archived": false,
+      "reported_license": "NOASSERTION"
+    },
+    {
+      "name": "qd-today/qd",
+      "url": "https://github.com/qd-today/qd",
+      "branch": "master",
+      "pushed_at": "2026-11-07T19:08:58Z",
+      "archived": false,
+      "reported_license": "MIT"
+    },
+    {
+      "name": "whyour/qinglong",
+      "url": "https://github.com/whyour/qinglong",
+      "branch": "develop",
+      "pushed_at": "2026-11-09T18:23:13Z",
+      "archived": false,
+      "reported_license": "Apache-2.0"
+    },
+    {
+      "name": "jhuckaby/Cronicle",
+      "url": "https://github.com/jhuckaby/Cronicle",
+      "branch": "master",
+      "pushed_at": "2026-11-07T18:17:50Z",
+      "archived": false,
+      "reported_license": "NOASSERTION"
+    },
+    {
+      "name": "healthchecks/healthchecks",
+      "url": "https://github.com/healthchecks/healthchecks",
+      "branch": "master",
+      "pushed_at": "2026-11-10T14:37:48Z",
+      "archived": false,
+      "reported_license": "BSD-3-Clause"
+    }
+  ],
+  "source_files": [
+    "https://github.com/MoeNetwork/Tieba-Cloud-Sign/blob/master/lib/class.cron.php",
+    "https://github.com/MoeNetwork/Tieba-Cloud-Sign/blob/master/license.html",
+    "https://github.com/qd-today/qd/blob/master/worker.py",
+    "https://github.com/qd-today/qd/blob/master/LICENSE",
+    "https://github.com/whyour/qinglong/blob/develop/back/services/cron.ts",
+    "https://github.com/whyour/qinglong/blob/develop/src/pages/crontab/index.tsx",
+    "https://github.com/whyour/qinglong/blob/develop/LICENSE",
+    "https://github.com/jhuckaby/Cronicle/blob/master/lib/scheduler.js",
+    "https://github.com/jhuckaby/Cronicle/blob/master/LICENSE.md",
+    "https://github.com/healthchecks/healthchecks/blob/master/hc/api/models.py",
+    "https://github.com/healthchecks/healthchecks/blob/master/LICENSE"
+  ]
+}

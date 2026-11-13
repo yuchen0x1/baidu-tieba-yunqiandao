@@ -190,7 +190,7 @@ class cron
             array(
                 substr((string) $name, 0, 40),
                 substr((string) $status, 0, 20),
-                substr((string) $message, 0, 1000),
+                mb_strcut((string) $message, 0, 1000, 'UTF-8'),
                 (int) $duration_ms,
                 (int) $started_at,
                 time(),
@@ -214,6 +214,44 @@ class cron
         return $rows;
     }
 
+    /** 按任务、状态和时间窗口查询历史；只读取一页，兼容已卸载任务的记录。 */
+    public static function runHistory($filters = array(), $page = 1, $pageSize = 20)
+    {
+        global $m;
+        self::ensureTables();
+        $pageSize = min(100, max(1, (int) $pageSize));
+        $where = array();
+        $params = array();
+        if (!empty($filters['name']) && is_string($filters['name'])) {
+            $where[] = '`name` = ?';
+            $params[] = substr($filters['name'], 0, 40);
+        }
+        if (isset($filters['status']) && in_array($filters['status'], array('success', 'error', 'skipped', 'running'), true)) {
+            $where[] = '`status` = ?';
+            $params[] = $filters['status'];
+        }
+        if (!empty($filters['since'])) {
+            // 旧版本的结束事件未保存 started_at，按 finished_at 保留可检索性。
+            $where[] = '(`started_at` >= ? OR (`started_at` = 0 AND `finished_at` >= ?))';
+            $params[] = max(0, (int) $filters['since']);
+            $params[] = max(0, (int) $filters['since']);
+        }
+        $table = '`' . DB_PREFIX . self::TASK_RUNS_TABLE . '`';
+        $clause = $where ? ' WHERE ' . implode(' AND ', $where) : '';
+        $rs = $m->pquery('SELECT COUNT(*) AS total FROM ' . $table . $clause, $params);
+        $count = $rs ? $m->fetch_array($rs) : array();
+        $total = (int) ($count['total'] ?? 0);
+        $pages = max(1, (int) ceil($total / $pageSize));
+        $page = min($pages, max(1, (int) $page));
+        $offset = ($page - 1) * $pageSize;
+        $rs = $m->pquery('SELECT * FROM ' . $table . $clause . " ORDER BY `id` DESC LIMIT {$pageSize} OFFSET {$offset}", $params);
+        $rows = array();
+        while ($rs && ($row = $m->fetch_array($rs))) {
+            $rows[] = $row;
+        }
+        return array('rows' => $rows, 'total' => $total, 'page' => $page, 'pages' => $pages);
+    }
+
     /**
      * 获取某任务最近一条运行记录。
      */
@@ -231,14 +269,20 @@ class cron
      * @param string $name 任务名
      * @return bool 是否成功获取锁
      */
-    public static function acquireLock($name)
+    public static function acquireLock($name, $scheduled = false)
     {
         global $m;
         $timeout = max(60, (int) option::get('cron_lock_timeout'));
         $now = time();
+        // 到期判断必须与领取同一条 UPDATE，防止多个调度器使用过时的列表快照。
+        $due = $scheduled ? " AND `no` <> 1 AND `enable` <> 0 AND (`freq` = '-1' OR `nextrun` <= ?)" : '';
+        $params = array($now, (string) $name, $now - $timeout);
+        if ($scheduled) {
+            $params[] = $now;
+        }
         $ok = $m->pquery(
-            "UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "cron` SET `running` = 1, `running_at` = ? WHERE `name` = ? AND (`running` = 0 OR `running_at` < ?)",
-            array($now, (string) $name, $now - $timeout)
+            "UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "cron` SET `running` = 1, `running_at` = ? WHERE `name` = ? AND (`running` = 0 OR `running_at` < ?)" . $due,
+            $params
         );
         if (!$ok) {
             return false;
@@ -280,7 +324,7 @@ class cron
         global $m;
         $now = time();
         $maxRetry = max(0, (int) option::get('cron_max_retry'));
-        $backoff = max(30, (int) option::get('cron_retry_backoff'));
+        $backoff = min(86400, max(30, (int) option::get('cron_retry_backoff')));
         $durationMs = (int) $durationMs;
 
         if ($freq == '-1') {
@@ -304,12 +348,13 @@ class cron
 
         // 失败：读取当前累计重试次数
         $escaped = $m->real_escape_string((string) $name);
-        $row = $m->once_fetch_array("SELECT `retry` FROM `" . DB_NAME . "`.`" . DB_PREFIX . "cron` WHERE `name` = '{$escaped}' LIMIT 1");
+        $row = $m->once_fetch_array("SELECT `retry`, `max_retry` FROM `" . DB_NAME . "`.`" . DB_PREFIX . "cron` WHERE `name` = '{$escaped}' LIMIT 1");
+        $maxRetry = min(20, max(0, isset($row['max_retry']) ? (int) $row['max_retry'] : $maxRetry));
         $retry = isset($row['retry']) ? (int) $row['retry'] + 1 : 1;
 
         if ($retry <= $maxRetry) {
-            // 指数退避：第 1 次失败等 backoff×1，第 2 次等 backoff×2……
-            $next = $now + $backoff * $retry;
+            // 指数退避，最多等待一天；保留前两次 1×/2× 的兼容行为。
+            $next = $now + min(86400, $backoff * (2 ** ($retry - 1)));
             self::aset($name, array(
                 'lastdo'        => $now,
                 'nextrun'       => $next,
@@ -354,9 +399,11 @@ class cron
      * 完整执行单个计划任务：加锁 → 执行 → 记录运行历史 → 解锁 → 排程。
      * 可同时用于「定时调度」「手动运行」「手动重试」。
      * @param string $name 计划任务名称
+     * @param bool $scheduled 自动调度时原子检查到期与启用状态，手动调用默认不检查
+     * @param bool $resetRetry 领取成功后才重置重试计数
      * @return mixed 执行成功给出日志，否则 false
      */
-    public static function runOnce($name)
+    public static function runOnce($name, $scheduled = false, $resetRetry = false)
     {
         global $m;
         $name = (string) $name;
@@ -369,32 +416,40 @@ class cron
             return false;
         }
 
-        if (!self::acquireLock($name)) {
-            self::logRun($name, 'skipped', '任务已在运行或运行锁未释放（锁超时 ' . (int) option::get('cron_lock_timeout') . ' 秒）', 0, time());
+        if (!self::acquireLock($name, $scheduled)) {
+            self::logRun($name, 'skipped', '任务正在运行，或已被其他调度器排程/停用（锁超时 ' . (int) option::get('cron_lock_timeout') . ' 秒）', 0, time());
             return false;
         }
 
         $start = microtime(true);
-        self::logRun($name, 'running', '开始执行', 0, time());
+        $startedAt = time();
         try {
-            $ret = self::run($row['file'], $row['name']);
-            $ok = ($ret !== false);
-        } catch (Throwable $e) {
-            $ret = '执行异常：' . $e->getMessage();
-            $ok = false;
-            require_once SYSTEM_ROOT . '/lib/class.logger.php';
-            Logger::error('计划任务执行异常', array('name' => $name, 'error' => $e->getMessage()));
-        }
-        $durationMs = intval((microtime(true) - $start) * 1000);
-        // 运行历史与排程写入在持锁状态下完成（finally 释放），避免并发进程在
-        // 解锁与排程之间交错读取 retry/nextrun 造成重复计数或重复领取
-        try {
-            self::logRun($name, $ok ? 'success' : 'error', $ok ? (string) $ret : '失败：' . (string) $ret, $durationMs);
+            // 领取之后重新读取配置；重试重置也必须持锁，不能改动别人的运行状态。
+            $row = $m->once_fetch_array("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . "cron` WHERE `name` = '{$escaped}' LIMIT 1");
+            if (empty($row['name'])) {
+                return false;
+            }
+            if ($resetRetry) {
+                self::aset($name, array('retry' => 0));
+            }
+            self::logRun($name, 'running', '开始执行', 0, $startedAt);
+            try {
+                $ret = self::run($row['file'], $row['name']);
+                $ok = ($ret !== false);
+            } catch (Throwable $e) {
+                $ret = '执行异常：' . $e->getMessage();
+                $ok = false;
+                require_once SYSTEM_ROOT . '/lib/class.logger.php';
+                Logger::error('计划任务执行异常', array('name' => $name, 'error' => $e->getMessage()));
+            }
+            $durationMs = intval((microtime(true) - $start) * 1000);
+            // 历史与排程持锁写入；包含首次日志失败在内的异常均由 finally 解锁。
+            self::logRun($name, $ok ? 'success' : 'error', $ok ? (string) $ret : '失败：' . (string) $ret, $durationMs, $startedAt);
             self::scheduleAfterRun($row['name'], (string) $row['freq'], $ok, (string) $ret, $durationMs);
         } finally {
             self::releaseLock($name);
         }
-        return $ret;
+        return $ok ? $ret : false;
     }
 
     /**
@@ -445,7 +500,7 @@ class cron
             return false;
         }
         $url = SYSTEM_URL . 'do.php?mod=runcron&cron=' . urlencode($name);
-        $cpw = option::get('cron_pw');
+        $cpw = SecretBox::get('cron_pw');
         $post = '';
         if (!empty($cpw)) {
             $post = 'pw=' . urlencode($cpw);
@@ -470,14 +525,14 @@ class cron
             }
             // 一次性任务：执行后由 scheduleAfterRun 删除
             if ($cs['freq'] == '-1') {
-                self::runOnce($cs['name']);
+                self::runOnce($cs['name'], true);
                 continue;
             }
             // 未到点则跳过（freq=0 / nextrun=0 视为始终待执行）
             if ((int) $cs['nextrun'] > time()) {
                 continue;
             }
-            self::runOnce($cs['name']);
+            self::runOnce($cs['name'], true);
         }
     }
 }

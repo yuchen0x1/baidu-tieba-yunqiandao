@@ -10,6 +10,7 @@ use PHPUnit\Framework\TestCase;
 
 final class FakeCronDB
 {
+    public $failNextHistoryInsert = false;
     /** 最近一次 pquery 调用 */
     public $lastPquery = array('sql' => '', 'params' => array());
     /** 所有 pquery 调用 */
@@ -31,6 +32,11 @@ final class FakeCronDB
         $this->lastPquery = array('sql' => $sql, 'params' => $params);
         $this->calls[] = $this->lastPquery;
         $this->affected = 1;
+
+        if ($this->failNextHistoryInsert && strpos($sql, 'task_runs') !== false) {
+            $this->failNextHistoryInsert = false;
+            throw new RuntimeException('history storage unavailable');
+        }
 
         if (stripos($sql, 'INSERT') === 0) {
             // INSERT ... ON DUPLICATE KEY UPDATE：按列名映射参数到 cronRows
@@ -54,6 +60,12 @@ final class FakeCronDB
         if (preg_match('/`running` = 1/i', $sql) && preg_match('/`running_at` < \?/i', $sql)) {
             // 获取锁
             $this->affected = $this->lockResult;
+            if (strpos($sql, '`nextrun` <= ?') !== false) {
+                $row = $this->cronRows[$params[1]] ?? array();
+                if (!cron::isEnabled($row) || ((int) ($row['freq'] ?? 0) !== -1 && (int) ($row['nextrun'] ?? 0) > $params[3])) {
+                    $this->affected = 0;
+                }
+            }
             return true;
         }
         if (preg_match('/`running` = 0/i', $sql)) {
@@ -82,7 +94,7 @@ final class FakeCronDB
                 return null;
             }
             if (preg_match('/SELECT `retry`/i', $sql)) {
-                return array('retry' => isset($this->cronRows[$name]['retry']) ? $this->cronRows[$name]['retry'] : 0);
+                return $this->cronRows[$name];
             }
             return $this->cronRows[$name];
         }
@@ -93,6 +105,12 @@ final class FakeCronDB
     {
         return false;
     }
+}
+
+function cron_unit_probe()
+{
+    if (!empty($GLOBALS['cron_probe_throws'])) { throw new RuntimeException('probe failure'); }
+    return 'probe-ok';
 }
 
 final class CronSchedulerTest extends TestCase
@@ -146,6 +164,91 @@ final class CronSchedulerTest extends TestCase
     {
         $this->db->lockResult = 0;
         $this->assertFalse(cron::acquireLock('system_health_check'));
+    }
+
+    public function testScheduledClaimRejectsNewlyRescheduledAndDisabledTask(): void
+    {
+        $this->db->cronRows['task'] = array('freq' => 3600, 'nextrun' => time() + 3600, 'enable' => 1);
+        $this->assertFalse(cron::acquireLock('task', true));
+        $this->assertTrue(cron::acquireLock('task'), 'manual runs may bypass schedule');
+        $this->db->cronRows['task'] = array('freq' => -1, 'nextrun' => 0, 'enable' => 0);
+        $this->assertFalse(cron::acquireLock('task', true));
+    }
+
+    public function testTaskRetryLimitOverridesGlobalAndZeroDisablesRetries(): void
+    {
+        $this->db->cronRows['task'] = array('name' => 'task', 'retry' => 0, 'max_retry' => 0);
+        cron::scheduleAfterRun('task', '3600', false, 'failed');
+        $this->assertSame(0, $this->db->cronRows['task']['retry']);
+        $this->assertEqualsWithDelta(time() + 3600, $this->db->cronRows['task']['nextrun'], 2);
+        $this->db->cronRows['task'] = array('name' => 'task', 'retry' => 2, 'max_retry' => 4);
+        cron::scheduleAfterRun('task', '3600', false, 'failed');
+        $this->assertSame(3, $this->db->cronRows['task']['retry']);
+        $this->assertEqualsWithDelta(time() + 1200, $this->db->cronRows['task']['nextrun'], 2);
+    }
+
+    public function testExponentialBackoffIsCappedAtOneDay(): void
+    {
+        $this->db->cronRows['task'] = array('name' => 'task', 'retry' => 19, 'max_retry' => 20);
+        cron::scheduleAfterRun('task', '3600', false, 'failed');
+        $this->assertEqualsWithDelta(time() + 86400, $this->db->cronRows['task']['nextrun'], 2);
+    }
+
+    public function testHistoryTruncationPreservesUtf8(): void
+    {
+        cron::logRun('task', 'error', str_repeat('中文😀', 200));
+        $message = $this->db->lastPquery['params'][2];
+        $this->assertTrue(mb_check_encoding($message, 'UTF-8'));
+        $this->assertLessThanOrEqual(1000, strlen($message));
+    }
+
+    private function seedProbe(): void
+    {
+        $this->db->cronRows['unit_probe'] = array('name' => 'unit_probe', 'file' => 'lib/class.cron.php', 'freq' => 3600, 'retry' => 2);
+    }
+
+    private function wasReleased(): bool
+    {
+        foreach ($this->db->calls as $call) {
+            if (strpos($call['sql'], 'SET `running` = 0') !== false) { return true; }
+        }
+        return false;
+    }
+
+    public function testInitialHistoryFailureStillReleasesLock(): void
+    {
+        $this->seedProbe();
+        $this->db->failNextHistoryInsert = true;
+        try {
+            cron::runOnce('unit_probe');
+            $this->fail('expected history write failure');
+        } catch (RuntimeException $e) {
+            $this->assertSame('history storage unavailable', $e->getMessage());
+        }
+        $this->assertTrue($this->wasReleased());
+    }
+
+    public function testTaskExceptionReturnsFalseAndRecordsStartTime(): void
+    {
+        $this->seedProbe();
+        $GLOBALS['cron_probe_throws'] = true;
+        try {
+            $this->assertFalse(cron::runOnce('unit_probe'));
+            $errors = array_values(array_filter($this->db->calls, static function ($call) {
+                return strpos($call['sql'], 'task_runs') !== false && ($call['params'][1] ?? '') === 'error';
+            }));
+            $this->assertCount(1, $errors);
+            $this->assertGreaterThan(0, $errors[0]['params'][4]);
+            $this->assertTrue($this->wasReleased());
+        } finally { unset($GLOBALS['cron_probe_throws']); }
+    }
+
+    public function testLockedManualRetryDoesNotResetAnotherRunsState(): void
+    {
+        $this->seedProbe();
+        $this->db->lockResult = 0;
+        $this->assertFalse(cron::runOnce('unit_probe', false, true));
+        $this->assertSame(2, $this->db->cronRows['unit_probe']['retry']);
     }
 
     // ---------- scheduleAfterRun：成功 ----------

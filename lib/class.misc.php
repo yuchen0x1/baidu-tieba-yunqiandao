@@ -361,7 +361,7 @@ class misc
             'host' => $host,
             'port' => $port,
             'user' => (string) option::get('proxy_user'),
-            'pass' => (string) option::get('proxy_pass'),
+            'pass' => SecretBox::get('proxy_pass'),
         );
     }
 

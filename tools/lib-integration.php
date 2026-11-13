@@ -42,6 +42,8 @@ function it_connect_db()
     $pass = getenv('TCS_IT_DB_PASS') ?: '';
     try {
         $conn = new mysqli($host, $user, $pass, '', $port);
+        // 测试连接必须与应用连接一致，避免 Windows 默认 latin1 把中文夹具双重编码。
+        $conn->set_charset('utf8mb4');
     } catch (mysqli_sql_exception $e) {
         echo "SKIP: 数据库不可达（{$host}:{$port}）：{$e->getMessage()}\n";
         exit(0);
@@ -58,19 +60,18 @@ function it_copy_project($src, $dst)
         return false;
     }
     $iterator = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($src, FilesystemIterator::SKIP_DOTS),
+        new RecursiveCallbackFilterIterator(
+            new RecursiveDirectoryIterator($src, FilesystemIterator::SKIP_DOTS),
+            static function ($item) use ($src) {
+                return !$item->isDir() || realpath($item->getPath()) !== realpath($src)
+                    || !in_array($item->getFilename(), array('.git', 'vendor', 'data', '.evolution'), true);
+            }
+        ),
         RecursiveIteratorIterator::SELF_FIRST
     );
     foreach ($iterator as $item) {
         $path = (string) $item;
         $relative = substr($path, strlen($src) + 1);
-        $top = strtok($relative, '/\\');
-        if ($top === 'vendor' || $top === 'data') {
-            if ($item->isDir()) {
-                $iterator->next();
-            }
-            continue;
-        }
         $target = $dst . '/' . $relative;
         if ($item->isDir()) {
             if (!is_dir($target) && !mkdir($target, 0777, true)) {

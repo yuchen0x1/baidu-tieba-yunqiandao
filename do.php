@@ -5,7 +5,7 @@ require dirname(__FILE__) . '/init.php';
 global $m,$today,$i;
 ignore_user_abort(true);
 set_time_limit(0);
-$cron_pw = option::get('cron_pw');
+$cron_pw = SecretBox::get('cron_pw');
 $cmd_pw = function_exists('getopt') ? getopt('', array('pw::', 'loop::')) : false;
 $providedCronPassword = request_scalar_value($_REQUEST, 'pw');
 $providedCommandPassword = is_array($cmd_pw) && isset($cmd_pw['pw']) ? (string) $cmd_pw['pw'] : '';
@@ -74,8 +74,6 @@ if (SYSTEM_PAGE == 'runcron') {
         msg('运行失败：计划任务名称不合法');
     }
     $cron = sqladds($cron);
-    $cpw  = option::get('cron_pw');
-
     $x    = $m->once_fetch_array("SELECT * FROM `" . DB_PREFIX . "cron` WHERE `name` = '{$cron}';");
     if (empty($x['id'])) {
         msg('运行失败：此计划任务不存在');

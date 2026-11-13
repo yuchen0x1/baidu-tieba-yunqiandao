@@ -46,9 +46,14 @@ while (ob_get_level() > 0) { @ob_end_clean(); }
 $action = isset($argv[1]) ? $argv[1] : '';
 $name = isset($argv[2]) ? $argv[2] : '';
 global $m;
-if ($action === 'run') {
-    $ret = cron::runOnce($name);
+if ($action === 'run' || $action === 'scheduled' || $action === 'retry') {
+    $ret = cron::runOnce($name, $action === 'scheduled', $action === 'retry');
     echo json_encode(array('ok' => $ret !== false, 'ret' => is_string($ret) ? $ret : ''));
+} elseif ($action === 'encrypt_cron') {
+    SecretBox::put('cron_pw', 'itpw');
+    echo json_encode(array('encrypted' => strpos(option::get('cron_pw'), 'enc:v1:') === 0));
+} elseif ($action === 'history') {
+    echo json_encode(cron::runHistory(array('name' => $name, 'status' => 'success', 'since' => time() - 86400), 999999));
 } elseif ($action === 'state') {
     $escaped = $m->real_escape_string($name);
     $row = $m->once_fetch_array("SELECT * FROM `" . DB_NAME . "`.`" . DB_PREFIX . "cron` WHERE `name` = '{$escaped}'");
@@ -159,6 +164,24 @@ try {
     check('task_runs 记录 success', $state !== null && ($state['runs'][0]['status'] ?? '') === 'success');
     check('探针副作用已产生', is_file($markers . '/probe.txt'));
 
+    // 新调度器不能凭过时快照再次运行已被另一个调度器推进的任务；手动运行仍可绕过时间。
+    @unlink($markers . '/probe.txt');
+    list($code, $output) = it_run_php($workRoot . '/tools/it_scheduler.php', array('scheduled', 'it_probe'));
+    check('原子领取拒绝已被推进到未来的任务', json_decode($output, true)['ok'] === false && !is_file($markers . '/probe.txt'));
+    list($code, $output) = it_run_php($workRoot . '/tools/it_scheduler.php', array('run', 'it_probe'));
+    check('手动运行仍可执行未到期任务', json_decode($output, true)['ok'] === true && is_file($markers . '/probe.txt'));
+    $conn->query("UPDATE `{$prefix}cron` SET `enable` = 0, `nextrun` = 0 WHERE `name` = 'it_probe'");
+    list($code, $output) = it_run_php($workRoot . '/tools/it_scheduler.php', array('scheduled', 'it_probe'));
+    check('原子领取拒绝已停用任务', json_decode($output, true)['ok'] === false);
+    $conn->query("UPDATE `{$prefix}cron` SET `enable` = 1 WHERE `name` = 'it_probe'");
+    list($code, $output) = it_run_php($workRoot . '/tools/it_scheduler.php', array('history', 'it_probe'));
+    $history = json_decode($output, true);
+    check('真实数据库历史筛选与越界页码收敛', $history['total'] === 2 && count($history['rows']) === 2 && $history['page'] === 1);
+    check('结束记录保存真实开始时间', (int) $history['rows'][0]['started_at'] > 0);
+    $conn->query("INSERT INTO `{$prefix}task_runs` (`name`,`status`,`message`,`started_at`,`finished_at`) VALUES ('it_legacy','success','legacy event',0," . time() . ")");
+    list($code, $output) = it_run_php($workRoot . '/tools/it_scheduler.php', array('history', 'it_legacy'));
+    check('旧版无开始时间的结束事件仍可按时间检索', json_decode($output, true)['total'] === 1);
+
     // ---------- 场景 B：锁冲突 → skipped，不执行 ----------
     $conn->query("UPDATE `{$prefix}cron` SET `running` = 1, `running_at` = " . time() . " WHERE `name` = 'it_probe'");
     it_drain($conn);
@@ -167,7 +190,7 @@ try {
     check('持锁时 runOnce 返回失败', $code === 0 && $result !== null && $result['ok'] === false);
     $state = fetchRow($workRoot, 'it_probe');
     check('锁冲突记录 task_runs skipped', ($state['runs'][0]['status'] ?? '') === 'skipped');
-    check('持锁期间任务未被执行', (int) it_query_value($conn, $db, "SELECT COUNT(*) FROM `{$prefix}task_runs` WHERE `name` = 'it_probe' AND `status` = 'success'") === 1);
+    check('持锁期间任务未被执行', (int) it_query_value($conn, $db, "SELECT COUNT(*) FROM `{$prefix}task_runs` WHERE `name` = 'it_probe' AND `status` = 'success'") === 2);
 
     // ---------- 场景 C：过期锁恢复 ----------
     $conn->query("UPDATE `{$prefix}cron` SET `running` = 1, `running_at` = " . (time() - 700) . " WHERE `name` = 'it_probe'");
@@ -212,6 +235,18 @@ try {
     $thirdMarker = (int) it_query_value($conn, $db, "SELECT `value` FROM `{$prefix}options` WHERE `name` = 'cron_notify_last_it_fail'");
     check('interval=0 时耗尽立即更新告警标记', $thirdMarker > $firstMarker);
     check('结构化日志累计 3 条', countExhaustLogs($workRoot) === 3);
+
+    check('种子零重试任务', seedTask($conn, $db, $prefix, 'it_zero', 'lib/cron_it_zero.php', '3600', 0, 0));
+    check('写入零重试探针', writeProbeTask($workRoot, 'it_zero', 'zero', false));
+    it_run_php($workRoot . '/tools/it_scheduler.php', array('run', 'it_zero'));
+    $zero = fetchRow($workRoot, 'it_zero')['row'];
+    check('单任务 max_retry=0 生效', (int) $zero['retry'] === 0 && abs((int) $zero['nextrun'] - (time() + 3600)) <= 15);
+    list($code, $output) = it_run_php($workRoot . '/tools/it_scheduler.php', array('encrypt_cron'));
+    check('计划任务密码已加密落库', json_decode($output, true)['encrypted'] === true);
+    list($code, $output) = it_run_php($workRoot . '/do.php', array('--pw=wrong-password'));
+    check('错误明文密码被拒绝', strpos($output, '密码错误') !== false);
+    list($code, $output) = it_run_php($workRoot . '/do.php', array('--pw=itpw'));
+    check('正确明文密码可读取加密配置并执行', strpos($output, '本次计划任务完成') !== false);
 
     // ---------- 场景 E：一次性任务执行后删除 ----------
     check('种子一次性任务 it_once', seedTask($conn, $db, $prefix, 'it_once', 'lib/cron_it_once.php', '-1'));

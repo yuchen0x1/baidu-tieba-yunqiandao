@@ -5,6 +5,11 @@
  */
 
 require dirname(__FILE__) . '/init.php';
+if (SYSTEM_PAGE === 'admin:cron' && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    http_response_code(405);
+    header('Allow: POST');
+    msg('计划任务操作需通过页面表单提交。请返回计划任务页重试。');
+}
 csrf();
 if (ROLE != 'user' && ROLE != 'admin' && ROLE != 'vip') {
     msg('权限不足');
@@ -674,11 +679,14 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
         if (!in_array($signRunTask, array('system_sign', 'system_sign_retry', 'system_health_check'), true)) {
             msg('未指定可执行的任务');
         }
-        cron::runOnce($signRunTask);
+        if (cron::runOnce($signRunTask) === false) {
+            Redirect('index.php?mod=admin:cron&run_failed=1');
+        }
         Redirect('index.php?mod=admin:sign&run_ok=' . urlencode($signRunTask));
 
         break;
     case 'admin:cron':
+        csrf(true, true);
         doAction('cron_setting_1');
         if (!empty($_GET['act']) && preg_match('/^[A-Za-z0-9_]+$/', (string) $_GET['act'])) {
             cron::aset($_GET['act'], array('no' => 0, 'enable' => 1));
@@ -701,14 +709,16 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
             }
         } elseif (isset($_GET['run']) && preg_match('/^[A-Za-z0-9_]+$/', (string) $_GET['run'])) {
             // V5.13：完整执行单个任务（加锁→执行→记录→排程）
-            cron::runOnce($_GET['run']);
+            if (cron::runOnce($_GET['run']) === false) {
+                Redirect('index.php?mod=admin:cron&run_failed=1');
+            }
         } elseif (isset($_GET['runall'])) {
             // 运行全部到期任务：走管理员会话 + CSRF，避免把计划任务密码写进页面 HTML
             cron::runall();
         } elseif (isset($_GET['retry']) && preg_match('/^[A-Za-z0-9_]+$/', (string) $_GET['retry'])) {
-            // V5.13：手动重试，先清零重试计数再立即执行
-            cron::aset($_GET['retry'], array('retry' => 0, 'nextrun' => 0));
-            cron::runOnce($_GET['retry']);
+            if (cron::runOnce($_GET['retry'], false, true) === false) {
+                Redirect('index.php?mod=admin:cron&run_failed=1');
+            }
         } elseif (isset($_GET['xorder'])) {
             foreach ($_POST['order'] as $key => $value) {
                 if (!preg_match('/^[A-Za-z0-9_]+$/', (string) $key)) {
