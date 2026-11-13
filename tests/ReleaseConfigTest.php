@@ -4,7 +4,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * 版本元数据与发布配置回归测试（V7.0）
- * 防止再次出现安装模板、Docker、Windows 脚本与运行版本漂移：
+ * 防止再次出现安装模板、Docker 与运行版本漂移，且仅分发 Web 部署包：
  * 全部版本与令牌命名只有一个来源（version.php / UPDATE_GITHUB_TOKEN）。
  */
 final class ReleaseConfigTest extends TestCase
@@ -100,10 +100,26 @@ final class ReleaseConfigTest extends TestCase
         $this->assertStringNotContainsString('gitee.com', strtolower($updater));
     }
 
-    public function testWindowsUpdateCheckDefaultsToCurrentVersion(): void
+    public function testOnlyWebPackagesArePublished(): void
     {
-        $content = $this->read('windows/check-update.ps1');
-        $this->assertMatchesRegularExpression('/CurrentVersion\s*=\s*"' . preg_quote($this->currentVersion(), '/') . '"/', $content);
+        $publisher = $this->read('tools/publish-github.ps1');
+        $this->assertStringContainsString('tieba-cloud-sign-web-{0}.zip', $publisher);
+        $this->assertStringNotContainsString('tieba-cloud-sign-windows-{0}.zip', $publisher);
+        $this->assertSame(array(), glob(dirname(__DIR__) . '/windows/*'));
+        $this->assertStringContainsString('发布 Web 部署包', $this->read('.github/workflows/release.yml'));
+        $this->assertStringNotContainsString('windows-latest', $this->read('.github/workflows/ci.yml'));
+    }
+
+    public function testReleaseExportKeepsMigrationAndProtectionFiles(): void
+    {
+        $attributes = $this->read('.gitattributes');
+        foreach (array('/tests', '/docs', '/.evolution', '/upgrade-report', '/windows') as $path) {
+            $this->assertStringContainsString($path . ' export-ignore', $attributes);
+        }
+        foreach (array('/tools/migrate.php', '/tools/.htaccess', '/data/backups/.htaccess', '/data/backups/index.html') as $path) {
+            $this->assertStringContainsString($path . ' -export-ignore', $attributes);
+        }
+        $this->assertStringContainsString('--worktree-attributes', $this->read('tools/publish-github.ps1'));
     }
 
     public function testComposerPlatformContractCoversRealDependencies(): void

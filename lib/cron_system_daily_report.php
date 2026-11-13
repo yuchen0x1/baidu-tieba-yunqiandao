@@ -20,7 +20,7 @@ if (!defined('SYSTEM_ROOT')) {
 function cron_system_daily_report()
 {
     $reportHour = (int) option::get('daily_report_hour');
-    if ($reportHour <= 0) {
+    if ($reportHour < 0 || $reportHour > 23 || option::get('daily_report_hour') === null || option::get('daily_report_hour') === '') {
         $reportHour = 21;
     }
     $requireComplete = option::get('daily_report_require_complete') === '1';
@@ -46,6 +46,10 @@ function cron_system_daily_report()
     }
     require_once SYSTEM_ROOT . '/lib/class.Reminder.php';
     $reports = Reminder::sendDailySummary();
-    $sent = is_array($reports) ? count($reports) : 0;
-    return "日报已发送给 " . $sent . " 个启用用户（时间 " . date('H:i') . "）";
+    $sent = 0;
+    $failed = 0;
+    foreach ($reports as $report) {
+        if (!empty($report['ok'])) { $sent++; } else { $failed++; }
+    }
+    return "日报推送完成：渠道已接受 " . $sent . " 位用户，失败 " . $failed . " 位（失败项下轮重试，时间 " . date('H:i') . "）";
 }

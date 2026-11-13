@@ -106,8 +106,8 @@ class ProjectUpdater
             'asset_download_url' => $asset['url'],
             'asset_size' => $asset['size'],
             'asset_digest' => $asset['digest'],
-            'asset_checksum_url' => self::selectChecksumAsset(isset($payload['assets']) && is_array($payload['assets']) ? $payload['assets'] : array()),
-            'asset_signature_url' => self::selectSignatureAsset(isset($payload['assets']) && is_array($payload['assets']) ? $payload['assets'] : array()),
+            'asset_checksum_url' => self::selectChecksumAsset(isset($payload['assets']) && is_array($payload['assets']) ? $payload['assets'] : array(), $asset['name']),
+            'asset_signature_url' => self::selectSignatureAsset(isset($payload['assets']) && is_array($payload['assets']) ? $payload['assets'] : array(), $asset['name']),
             'published_at' => isset($payload['published_at']) ? (string) $payload['published_at'] : '',
             'is_prerelease' => !empty($payload['prerelease'])
         );
@@ -158,8 +158,8 @@ class ProjectUpdater
 
     /**
      * Discover the latest tag from GitHub's official Releases page when the API
-     * quota is exhausted. Asset URLs follow the fixed names emitted by the
-     * release publisher; the checksum is still downloaded and verified at install.
+     * quota is exhausted. Discover the actual assets to support both new Web
+     * package names and historical Web archives; installation still verifies hashes.
      */
     private static function fetchLatestReleaseFromPage()
     {
@@ -178,9 +178,20 @@ class ProjectUpdater
         }
         $version = self::normalizeVersion($tag);
         $tagPath = rawurlencode($tag);
-        $assetName = 'tieba-cloud-sign-windows-' . $tag . '.zip';
-        $assetUrl = 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/' . $tagPath . '/' . rawurlencode($assetName);
-        $checksumUrl = $assetUrl . '.sha256';
+        $assets = self::extractReleaseAssets($response['body'], $tag);
+        if (self::selectZipAsset($assets)['url'] === '') {
+            $expanded = self::requestSafeUrl(
+                'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/expanded_assets/' . $tagPath,
+                array('Accept: text/html'), self::DEFAULT_TIMEOUT_MS, false
+            );
+            if ($expanded['body'] === false || $expanded['error'] !== '' || $expanded['status'] < 200 || $expanded['status'] >= 300) {
+                throw new RuntimeException('GitHub Release 部署包列表暂时不可用');
+            }
+            $assets = self::extractReleaseAssets($expanded['body'], $tag);
+        }
+        if (self::selectZipAsset($assets)['url'] === '') {
+            throw new RuntimeException('GitHub Release 没有可用的 Web 部署包');
+        }
         return self::parseRelease(array(
             'tag_name' => $tag,
             'name' => '百度贴吧云签到 V' . $version,
@@ -189,12 +200,25 @@ class ProjectUpdater
             'zipball_url' => 'https://api.github.com/repos/yuchen0x1/baidu-tieba-yunqiandao/zipball/' . $tagPath,
             'published_at' => '',
             'prerelease' => false,
-            'assets' => array(
-                array('name' => $assetName, 'browser_download_url' => $assetUrl, 'size' => 0, 'digest' => ''),
-                array('name' => $assetName . '.sha256', 'browser_download_url' => $checksumUrl, 'size' => 0, 'digest' => ''),
-                array('name' => $assetName . '.sig', 'browser_download_url' => $assetUrl . '.sig', 'size' => 0, 'digest' => '')
-            )
+            'assets' => $assets
         ));
+    }
+
+    /** 只提取本仓库、本标签的真实附件；不猜测不存在的摘要或签名文件。 */
+    private static function extractReleaseAssets($html, $tag)
+    {
+        $prefix = 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/' . rawurlencode($tag) . '/';
+        preg_match_all('~href=["\']([^"\']+)["\']~i', (string) $html, $matches);
+        $assets = array();
+        foreach ($matches[1] as $href) {
+            $url = html_entity_decode($href, ENT_QUOTES, 'UTF-8');
+            if (strpos($url, '/') === 0 && strpos($url, '//') !== 0) { $url = 'https://github.com' . $url; }
+            if (strpos($url, $prefix) !== 0 || !self::isAllowedUrl($url)) { continue; }
+            $name = rawurldecode(substr($url, strlen($prefix)));
+            if ($name === '' || strpos($name, '/') !== false || preg_match('/[?#\\\\]/', $name)) { continue; }
+            $assets[$name] = array('name' => $name, 'browser_download_url' => $url, 'size' => 0, 'digest' => '');
+        }
+        return array_values($assets);
     }
 
     private static function extractReleaseTag(array $response)
@@ -827,7 +851,8 @@ class ProjectUpdater
         foreach ($assets as $asset) {
             $name = isset($asset['name']) ? (string) $asset['name'] : '';
             $url = isset($asset['browser_download_url']) ? trim((string) $asset['browser_download_url']) : '';
-            if (strtolower(pathinfo($name, PATHINFO_EXTENSION)) !== 'zip' || !self::isAllowedUrl($url)) {
+            // windows 是历史 Web 源码归档的旧名称，仅保留读取兼容，不再构建或优先分发。
+            if (!preg_match('/^tieba-cloud-sign-(web|windows)-.+\.zip$/i', $name) || !self::isAllowedUrl($url)) {
                 continue;
             }
             $candidate = array(
@@ -836,10 +861,10 @@ class ProjectUpdater
                 'size' => isset($asset['size']) ? (int) $asset['size'] : 0,
                 'digest' => isset($asset['digest']) ? (string) $asset['digest'] : ''
             );
-            if ($selected['url'] === '' || stripos($name, 'windows') !== false) {
+            if ($selected['url'] === '' || stripos($name, 'tieba-cloud-sign-web-') === 0) {
                 $selected = $candidate;
             }
-            if (stripos($name, 'windows') !== false) {
+            if (stripos($name, 'tieba-cloud-sign-web-') === 0) {
                 break;
             }
         }
@@ -849,12 +874,12 @@ class ProjectUpdater
     /**
      * 从 GitHub Release 资产中选取 SHA-256 校验文件（.sha256）
      */
-    private static function selectChecksumAsset(array $assets)
+    private static function selectChecksumAsset(array $assets, $packageName)
     {
         foreach ($assets as $asset) {
             $name = isset($asset['name']) ? (string) $asset['name'] : '';
             $url = isset($asset['browser_download_url']) ? trim((string) $asset['browser_download_url']) : '';
-            if (strtolower(pathinfo($name, PATHINFO_EXTENSION)) === 'sha256' && self::isAllowedUrl($url)) {
+            if ($packageName !== '' && $name === $packageName . '.sha256' && self::isAllowedUrl($url)) {
                 return $url;
             }
         }
@@ -865,12 +890,12 @@ class ProjectUpdater
      * 从 GitHub Release 资产中选取可选的 detached signature（.sig）。
      * 签名不会替代 SHA-256；只有部署环境配置公钥时才会强制验证。
      */
-    private static function selectSignatureAsset(array $assets)
+    private static function selectSignatureAsset(array $assets, $packageName)
     {
         foreach ($assets as $asset) {
             $name = isset($asset['name']) ? (string) $asset['name'] : '';
             $url = isset($asset['browser_download_url']) ? trim((string) $asset['browser_download_url']) : '';
-            if (strtolower(pathinfo($name, PATHINFO_EXTENSION)) === 'sig' && self::isAllowedUrl($url)) {
+            if ($packageName !== '' && $name === $packageName . '.sig' && self::isAllowedUrl($url)) {
                 return $url;
             }
         }

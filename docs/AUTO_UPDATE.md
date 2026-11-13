@@ -2,7 +2,7 @@
 
 ## 适用范围
 
-本项目是 PHP Web 应用，不是 Electron、Tauri 或原生桌面程序。因此没有把 Electron 的 `latest.yml`、Tauri updater 或桌面安装器强行套进来；更新对象是部署站点的源码和数据库迁移。
+本项目只维护 PHP 网页版，不提供桌面或移动 App。Docker 与传统 PHP 部署共用同一代码和发布包；更新对象是站点源码和数据库迁移。
 
 ## 方案选型
 
@@ -24,6 +24,8 @@
 6. 覆盖前将当前代码（不含 `data/`、配置、锁文件、`vendor/` 和更新缓存）保存为 `data/backups/pre-update-files-*.zip`，保留最近 3 份。写入失败会自动移除本次新增文件并恢复旧代码。
 7. 文件成功覆盖后跳转 `upgrade.php`：先备份数据库，再执行统一迁移器和 opcache 清理。迁移失败会保留失败状态和数据库备份，不会伪报成功。
 
+发布包名称统一使用 `tieba-cloud-sign-web-<tag>.zip`。更新器优先选择 Web 包，校验文件与签名必须匹配同一包名。历史 `windows` 命名的 ZIP 实际也是 PHP 网页源码，只保留读取兼容；不再生成这类发行包。API 限流回退通过同一仓库的 Release 页面和附件列表读取真实名称，不猜测资产或签名存在。
+
 ## 配置
 
 | 变量 | 必需 | 说明 |
@@ -34,7 +36,7 @@
 | `SSL_CERT_FILE` / `CURL_CA_BUNDLE` | 否 | Windows PHP 没有系统 CA bundle 时指定可信 CA 文件，禁止关闭 TLS 校验。 |
 | `LOOP_RELOAD_FILE` | 否 | `do.php --loop` 的优雅重载标记文件。 |
 
-发布私钥只应保存在受控的 CI Secret 或发布机，不得提交仓库。当前仓库没有代码签名证书，因此 Windows Authenticode 仍属于待外部配置项；SHA-256 和可选 Release 签名不等同于代码签名证书。
+发布私钥只应保存在受控的 CI Secret 或发布机，不得提交仓库。网页部署包使用 SHA-256 和可选 Release 签名验证，不涉及桌面安装器或 Authenticode 签名。
 
 ## GitHub Secrets
 
@@ -52,7 +54,7 @@ git push origin v<版本号>
 
 `.github/workflows/release.yml` 会重新安装依赖、运行测试和 MariaDB 集成检查，然后调用 `tools/publish-github.ps1` 生成：
 
-- `tieba-cloud-sign-windows-vX.Y.Z.zip`
+- `tieba-cloud-sign-web-vX.Y.Z.zip`
 - `.sha256` 校验文件
 - `tieba-cloud-sign-update-vX.Y.Z.json` 更新清单
 
@@ -63,7 +65,7 @@ git push origin v<版本号>
 ## 测试与故障处理
 
 - 本地：`composer check`、`composer integration`（需要 MariaDB）、`composer gate`。
-- CI：PHP 8.2/8.4、Secret 扫描、迁移/调度/API/备份恢复、Docker 冒烟和 Windows 发布包校验。
+- CI：PHP 8.2/8.4、Secret 扫描、迁移/调度/API/备份恢复、Docker 冒烟和 通用 Web 发布包校验。
 - 更新包下载中断会重试；大小、SHA-256、签名或 ZIP 安全检查失败时不覆盖现有文件。
 - 覆盖写入中途失败会自动回滚代码；数据库迁移失败时以 `data/backups/pre-upgrade_*.sql` 为恢复依据，修复后可再次运行 `upgrade.php`。
 - GitHub 不可用时应用仍可正常运行，管理员可以从 Release 页面手动下载并按常规部署流程更新。
@@ -72,4 +74,4 @@ git push origin v<版本号>
 
 - PHP Web 请求无法像桌面安装器一样在浏览器中静默重启 PHP-FPM；更新期间页面会等待服务器完成下载和校验，常驻 `do.php --loop` 仅通过 `LOOP_RELOAD_FILE` 通知进程管理器重启。
 - 没有配置签名公钥时，系统仍强制 SHA-256，但不会声称完成数字签名验证。
-- GitHub Release、仓库写权限、CI Secret 和 Windows 代码签名证书属于外部资源；本地代码和工作流可以验证，实际线上发布需在拥有权限的仓库中运行。
+- GitHub Release、仓库写权限和 CI Secret属于外部资源；本地代码和工作流可以验证，实际线上发布需在拥有权限的仓库中运行。

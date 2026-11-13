@@ -12,6 +12,37 @@ if (!defined('SYSTEM_ROOT')) {
  */
 class Notify
 {
+    /** 旧插件仍可读取 ok；跳过不代表渠道已接受通知。 */
+    public static function wasDelivered($result)
+    {
+        return !empty($result['ok']) && (!array_key_exists('delivered', $result) || $result['delivered'] === true);
+    }
+
+    protected static function createClient($url = '')
+    {
+        return new wcurl($url);
+    }
+
+    protected static function hasProviderCode($response, $field, $expected)
+    {
+        return is_array($response) && isset($response[$field])
+            && (is_int($response[$field]) || is_string($response[$field]))
+            && (string) $response[$field] === (string) $expected;
+    }
+
+    /** 不回显响应体、URL 或异常文本，避免渠道凭据进入页面和任务日志。 */
+    protected static function transportFailure($client, $response, $channel)
+    {
+        $code = (int) curl_getinfo($client->conn, CURLINFO_HTTP_CODE);
+        if ($response === false) {
+            return array('ok' => false, 'delivered' => false, 'detail' => $channel . ' 请求失败（cURL ' . curl_errno($client->conn) . '）');
+        }
+        if ($code < 200 || $code >= 300) {
+            return array('ok' => false, 'delivered' => false, 'detail' => $channel . ' 请求未被接受（HTTP ' . $code . '）');
+        }
+        return null;
+    }
+
     /**
      * 按用户自己的通知渠道发送（个人面板配置，存于 users_options 的 ver4_notify_*）
      * 渠道为「跟随站点」或未配置时回退到站点渠道（self::send）；
@@ -39,38 +70,38 @@ class Notify
                 if ($key === '') {
                     return array('ok' => false, 'detail' => '未配置 Server酱 SendKey');
                 }
-                return self::sendServerChan($key, $title, $content);
+                return static::sendServerChan($key, $title, $content);
             case 'telegram':
                 $token = $uget('ver4_notify_telegram_token');
                 $chatId = $uget('ver4_notify_telegram_chatid');
                 if ($token === '' || $chatId === '') {
                     return array('ok' => false, 'detail' => '未配置 Telegram Bot Token / Chat ID');
                 }
-                return self::sendTelegram($token, $chatId, $title, $content);
+                return static::sendTelegram($token, $chatId, $title, $content);
             case 'bark':
                 $url = $uget('ver4_notify_bark_url');
                 if ($url === '') {
                     return array('ok' => false, 'detail' => '未配置 Bark URL');
                 }
-                return self::sendBark($url, $title, $content);
+                return static::sendBark($url, $title, $content);
             case 'pushplus':
                 $token = $uget('ver4_notify_pushplus_token');
                 if ($token === '') {
                     return array('ok' => false, 'detail' => '未配置 PushPlus Token');
                 }
-                return self::sendPushPlus($token, $title, $content);
+                return static::sendPushPlus($token, $title, $content);
             case 'webhook':
                 $url = $uget('ver4_notify_webhook_url');
                 if ($url === '') {
                     return array('ok' => false, 'detail' => '未配置 Webhook URL');
                 }
-                return self::sendWebhook($url, $title, $content);
+                return static::sendWebhook($url, $title, $content);
             case 'ntfy':
                 $topic = $uget('ver4_notify_ntfy_topic');
                 if ($topic === '' || preg_match('/^[A-Za-z0-9_-]{1,128}$/', $topic) !== 1) {
                     return array('ok' => false, 'detail' => '未配置或配置了无效的 ntfy Topic');
                 }
-                return self::sendNtfy($uget('ver4_notify_ntfy_server'), $topic, $title, $content);
+                return static::sendNtfy($uget('ver4_notify_ntfy_server'), $topic, $title, $content);
             default:
                 return array('ok' => false, 'detail' => '该渠道暂不支持个人配置');
         }
@@ -86,13 +117,13 @@ class Notify
     public static function send($title, $content, $event = '')
     {
         if (!option::get('notify_enable')) {
-            return array('ok' => true, 'detail' => '通知未启用');
+            return array('ok' => true, 'delivered' => false, 'detail' => '通知未启用');
         }
         if ($event === 'sign_fail' && !option::get('notify_on_fail')) {
-            return array('ok' => true, 'detail' => '签到失败提醒未启用');
+            return array('ok' => true, 'delivered' => false, 'detail' => '签到失败提醒未启用');
         }
         if ($event === 'health_invalid' && !option::get('notify_on_health')) {
-            return array('ok' => true, 'detail' => '账号失效提醒未启用');
+            return array('ok' => true, 'delivered' => false, 'detail' => '账号失效提醒未启用');
         }
 
         switch (option::get('notify_channel')) {
@@ -101,67 +132,67 @@ class Notify
                 if (empty($key)) {
                     return array('ok' => false, 'detail' => '未配置 Server酱 SendKey');
                 }
-                return self::sendServerChan($key, $title, $content);
+                return static::sendServerChan($key, $title, $content);
             case 'telegram':
                 $token = SecretBox::get('notify_telegram_token');
                 $chatId = option::get('notify_telegram_chatid');
                 if (empty($token) || empty($chatId)) {
                     return array('ok' => false, 'detail' => '未配置 Telegram Bot Token / Chat ID');
                 }
-                return self::sendTelegram($token, $chatId, $title, $content);
+                return static::sendTelegram($token, $chatId, $title, $content);
             case 'webhook':
                 $url = SecretBox::get('notify_webhook_url');
                 if (empty($url)) {
                     return array('ok' => false, 'detail' => '未配置 Webhook URL');
                 }
-                return self::sendWebhook($url, $title, $content);
+                return static::sendWebhook($url, $title, $content);
             case 'bark':
                 $barkUrl = SecretBox::get('notify_bark_url');
                 if (empty($barkUrl)) {
                     return array('ok' => false, 'detail' => '未配置 Bark URL');
                 }
-                return self::sendBark($barkUrl, $title, $content);
+                return static::sendBark($barkUrl, $title, $content);
             case 'pushplus':
                 $ppToken = SecretBox::get('notify_pushplus_token');
                 if (empty($ppToken)) {
                     return array('ok' => false, 'detail' => '未配置 PushPlus Token');
                 }
-                return self::sendPushPlus($ppToken, $title, $content);
+                return static::sendPushPlus($ppToken, $title, $content);
             case 'dingtalk':
                 $dtUrl = SecretBox::get('notify_dingtalk_webhook');
                 if (empty($dtUrl)) {
                     return array('ok' => false, 'detail' => '未配置钉钉机器人 Webhook');
                 }
-                return self::sendDingTalk($dtUrl, SecretBox::get('notify_dingtalk_secret'), $title, $content);
+                return static::sendDingTalk($dtUrl, SecretBox::get('notify_dingtalk_secret'), $title, $content);
             case 'wecom':
                 $wcUrl = SecretBox::get('notify_wecom_webhook');
                 if (empty($wcUrl)) {
                     return array('ok' => false, 'detail' => '未配置企业微信机器人 Webhook');
                 }
-                return self::sendWeCom($wcUrl, $title, $content);
+                return static::sendWeCom($wcUrl, $title, $content);
             case 'feishu':
                 $fsUrl = SecretBox::get('notify_feishu_webhook');
                 if (empty($fsUrl)) {
                     return array('ok' => false, 'detail' => '未配置飞书机器人 Webhook');
                 }
-                return self::sendFeiShu($fsUrl, $title, $content);
+                return static::sendFeiShu($fsUrl, $title, $content);
             case 'wxpusher':
                 $xpToken = SecretBox::get('notify_wxpusher_token');
                 $xpUid = option::get('notify_wxpusher_uid');
                 if (empty($xpToken) || empty($xpUid)) {
                     return array('ok' => false, 'detail' => '未配置 WxPusher AppToken / UID');
                 }
-                return self::sendWxPusher($xpToken, $xpUid, $title, $content);
+                return static::sendWxPusher($xpToken, $xpUid, $title, $content);
             case 'ntfy':
                 $ntfyTopic = option::get('notify_ntfy_topic');
                 if (empty($ntfyTopic) || preg_match('/^[A-Za-z0-9_-]{1,128}$/', $ntfyTopic) !== 1) {
                     return array('ok' => false, 'detail' => '未配置或配置了无效的 ntfy Topic');
                 }
-                return self::sendNtfy(option::get('notify_ntfy_server'), $ntfyTopic, $title, $content);
+                return static::sendNtfy(option::get('notify_ntfy_server'), $ntfyTopic, $title, $content);
             case 'mail':
-                return self::sendMail($title, $content);
+                return static::sendMail($title, $content);
             default:
-                return array('ok' => true, 'detail' => '未选择通知渠道');
+                return array('ok' => true, 'delivered' => false, 'detail' => '未选择通知渠道');
         }
     }
 
@@ -171,16 +202,18 @@ class Notify
     public static function sendServerChan($key, $title, $content)
     {
         try {
-            $c = new wcurl('https://sctapi.ftqq.com/' . urlencode($key) . '.send');
+            $c = static::createClient('https://sctapi.ftqq.com/' . urlencode($key) . '.send');
             $c->set(CURLOPT_TIMEOUT, 15);
             $resp = $c->post(array('title' => $title, 'desp' => $content));
+            $failure = self::transportFailure($c, $resp, 'Server酱');
+            if ($failure !== null) { return $failure; }
             $json = json_decode($resp, true);
-            if (is_array($json) && isset($json['code']) && (int) $json['code'] === 0) {
-                return array('ok' => true, 'detail' => 'Server酱 发送成功');
+            if (self::hasProviderCode($json, 'code', 0)) {
+                return array('ok' => true, 'delivered' => true, 'detail' => 'Server酱 发送成功');
             }
-            return array('ok' => false, 'detail' => 'Server酱 返回: ' . substr((string) $resp, 0, 200));
-        } catch (Exception $e) {
-            return array('ok' => false, 'detail' => 'Server酱 异常: ' . $e->getMessage());
+            return array('ok' => false, 'detail' => 'Server酱 返回无效响应或业务错误，请检查渠道配置');
+        } catch (Throwable $e) {
+            return array('ok' => false, 'detail' => 'Server酱 发送异常，请检查渠道配置与网络');
         }
     }
 
@@ -191,16 +224,18 @@ class Notify
     {
         try {
             $text = $title . "\n\n" . $content;
-            $c = new wcurl('https://api.telegram.org/bot' . $token . '/sendMessage');
+            $c = static::createClient('https://api.telegram.org/bot' . $token . '/sendMessage');
             $c->set(CURLOPT_TIMEOUT, 15);
             $resp = $c->post(array('chat_id' => $chatId, 'text' => $text, 'disable_web_page_preview' => '1'));
+            $failure = self::transportFailure($c, $resp, 'Telegram');
+            if ($failure !== null) { return $failure; }
             $json = json_decode($resp, true);
-            if (is_array($json) && !empty($json['ok'])) {
-                return array('ok' => true, 'detail' => 'Telegram 发送成功');
+            if (is_array($json) && ($json['ok'] ?? null) === true) {
+                return array('ok' => true, 'delivered' => true, 'detail' => 'Telegram 发送成功');
             }
-            return array('ok' => false, 'detail' => 'Telegram 返回: ' . substr((string) $resp, 0, 200));
-        } catch (Exception $e) {
-            return array('ok' => false, 'detail' => 'Telegram 异常: ' . $e->getMessage());
+            return array('ok' => false, 'detail' => 'Telegram 返回无效响应或业务错误，请检查渠道配置');
+        } catch (Throwable $e) {
+            return array('ok' => false, 'detail' => 'Telegram 发送异常，请检查渠道配置与网络');
         }
     }
 
@@ -213,9 +248,9 @@ class Notify
      * @param string $url
      * @return wcurl|false
      */
-    private static function createPublicClient($url)
+    protected static function createPublicClient($url)
     {
-        $client = new wcurl();
+        $client = static::createClient();
         if (!$client->setPublicUrl($url)) {
             return false;
         }
@@ -229,7 +264,7 @@ class Notify
     public static function sendWebhook($url, $title, $content)
     {
         try {
-            $c = self::createPublicClient($url);
+            $c = static::createPublicClient($url);
             if ($c === false) {
                 return array('ok' => false, 'detail' => 'Webhook 拒绝访问内网或非公开地址 (SSRF 防御)');
             }
@@ -242,12 +277,11 @@ class Notify
             $c->set(CURLOPT_POSTFIELDS, $payload);
             $c->set(CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
             $resp = $c->exec();
-            if ($resp === false) {
-                return array('ok' => false, 'detail' => 'Webhook 请求失败: ' . curl_error($c->conn));
-            }
-            return array('ok' => true, 'detail' => 'Webhook 已发送 (HTTP 响应: ' . substr((string) $resp, 0, 100) . ')');
-        } catch (Exception $e) {
-            return array('ok' => false, 'detail' => 'Webhook 异常: ' . $e->getMessage());
+            $failure = self::transportFailure($c, $resp, 'Webhook');
+            if ($failure !== null) { return $failure; }
+            return array('ok' => true, 'delivered' => true, 'detail' => 'Webhook 服务已接受（HTTP ' . (int) curl_getinfo($c->conn, CURLINFO_HTTP_CODE) . '）');
+        } catch (Throwable $e) {
+            return array('ok' => false, 'detail' => 'Webhook 发送异常，请检查渠道配置与网络');
         }
     }
 
@@ -258,18 +292,20 @@ class Notify
     {
         try {
             $url = rtrim($url, '/') . '/' . urlencode($title) . '/' . urlencode($content);
-            $c = self::createPublicClient($url);
+            $c = static::createPublicClient($url);
             if ($c === false) {
                 return array('ok' => false, 'detail' => 'Bark 拒绝访问内网或非公开地址 (SSRF 防御)');
             }
             $resp = $c->exec();
+            $failure = self::transportFailure($c, $resp, 'Bark');
+            if ($failure !== null) { return $failure; }
             $json = json_decode($resp, true);
-            if (is_array($json) && isset($json['code']) && (int) $json['code'] === 200) {
-                return array('ok' => true, 'detail' => 'Bark 发送成功');
+            if (self::hasProviderCode($json, 'code', 200)) {
+                return array('ok' => true, 'delivered' => true, 'detail' => 'Bark 发送成功');
             }
-            return array('ok' => false, 'detail' => 'Bark 返回: ' . substr((string) $resp, 0, 200));
-        } catch (Exception $e) {
-            return array('ok' => false, 'detail' => 'Bark 异常: ' . $e->getMessage());
+            return array('ok' => false, 'detail' => 'Bark 返回无效响应或业务错误，请检查渠道配置');
+        } catch (Throwable $e) {
+            return array('ok' => false, 'detail' => 'Bark 发送异常，请检查渠道配置与网络');
         }
     }
 
@@ -279,20 +315,22 @@ class Notify
     public static function sendPushPlus($token, $title, $content)
     {
         try {
-            $c = new wcurl('https://www.pushplus.plus/send');
+            $c = static::createClient('https://www.pushplus.plus/send');
             $c->set(CURLOPT_TIMEOUT, 15);
             $payload = json_encode(array('token' => $token, 'title' => $title, 'content' => $content, 'template' => 'txt'), JSON_UNESCAPED_UNICODE);
             $c->set(CURLOPT_POST, 1);
             $c->set(CURLOPT_POSTFIELDS, $payload);
             $c->set(CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
             $resp = $c->exec();
+            $failure = self::transportFailure($c, $resp, 'PushPlus');
+            if ($failure !== null) { return $failure; }
             $json = json_decode($resp, true);
-            if (is_array($json) && isset($json['code']) && (int) $json['code'] === 200) {
-                return array('ok' => true, 'detail' => 'PushPlus 发送成功');
+            if (self::hasProviderCode($json, 'code', 200)) {
+                return array('ok' => true, 'delivered' => true, 'detail' => 'PushPlus 发送成功');
             }
-            return array('ok' => false, 'detail' => 'PushPlus 返回: ' . substr((string) $resp, 0, 200));
-        } catch (Exception $e) {
-            return array('ok' => false, 'detail' => 'PushPlus 异常: ' . $e->getMessage());
+            return array('ok' => false, 'detail' => 'PushPlus 返回无效响应或业务错误，请检查渠道配置');
+        } catch (Throwable $e) {
+            return array('ok' => false, 'detail' => 'PushPlus 发送异常，请检查渠道配置与网络');
         }
     }
 
@@ -309,7 +347,10 @@ class Notify
                 $sign = urlencode(base64_encode(hash_hmac('sha256', $stringToSign, $secret, true)));
                 $webhook .= (strpos($webhook, '?') === false ? '?' : '&') . 'timestamp=' . $timestamp . '&sign=' . $sign;
             }
-            $c = new wcurl($webhook);
+            $c = static::createPublicClient($webhook);
+            if ($c === false) {
+                return array('ok' => false, 'detail' => '机器人 Webhook 拒绝访问内网或非公开地址 (SSRF 防御)');
+            }
             $c->set(CURLOPT_TIMEOUT, 15);
             $payload = json_encode(array(
                 'msgtype' => 'text',
@@ -319,13 +360,15 @@ class Notify
             $c->set(CURLOPT_POSTFIELDS, $payload);
             $c->set(CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
             $resp = $c->exec();
+            $failure = self::transportFailure($c, $resp, '钉钉');
+            if ($failure !== null) { return $failure; }
             $json = json_decode($resp, true);
-            if (is_array($json) && isset($json['errcode']) && (int) $json['errcode'] === 0) {
-                return array('ok' => true, 'detail' => '钉钉 发送成功');
+            if (self::hasProviderCode($json, 'errcode', 0)) {
+                return array('ok' => true, 'delivered' => true, 'detail' => '钉钉 发送成功');
             }
-            return array('ok' => false, 'detail' => '钉钉 返回: ' . substr((string) $resp, 0, 200));
-        } catch (Exception $e) {
-            return array('ok' => false, 'detail' => '钉钉 异常: ' . $e->getMessage());
+            return array('ok' => false, 'detail' => '钉钉 返回无效响应或业务错误，请检查渠道配置');
+        } catch (Throwable $e) {
+            return array('ok' => false, 'detail' => '钉钉 发送异常，请检查渠道配置与网络');
         }
     }
 
@@ -335,7 +378,10 @@ class Notify
     public static function sendWeCom($webhook, $title, $content)
     {
         try {
-            $c = new wcurl($webhook);
+            $c = static::createPublicClient($webhook);
+            if ($c === false) {
+                return array('ok' => false, 'detail' => '机器人 Webhook 拒绝访问内网或非公开地址 (SSRF 防御)');
+            }
             $c->set(CURLOPT_TIMEOUT, 15);
             $payload = json_encode(array(
                 'msgtype' => 'text',
@@ -345,13 +391,15 @@ class Notify
             $c->set(CURLOPT_POSTFIELDS, $payload);
             $c->set(CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
             $resp = $c->exec();
+            $failure = self::transportFailure($c, $resp, '企业微信');
+            if ($failure !== null) { return $failure; }
             $json = json_decode($resp, true);
-            if (is_array($json) && isset($json['errcode']) && (int) $json['errcode'] === 0) {
-                return array('ok' => true, 'detail' => '企业微信 发送成功');
+            if (self::hasProviderCode($json, 'errcode', 0)) {
+                return array('ok' => true, 'delivered' => true, 'detail' => '企业微信 发送成功');
             }
-            return array('ok' => false, 'detail' => '企业微信 返回: ' . substr((string) $resp, 0, 200));
-        } catch (Exception $e) {
-            return array('ok' => false, 'detail' => '企业微信 异常: ' . $e->getMessage());
+            return array('ok' => false, 'detail' => '企业微信 返回无效响应或业务错误，请检查渠道配置');
+        } catch (Throwable $e) {
+            return array('ok' => false, 'detail' => '企业微信 发送异常，请检查渠道配置与网络');
         }
     }
 
@@ -361,7 +409,10 @@ class Notify
     public static function sendFeiShu($webhook, $title, $content)
     {
         try {
-            $c = new wcurl($webhook);
+            $c = static::createPublicClient($webhook);
+            if ($c === false) {
+                return array('ok' => false, 'detail' => '机器人 Webhook 拒绝访问内网或非公开地址 (SSRF 防御)');
+            }
             $c->set(CURLOPT_TIMEOUT, 15);
             $payload = json_encode(array(
                 'msg_type' => 'text',
@@ -371,13 +422,15 @@ class Notify
             $c->set(CURLOPT_POSTFIELDS, $payload);
             $c->set(CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
             $resp = $c->exec();
+            $failure = self::transportFailure($c, $resp, '飞书');
+            if ($failure !== null) { return $failure; }
             $json = json_decode($resp, true);
-            if (is_array($json) && ((isset($json['code']) && (int) $json['code'] === 0) || (isset($json['StatusCode']) && (int) $json['StatusCode'] === 0))) {
-                return array('ok' => true, 'detail' => '飞书 发送成功');
+            if (self::hasProviderCode($json, 'code', 0) || self::hasProviderCode($json, 'StatusCode', 0)) {
+                return array('ok' => true, 'delivered' => true, 'detail' => '飞书 发送成功');
             }
-            return array('ok' => false, 'detail' => '飞书 返回: ' . substr((string) $resp, 0, 200));
-        } catch (Exception $e) {
-            return array('ok' => false, 'detail' => '飞书 异常: ' . $e->getMessage());
+            return array('ok' => false, 'detail' => '飞书 返回无效响应或业务错误，请检查渠道配置');
+        } catch (Throwable $e) {
+            return array('ok' => false, 'detail' => '飞书 发送异常，请检查渠道配置与网络');
         }
     }
 
@@ -387,7 +440,7 @@ class Notify
     public static function sendWxPusher($appToken, $uid, $title, $content)
     {
         try {
-            $c = new wcurl('https://wxpusher.zjiecode.com/api/send/message');
+            $c = static::createClient('https://wxpusher.zjiecode.com/api/send/message');
             $c->set(CURLOPT_TIMEOUT, 15);
             $payload = json_encode(array(
                 'appToken' => $appToken,
@@ -400,13 +453,15 @@ class Notify
             $c->set(CURLOPT_POSTFIELDS, $payload);
             $c->set(CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
             $resp = $c->exec();
+            $failure = self::transportFailure($c, $resp, 'WxPusher');
+            if ($failure !== null) { return $failure; }
             $json = json_decode($resp, true);
-            if (is_array($json) && isset($json['code']) && (int) $json['code'] === 1000) {
-                return array('ok' => true, 'detail' => 'WxPusher 发送成功');
+            if (self::hasProviderCode($json, 'code', 1000)) {
+                return array('ok' => true, 'delivered' => true, 'detail' => 'WxPusher 发送成功');
             }
-            return array('ok' => false, 'detail' => 'WxPusher 返回: ' . substr((string) $resp, 0, 200));
-        } catch (Exception $e) {
-            return array('ok' => false, 'detail' => 'WxPusher 异常: ' . $e->getMessage());
+            return array('ok' => false, 'detail' => 'WxPusher 返回无效响应或业务错误，请检查渠道配置');
+        } catch (Throwable $e) {
+            return array('ok' => false, 'detail' => 'WxPusher 发送异常，请检查渠道配置与网络');
         }
     }
 
@@ -421,7 +476,7 @@ class Notify
             if (empty($parts['scheme']) || strtolower($parts['scheme']) !== 'https' || empty($parts['host'])) {
                 return array('ok' => false, 'detail' => 'ntfy 服务器必须是 HTTPS 地址');
             }
-            $c = self::createPublicClient($server . '/' . rawurlencode($topic));
+            $c = static::createPublicClient($server . '/' . rawurlencode($topic));
             if ($c === false) {
                 return array('ok' => false, 'detail' => 'ntfy 拒绝访问内网或非公开地址 (SSRF 防御)');
             }
@@ -433,13 +488,15 @@ class Notify
                 'Accept: application/json'
             ));
             $resp = $c->exec();
+            $failure = self::transportFailure($c, $resp, 'ntfy');
+            if ($failure !== null) { return $failure; }
             $json = json_decode($resp, true);
             if (is_array($json) && isset($json['event']) && $json['event'] === 'message') {
-                return array('ok' => true, 'detail' => 'ntfy 发送成功');
+                return array('ok' => true, 'delivered' => true, 'detail' => 'ntfy 发送成功');
             }
-            return array('ok' => false, 'detail' => 'ntfy 返回: ' . substr((string) $resp, 0, 200));
-        } catch (Exception $e) {
-            return array('ok' => false, 'detail' => 'ntfy 异常: ' . $e->getMessage());
+            return array('ok' => false, 'detail' => 'ntfy 返回无效响应或业务错误，请检查渠道配置');
+        } catch (Throwable $e) {
+            return array('ok' => false, 'detail' => 'ntfy 发送异常，请检查渠道配置与网络');
         }
     }
 
@@ -454,10 +511,14 @@ class Notify
         if (empty($to)) {
             return array('ok' => false, 'detail' => '未找到管理员邮箱');
         }
-        $result = misc::mail($to, $title, nl2br(htmlspecialchars($content, ENT_QUOTES, 'UTF-8')));
-        if ($result === true) {
-            return array('ok' => true, 'detail' => '邮件发送成功 (发往 ' . $to . ')');
+        try {
+            $result = misc::mail($to, $title, nl2br(htmlspecialchars($content, ENT_QUOTES, 'UTF-8')));
+        } catch (Throwable $e) {
+            return array('ok' => false, 'detail' => '邮件发送异常，请检查邮件配置');
         }
-        return array('ok' => false, 'detail' => '邮件发送失败: ' . (string) $result);
+        if ($result === true) {
+            return array('ok' => true, 'delivered' => true, 'detail' => '邮件发送成功 (发往 ' . $to . ')');
+        }
+        return array('ok' => false, 'detail' => '邮件发送失败，请检查邮件配置');
     }
 }

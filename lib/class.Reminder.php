@@ -9,8 +9,7 @@ require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
  *
  * 与全局 Notify 不同，Reminder 面向单个用户，按用户在「个人设置」中勾选的
  *  remind_sign_fail / remind_daily_summary 选项决定是否推送。
- * 当前实现走用户自己的邮箱（users.email）；如需扩展为用户级推送渠道，
- *  只需在 sendToUser() 中追加分支即可。
+ * 失败提醒走用户邮箱，日报优先走个人通知渠道，未被接受时回退邮箱。
  *
  * 调用时机：
  *  - lib/cron_system_sign.php 签到结束后调用 Reminder::checkSignFailures()
@@ -34,7 +33,7 @@ class Reminder
         $sql = "SELECT `uid`,
             SUM(`status` = 'error') AS fail_count,
             SUM(`status` = 'success') AS ok_count,
-            SUBSTRING_INDEX(GROUP_CONCAT(`message` ORDER BY `id` DESC SEPARATOR ' | '), ' | ', 1) AS last_msg
+            SUBSTRING_INDEX(GROUP_CONCAT(CASE WHEN `status` = 'error' THEN `message` END ORDER BY `id` DESC SEPARATOR ' | '), ' | ', 1) AS last_msg
             FROM `" . DB_PREFIX . SignManager::HISTORY_TABLE . "`
             WHERE `created_at` >= {$todayStart} AND `uid` > 0
             GROUP BY `uid`";
@@ -71,8 +70,11 @@ class Reminder
                 $fail,
                 $lastMsg
             );
-            $detail = self::sendToUser($uid, $title, $content);
-            self::markSent($uid, 'sign_fail');
+            $detail = static::sendToUser($uid, $title, $content);
+            self::recordResult($uid, 'sign_fail', $detail);
+            if (!empty($detail['ok'])) {
+                self::markSent($uid, 'sign_fail');
+            }
             $reports[] = array('uid' => $uid, 'ok' => $detail['ok'], 'detail' => $detail['detail']);
         }
         return $reports;
@@ -119,7 +121,7 @@ class Reminder
             $lines = array();
             $lines[] = "【" . SYSTEM_FN . " · 每日签到晨报】";
             $lines[] = "📅 日期：" . $todayStr;
-            $lines[] = "📊 汇总：共签到 " . $total . " 个贴吧 | 成功 " . $ok . " | 失败 " . $fail;
+            $lines[] = "📊 汇总：共尝试签到 " . $total . " 次 | 成功 " . $ok . " | 失败 " . $fail;
             $lines[] = "📈 今日累计成长经验：+" . $totalExp . " 经验";
             $lines[] = "🎯 总体成功率：" . $rate . "%";
 
@@ -140,23 +142,17 @@ class Reminder
 
             $content = implode("\n", $lines);
 
-            // 优先通过用户自定义多渠道发送（支持 Telegram, Server酱, 飞书, 钉钉, Bark, ntfy 等），回退到邮件
-            if (class_exists('Notify')) {
-                require_once SYSTEM_ROOT . '/lib/class.notify.php';
-                $detail = Notify::sendForUser($uid, $title, $content, 'daily_summary');
-            } else {
-                $detail = self::sendToUser($uid, $title, $content);
-            }
+            require_once SYSTEM_ROOT . '/lib/class.notify.php';
+            $detail = Notify::sendForUser($uid, $title, $content, 'daily_summary');
 
-            $delivered = !empty($detail['ok']) && $detail['detail'] !== '通知未启用';
+            $delivered = Notify::wasDelivered($detail);
             if (!$delivered) {
                 // 站点通知未启用或个人渠道不可用时，回退到用户邮箱，避免未送达却记为已发送。
-                $emailDetail = self::sendToUser($uid, $title, $content);
-                if (!empty($emailDetail['ok'])) {
-                    $detail = $emailDetail;
-                    $delivered = true;
-                }
+                $emailDetail = static::sendToUser($uid, $title, $content);
+                $detail = $emailDetail;
+                $delivered = !empty($emailDetail['ok']);
             }
+            self::recordResult($uid, 'daily_summary', $detail);
             if ($delivered) {
                 self::markSent($uid, 'daily_summary');
             }
@@ -186,10 +182,20 @@ class Reminder
             if ($result === true) {
                 return array('ok' => true, 'detail' => '邮件已发送至 ' . $to);
             }
-            return array('ok' => false, 'detail' => '邮件发送失败: ' . (string) $result);
+            return array('ok' => false, 'detail' => '邮件发送失败，请联系管理员检查邮件配置');
         } catch (Throwable $e) {
-            return array('ok' => false, 'detail' => '邮件异常: ' . $e->getMessage());
+            return array('ok' => false, 'detail' => '邮件发送异常，请联系管理员检查邮件配置');
         }
+    }
+
+    /** 仅保存结果与时间，不保存通知正文、邮箱、渠道 URL 或密钥。 */
+    public static function recordResult($uid, $event, $result)
+    {
+        require_once SYSTEM_ROOT . '/lib/class.notify.php';
+        option::uset('remind_result_' . $event, json_encode(array(
+            'status' => Notify::wasDelivered($result) ? 'accepted' : (!empty($result['ok']) ? 'skipped' : 'failed'),
+            'at' => time(),
+        )), (int) $uid);
     }
 
     /**

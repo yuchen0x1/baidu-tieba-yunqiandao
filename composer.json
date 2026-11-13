@@ -24,7 +24,8 @@
             "@php tools/migrate-integration-test.php",
             "@php tools/scheduler-integration-test.php",
             "@php tools/api-integration-test.php",
-            "@php tools/backup-restore-drill.php"
+            "@php tools/backup-restore-drill.php",
+            "@php tools/notification-integration-test.php"
         ],
         "gate": "@php tools/release-gate.php",
         "check": [

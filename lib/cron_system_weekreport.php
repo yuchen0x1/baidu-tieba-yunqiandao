@@ -17,9 +17,11 @@ function cron_system_weekreport()
 {
     global $m;
     require_once SYSTEM_ROOT . '/lib/class.SignManager.php';
+    require_once SYSTEM_ROOT . '/lib/class.Reminder.php';
     $rs = $m->query("SELECT `id` FROM `" . DB_PREFIX . "users` ORDER BY `id` ASC");
     $sent = 0;
     $waiting = 0;
+    $failed = 0;
     while ($user = $m->fetch_array($rs)) {
         $uid = (int) $user['id'];
         if (option::uget('weekly_report_enable', $uid) !== '1') {
@@ -54,10 +56,13 @@ function cron_system_weekreport()
             $lines[] = "失败原因 Top：\n" . implode("\n", $reasons);
         }
         $r = Notify::sendForUser($uid, '签到周报（' . date('Y-m-d') . '）', implode("\n", $lines), 'weekreport');
-        option::uset('weekly_report_lastrun', (string) time(), $uid);
-        if (!empty($r['ok'])) {
+        Reminder::recordResult($uid, 'weekreport', $r);
+        if (Notify::wasDelivered($r)) {
+            option::uset('weekly_report_lastrun', (string) time(), $uid);
             $sent++;
+        } else {
+            $failed++;
         }
     }
-    return '签到周报完成：推送 ' . $sent . ' 位用户，' . $waiting . ' 位未到推送日或已推送';
+    return '签到周报完成：渠道已接受 ' . $sent . ' 位用户，失败或跳过 ' . $failed . ' 位，' . $waiting . ' 位未到推送日或已推送';
 }

@@ -14,7 +14,26 @@ docker/.env
 vendor/
 
 .phpunit.result.cache
-.evolution/runtime/
+.evolution/
+
+# 一次性的本地审计、旧方案与打包产物不属于源码。
+upgrade-report/
+PROJECT_AUDIT_REPORT.md
+dist/
+artifacts/
+*.log
+*.tmp
+*.bak
+
+# 实例配置、备份与本地密钥；保留目录访问保护文件。
+key.php
+.env.*
+!.env.example
+!docker/.env.example
+data/backups/*
+!data/backups/.htaccess
+!data/backups/index.html
+setup/config.php
 
 # 运行产物（不入库）
 data/log/

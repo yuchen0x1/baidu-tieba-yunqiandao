@@ -19,6 +19,15 @@ function ver4_monitor_log($msg)
     cron::aset('ver4_monitor_do', array('log' => '[' . date('Y-m-d H:i:s') . ']' . $msg));
 }
 
+/** 仅确认本次服务接受的批次；后续批次和其他用户的记录保持待推送。 */
+function ver4_monitor_acknowledge_digest($uid, array $ids, $delivery)
+{
+    global $m;
+    if (empty($ids) || !Notify::wasDelivered($delivery)) { return false; }
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    return $m->pquery("UPDATE `" . DB_PREFIX . "ver4_monitor_hit` SET `notified` = 1 WHERE `uid` = ? AND `id` IN ({$placeholders})", array_merge(array((int) $uid), $ids)) !== false;
+}
+
 
 /**
  * 拉取贴吧第一页最新主题帖
@@ -190,11 +199,13 @@ function cron_ver4_monitor_do()
         //每日汇总模式：到汇总小时点，把当天未推送的命中合并成一条摘要推送（附各吧命中统计）
         if ($pushMode === 'digest' && $doNotify && (int) date('G') === $digestHour) {
             $dayStart = strtotime(date('Y-m-d') . ' 00:00:00');
-            $pending = $m->pquery("SELECT `forum`, `kw`, `tid`, `title` FROM `" . DB_PREFIX . "ver4_monitor_hit` WHERE `uid` = ? AND `notified` = 0 AND `created_at` >= ? ORDER BY `id` ASC LIMIT 30", array($uid, $dayStart));
+            $pending = $m->pquery("SELECT `id`, `forum`, `kw`, `tid`, `title` FROM `" . DB_PREFIX . "ver4_monitor_hit` WHERE `uid` = ? AND `notified` = 0 AND `created_at` >= ? ORDER BY `id` ASC LIMIT 30", array($uid, $dayStart));
             $digestLines = array();
+            $digestIds = array();
             $forumStats = array();
             if ($pending !== false) {
                 while ($pRow = $pending->fetch_array()) {
+                    $digestIds[] = (int) $pRow['id'];
                     $digestLines[] = '【' . $pRow['forum'] . '吧】' . mb_substr((string) $pRow['title'], 0, 50) . "\nhttps://tieba.baidu.com/p/" . (int) $pRow['tid'];
                     $fsKey = (string) $pRow['forum'];
                     $forumStats[$fsKey] = ($forumStats[$fsKey] ?? 0) + 1;
@@ -206,9 +217,12 @@ function cron_ver4_monitor_do()
                     $statParts[] = $fsForum . '吧 ' . $fsCount . ' 条';
                 }
                 $digestLines[] = '—— 各吧命中：' . implode('、', $statParts);
-                Notify::sendForUser($uid, '帖子监控 · 今日汇总（' . count($digestLines) - 1 . ' 条命中）', implode("\n\n", $digestLines), 'monitor');
-                $m->pquery("UPDATE `" . DB_PREFIX . "ver4_monitor_hit` SET `notified` = 1 WHERE `uid` = ? AND `notified` = 0 AND `created_at` >= ?", array($uid, $dayStart));
-                ver4_monitor_log("用户 {$uid} 今日汇总推送 " . (count($digestLines) - 1) . ' 条');
+                $delivery = Notify::sendForUser($uid, '帖子监控 · 今日汇总（' . (count($digestLines) - 1) . ' 条命中）', implode("\n\n", $digestLines), 'monitor');
+                if (ver4_monitor_acknowledge_digest($uid, $digestIds, $delivery)) {
+                    ver4_monitor_log("用户 {$uid} 今日汇总已被渠道接受 " . count($digestIds) . ' 条');
+                } else {
+                    ver4_monitor_log("用户 {$uid} 今日汇总未被渠道接受，保留待推送记录");
+                }
             }
         }
 

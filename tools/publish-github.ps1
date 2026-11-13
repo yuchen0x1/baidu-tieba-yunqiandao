@@ -57,11 +57,12 @@ try {
         $OutputDirectory
     }
     New-Item -ItemType Directory -Path $outputRoot -Force | Out-Null
-    $package = Join-Path $outputRoot ("tieba-cloud-sign-windows-{0}.zip" -f $Tag)
+    $package = Join-Path $outputRoot ("tieba-cloud-sign-web-{0}.zip" -f $Tag)
     $checksum = "$package.sha256"
     $manifest = Join-Path $outputRoot ("tieba-cloud-sign-update-{0}.json" -f $Tag)
-    $signature = Join-Path $outputRoot ("tieba-cloud-sign-windows-{0}.zip.sig" -f $Tag)
-    & git archive --format=zip --prefix="$Repository-$Tag/" --output="$package" "$Tag"
+    $signature = "$package.sig"
+    # 旧标签可能仍含已停用的启动器；Web 发布包一律排除这些文件。
+    & git archive --worktree-attributes --format=zip --prefix="$Repository-$Tag/" --output="$package" "$Tag" -- . ':(exclude)windows' ':(exclude)windows/**'
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $package)) {
         throw "Failed to create GitHub release package."
     }

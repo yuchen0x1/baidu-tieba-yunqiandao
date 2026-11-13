@@ -1,0 +1,48 @@
+{
+  "date": "2026-11-13",
+  "baseline": "a58b5c4",
+  "php": "8.3.36",
+  "database": "MariaDB 11.4.9 isolated localhost:13376",
+  "unit": {
+    "tests": "192",
+    "assertions": "1037",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "0"
+  },
+  "integration": {
+    "migration": 46,
+    "scheduler": 61,
+    "api": 20,
+    "backup_restore": 15,
+    "notifications": 22
+  },
+  "release_gate": {
+    "passed": 11,
+    "skipped": 0,
+    "failed": 0
+  },
+  "browser": {
+    "status": "PASS",
+    "checks": [
+      "登录真实隔离站点",
+      "个人结果和时间展示",
+      "桌面/平板/移动无横向溢出",
+      "深色模式",
+      "个人设置保存并重新读取",
+      "旧GET测试入口405",
+      "POST测试关闭渠道不显示成功",
+      "无页面脚本异常"
+    ],
+    "screenshots": [
+      "docs/screenshots/notification-settings-desktop.png",
+      "docs/screenshots/notification-settings-tablet.png",
+      "docs/screenshots/notification-settings-mobile.png",
+      "docs/screenshots/notification-settings-dark.png"
+    ],
+    "errors": []
+  },
+  "docker": "BLOCKED: daemon unavailable",
+  "remote": "Not pushed, published or deployed",
+  "external_delivery": "Not tested"
+}

@@ -19,7 +19,7 @@
 | 开放 API | 旧版全局 Bearer Token 兼容；个人 Token 只存 SHA-256 哈希且按用户隔离 status/sign/retry/health/logs/calendar | `api.php`、`templates/set.php` |
 | 签到日历 | 单贴吧结果落历史表、个人 90 天热力图、API `calendar` | `lib/class.SignManager.php`、`templates/calendar.php` |
 | 合规 | 开源致谢页面、保留上游版权与 AGPL-3.0 责任 | `templates/thanks.php` |
-| 运维 | Gitee-only 在线更新、安装/升级链 V5.07→V5.12、Docker、Windows、PHP 8.2/8.4 CI | `setup/`、`docker/`、`windows/` |
+| 运维 | GitHub Release 在线更新、统一迁移器、Docker/传统 PHP 网页部署、PHP 8.2/8.4 CI | `setup/`、`docker/` |
 
 ## 版本迁移
 

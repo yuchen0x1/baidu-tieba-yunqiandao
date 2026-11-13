@@ -101,6 +101,14 @@ jobs:
           TCS_IT_DB_PASS: root
         run: php tools/backup-restore-drill.php
 
+      - name: Run notification integration test
+        env:
+          TCS_IT_DB_HOST: 127.0.0.1
+          TCS_IT_DB_PORT: '3306'
+          TCS_IT_DB_USER: root
+          TCS_IT_DB_PASS: root
+        run: php tools/notification-integration-test.php
+
   docker-smoke:
     name: Docker image smoke
     runs-on: ubuntu-latest
@@ -139,8 +147,8 @@ jobs:
         run: docker compose -f docker/docker-compose.yml down -v
 
   release-packaging:
-    name: Release packaging dry run
-    runs-on: windows-latest
+    name: Web release packaging dry run
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -148,20 +156,28 @@ jobs:
       - name: Create temporary release tag
         run: git tag v0.0.0
 
-      - name: Generate local package and checksum
+      - name: Parse publisher PowerShell script
         shell: pwsh
         run: |
-          tools/publish-github.ps1 -Tag v0.0.0 -OutputDirectory "$env:RUNNER_TEMP\pkg"
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path tools/publish-github.ps1), [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { $errors | Write-Error; exit 1 }
+
+      - name: Generate local Web package and checksum
+        shell: pwsh
+        run: |
+          tools/publish-github.ps1 -Tag v0.0.0 -OutputDirectory "$env:RUNNER_TEMP/pkg"
 
       - name: Verify package integrity
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $pkg = Get-ChildItem "$env:RUNNER_TEMP\pkg\*.zip" | Select-Object -First 1
+          $pkg = Get-ChildItem "$env:RUNNER_TEMP/pkg/tieba-cloud-sign-web-*.zip" | Select-Object -First 1
           if (-not $pkg) { throw "未生成发布包" }
           $checksum = "$($pkg.FullName).sha256"
           if (-not (Test-Path $checksum)) { throw "未生成 SHA-256 校验文件" }
-          $manifest = Get-ChildItem "$env:RUNNER_TEMP\pkg\*.json" | Select-Object -First 1
+          $manifest = Get-ChildItem "$env:RUNNER_TEMP/pkg/*.json" | Select-Object -First 1
           if (-not $manifest) { throw "未生成更新清单" }
           $metadata = Get-Content $manifest.FullName -Raw | ConvertFrom-Json
           if ($metadata.channel -ne 'stable' -or $metadata.assets.Count -lt 1) { throw "更新清单字段不完整" }
@@ -171,52 +187,20 @@ jobs:
           Add-Type -AssemblyName System.IO.Compression.FileSystem
           $zip = [System.IO.Compression.ZipFile]::OpenRead($pkg.FullName)
           try {
+            $entryCount = $zip.Entries.Count
             if ($zip.Entries.Count -lt 50) { throw "发布包条目异常：$($zip.Entries.Count)" }
+            $relativeEntries = @($zip.Entries | Where-Object { -not $_.FullName.EndsWith('/') } | ForEach-Object { ($_.FullName -split '/', 2)[1] })
+            $forbidden = '^((windows|tests|docs|release-notes|upgrade-report|official-service|vendor|\.github|\.evolution|\.zcode)/|tools/(?!migrate\.php$|\.htaccess$)|PROJECT_AUDIT_REPORT\.md$|phpunit\.xml$|\.env($|\.)|key\.php$)'
+            if (@($relativeEntries | Where-Object { $_ -match $forbidden }).Count -gt 0) { throw 'Web package includes development files or local instance data' }
+            foreach ($required in @('tools/migrate.php', 'data/backups/.htaccess', 'setup/install.template.sql', 'config.php')) {
+              if ($required -notin $relativeEntries) { throw "Missing deployment file: $required" }
+            }
             $hasEntry = $zip.Entries | Where-Object { $_.Name -in @('index.php','init.php','api.php','version.php') }
             if (-not $hasEntry -or @($hasEntry).Count -lt 4) { throw "发布包缺少核心入口文件" }
           } finally {
             $zip.Dispose()
           }
-          Write-Host "发布包校验通过：$($pkg.Name)（$($zip.Entries.Count) 条目已检查）"
-
-  windows-scripts:
-    name: Windows PowerShell syntax
-    runs-on: windows-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Parse PowerShell scripts
-        shell: pwsh
-        run: |
-          $failed = $false
-          Get-ChildItem windows,tools -Filter '*.ps1' -Recurse | ForEach-Object {
-            $tokens = $null
-            $errors = $null
-            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors) | Out-Null
-            if ($errors.Count -gt 0) {
-              $errors | Write-Error
-              $failed = $true
-            }
-          }
-          if ($failed) { exit 1 }
-
-      - name: Parse PowerShell scripts (Windows PowerShell 5.1 compatibility)
-        shell: powershell
-        run: |
-          # 部署文档推荐 powershell.exe（5.1）执行 windows 脚本；无 BOM 的 UTF-8 中文会导致 5.1 解析失败
-          $failed = $false
-          Get-ChildItem windows,tools -Filter '*.ps1' -Recurse | ForEach-Object {
-            $tokens = $null
-            $errors = $null
-            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors) | Out-Null
-            if ($errors.Count -gt 0) {
-              Write-Host "5.1 解析失败：$($_.Name)"
-              $errors | ForEach-Object { Write-Host $_.Message }
-              $failed = $true
-            }
-          }
-          if ($failed) { exit 1 }
+          Write-Host "发布包校验通过：$($pkg.Name)（$entryCount 条目已检查）"
 
   compose:
     name: Compose validation

@@ -30,10 +30,10 @@ $hasApiTokenHero = !empty($tokenRow0['api_token_hash']);
         <span class="hero-tag">API Token：<?php echo $hasApiTokenHero ? '已启用' : '未生成'; ?></span>
     </div>
 </section>
-<form action="setting.php?mod=set" method="post">
+<form action="setting.php?mod=set" method="post" class="personal-settings-form">
 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
 <?php doAction('set_1'); ?>
-<div style="margin:16px 1%;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;align-items:start">
+<div style="margin:16px 1%;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px;align-items:start">
 <div style="display:flex;flex-direction:column;gap:16px">
 <div class="panel panel-primary">
     <div class="panel-heading"><span class="panel-title">① 基本信息</span></div>
@@ -66,6 +66,26 @@ $hasApiTokenHero = !empty($tokenRow0['api_token_hash']);
 </div>
 <div class="panel panel-info">
     <div class="panel-heading"><span class="panel-title">③ 通知与报告</span></div>
+    <div class="panel-body reminder-delivery">
+        <h3>最近推送结果</h3>
+        <p>服务接受后才记录已发送；失败保留重试机会。此处不代表手机或邮箱已经读到消息。</p>
+        <dl class="reminder-delivery-list">
+        <?php foreach (array('sign_fail' => '失败提醒', 'daily_summary' => '每日摘要', 'weekreport' => '每周报告') as $reminderEvent => $reminderLabel) {
+            $reminderResult = json_decode((string) option::uget('remind_result_' . $reminderEvent), true);
+            $reminderStatus = is_array($reminderResult) ? ($reminderResult['status'] ?? '') : '';
+            $reminderLabels = array('accepted' => '服务已接受', 'failed' => '发送失败', 'skipped' => '未发送');
+            $reminderText = $reminderLabels[$reminderStatus] ?? '尚无记录';
+            $reminderTone = $reminderStatus === 'accepted' ? 'success' : ($reminderStatus === 'failed' ? 'danger' : 'neutral');
+        ?>
+            <div>
+                <dt><?php echo $reminderLabel; ?></dt>
+                <dd><span class="cs-badge cs-badge-<?php echo $reminderTone; ?>"><?php echo $reminderText; ?></span>
+                <?php if (!empty($reminderResult['at'])) { ?><time datetime="<?php echo date('c', (int) $reminderResult['at']); ?>"><?php echo date('m-d H:i', (int) $reminderResult['at']); ?></time><?php } ?></dd>
+            </div>
+        <?php } ?>
+        </dl>
+        <p>失败提醒使用个人邮箱；每日摘要优先使用<?php if (in_array('ver4_monitor', $i['plugins']['actived'] ?? array(), true)) { ?><a href="index.php?plugin=ver4_monitor">帖子监控</a><?php } else { ?>帖子监控插件<?php } ?>中配置的个人渠道，未发送时回退邮箱。</p>
+    </div>
     <div class="table-responsive">
     <table class="cs-table">
         <tbody>
@@ -93,7 +113,7 @@ $hasApiTokenHero = !empty($tokenRow0['api_token_hash']);
             </td>
         </tr>
         <tr>
-            <td>每日签到摘要<br/>每天签到结束后向本站邮箱发送当日成功/失败汇总</td>
+            <td>每日签到摘要<br/>到站点设定时间或签到完成后发送当日尝试次数汇总，失败自动留待下轮重试</td>
             <td>
                 <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
                     <input type="checkbox" name="remind_daily_summary" value="1" <?php if (option::uget('remind_daily_summary') == 1) echo 'checked'; ?>>

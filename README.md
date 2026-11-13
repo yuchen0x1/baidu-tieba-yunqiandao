@@ -12,7 +12,7 @@
 [![Release](https://img.shields.io/badge/动态-查看最新Release-8A5CFF?logo=github)](https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/latest)
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue)](license.html)
 
-[下载 Windows 部署包](https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/latest) · [快速开始](#-快速开始) · [在线更新](#-在线更新) · [开放 API](#-开放-api) · [问题反馈](https://github.com/yuchen0x1/baidu-tieba-yunqiandao/issues)
+[下载 Web 部署包](https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/latest) · [快速开始](#-快速开始) · [在线更新](#-在线更新) · [开放 API](#-开放-api) · [问题反馈](https://github.com/yuchen0x1/baidu-tieba-yunqiandao/issues)
 
 </div>
 
@@ -20,21 +20,25 @@
 
 贴吧云签到是一个可自托管的百度贴吧自动签到站点：登录后台绑定百度账号并刷新关注贴吧后，系统按计划任务自动完成签到、对失败项智能复签、定期检查账号凭据健康度，并把每一批结果写入日志与统计——从此告别漏签和忘签。深色侧栏 + 双主题的现代控制台界面，所有操作都在浏览器里完成，无需 SSH 也能一键升级。
 
+本项目只维护网页版，不提供桌面客户端、Android/iOS App 或单独的 Windows 版本。检查与分发收敛记录见[仅维护网页版](docs/WEB_ONLY.md)。
+
 - **技术栈**：PHP 8.2 及以上（推荐 8.4）· MySQL/MariaDB · Docker Compose V2
-- **部署形态**：Docker Compose 一键起站 / 传统 PHP 环境 / Windows 免安装包
+- **部署形态**：仅网页版；Docker Compose / 传统 PHP 环境
 - **授权协议**：AGPL-3.0
 - **交流**：QQ 群 `1016190748` · Telegram <https://t.me/lenmoC>
 
 ## 最新更新
 
-### V7.6.0 · 2026-11-13
+### V7.7.0 · 2026-11-13
 
-- 计划任务支持搜索、状态筛选与分页历史，手机端可直接查看任务和操作。
-- 修复配置加密后计划任务密码、全局代理密码不可用的问题，失败重试按每项任务的设置执行。
-- 改善任务异常后的恢复和失败提示，并提高中文、emoji 与序列化配置的备份恢复兼容性。
-- 升级后，任务管理写操作需通过页面表单提交；7.5.0 升级无需新增数据库结构迁移，仍需完成版本同步。
+- 统一提供通用 Web 部署包，取消单独的 Windows 分发与启动器。
+- 补齐历史版本说明，按可核实记录区分发布日期与开发批次；部署包只保留网页运行及升级所需文件。
+- 推送失败或渠道未启用时，不再误报已发送；失败提醒、日报和周报保留下一轮重试机会。
+- 帖子监控摘要只确认本次接受的记录，超过 30 条的后续批次继续保留。
+- 个人设置显示最近推送结果和时间，手机端表单改为纵向排布，兼容深色模式。
+- 通知测试使用页面表单提交；机器人回调地址加强公开地址校验，错误提示不回显响应体和密钥。
 
-[完整更新历史](docs/releases/release-notes.md) · [本版发布说明](release-notes/v7.6.0.md)
+[完整更新历史](docs/releases/release-notes.md) · [本版更新与升级说明](release-notes/v7.7.0.md)
 
 ## ✨ 功能特性
 
@@ -56,6 +60,7 @@
 
 ### 扩展生态
 - 通知渠道：Server 酱、Telegram Bot、通用 Webhook、Bark、PushPlus、邮件；每日签到日报优先走个人渠道，未送达回退邮箱。
+- 推送结果：个人设置查看失败提醒、每日摘要、每周报告的最近结果。服务接受才更新已发送标记；未启用、未选渠道和失败分别处理。失败项在相关任务下一次执行时重试（需任务与个人订阅已启用）。服务接受不等于终端收件或阅读。
 - 开放 API：`api.php` 提供 Bearer Token 认证的状态/签到/日志/日历/排行等 17 个接口，权限矩阵自动生成文档。
 - 插件体系：内置 AI 发帖/回帖、灌水、点赞、封禁、删帖、审查、帖子监控、QQ 推送、云回帖等 16 个插件，支持在线安装。
 
@@ -91,17 +96,9 @@ docker compose -f docker/docker-compose.yml up -d --build
 
 PHP `>= 8.2`（扩展 `curl`、`json`、`mysqli`，按需 `gd`、`mbstring`、`openssl`、`session`、`zip`）+ MySQL/MariaDB + 任意 Web 服务器：
 
-1. 部署仓库文件到 Web 根目录（可选 `composer install`）。
+1. 部署 Web 包到站点目录（需要安装依赖时使用 `composer install --no-dev --optimize-autoloader`）。
 2. 访问 `/setup/install.php`，按向导完成安装。
 3. 确认 `setup/install.lock` 存在，然后进入后台配置站点地址、计划任务密码与通知渠道。
-
-### 方式三：Windows 免安装包
-
-从 [Releases](https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/latest) 下载 `tieba-cloud-sign-windows-*.zip`（发布页附 SHA-256 校验文件），解压后双击 `windows/start-web.bat` 即自动检查环境并打开站点；指定端口可运行：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File windows/start-web.ps1 -Port 8081
-```
 
 <div align="center">
 
@@ -148,7 +145,7 @@ php /var/www/do.php --pw=你的密码 --loop=60     # 自定义间隔（秒，�
 - 更新不会覆盖 `config.php`、`key.php`、`.env`、`docker/.env` 与 `setup/install.lock`，也不改动数据库内容。
 - 网络受限环境可选设置只读 `UPDATE_GITHUB_TOKEN`（仅发送给 `api.github.com`，不落盘、不随资产下载发送）。
 
-项目源码与 Windows 部署包发布在 [GitHub Releases](https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases)；发布流程细节见 [`docs/RELEASE.md`](docs/RELEASE.md)。
+项目源码与通用 Web 部署包发布在 [GitHub Releases](https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases)；发布流程细节见 [`docs/RELEASE.md`](docs/RELEASE.md)。
 自动更新的架构、签名配置、回滚边界和故障处理见 [`docs/AUTO_UPDATE.md`](docs/AUTO_UPDATE.md)。
 
 ## ⚙️ 配置参考
@@ -225,14 +222,14 @@ composer install
 composer test        # PHPUnit 冒烟测试
 composer lint        # 全仓 PHP 语法与安全检查
 composer check       # lint + test
-composer integration # 迁移/调度/API/备份恢复集成测试（需可连 MariaDB）
+composer integration # 迁移/调度/API/备份恢复/通知集成测试（需可连 MariaDB）
 composer gate        # 一键发布门禁，发布前必须全绿
 ```
 
 - 集成测试只在系统临时目录与自建 `tcs_it_*` 临时数据库工作（用 `TCS_IT_DB_HOST/PORT/USER/PASS` 指定连接），数据库不可达时自动跳过。
 - 本轮升级的调查、5 个开源项目对比、修改清单、验证范围及限制见 [`docs/reports/evolution-2026-11-13.md`](docs/reports/evolution-2026-11-13.md)。新增 [`tests/browser/cron-smoke.cjs`](tests/browser/cron-smoke.cjs) 可在含 `it_ui_probe` 本地探针的隔离站点上验收任务页；需自行准备 Playwright、Edge 与专用管理员，通过文件注释中的环境变量连接。截图来自测试夹具，见报告。
 - SQL 备份显式声明 utf8mb4，避免导入工具默认字符集不同造成中文、emoji 或序列化配置失真；备份演练包括以 latin1 连接回放及逐表比对。
-- CI 在 PHP 8.2/8.4 上执行 Composer 校验、依赖审计、语法检查与 PHPUnit，在 MariaDB 11.4 服务容器上运行四条集成链路，构建 Docker 镜像验证健康检查与应用路由，并对临时 tag 做发布脚本打包演练。
+- CI 在 PHP 8.2/8.4 上执行 Composer 校验、依赖审计、语法检查与 PHPUnit，在 MariaDB 11.4 服务容器上运行迁移、调度、API、备份恢复与通知集成链路，构建 Docker 镜像验证健康检查与应用路由，并对临时 tag 做通用 Web 包打包演练。
 - 工作流：`ci.yml`（质量门禁）、`release.yml`（`v*` tag 触发发布）、`build.yml`（多架构 Docker 镜像，未配置 Docker Hub 凭据时仅构建不推送）。
 - 分支约定：产品更新只合并到 `main`；Release 标签必须指向 `main` 已包含的提交，避免从临时分支发布漂移版本。
 

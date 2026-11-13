@@ -1,4 +1,4 @@
-name: 发布 Windows 部署包
+name: 发布 Web 部署包
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   release:
-    name: 构建并发布 Windows 部署包
+    name: 构建并发布 Web 部署包
     runs-on: ubuntu-latest
     services:
       mariadb:

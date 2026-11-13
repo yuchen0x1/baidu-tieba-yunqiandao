@@ -69,7 +69,7 @@ if (is_writable(SYSTEM_ROOT . '/setup')) {
     <div class="panel-body">
 	  <b>Tips:</b><br/>
 	  1.系统现在按 GitHub 正式 Release 检查版本，不会把开发中的 commit 当成稳定更新。<br/>
-	  2.检测到新版本后会显示版本说明、Release 页面和 Windows 部署包下载入口。<br/>
+	  2.检测到新版本后会显示版本说明、Release 页面和 Web 部署包下载入口。<br/>
 	  3.部分版本变动需要执行升级脚本，请留意版本说明；升级后可前往<a href="./setup/update.php" target="_blank">脚本列表</a>查看。<br>
     </div>
   </div>

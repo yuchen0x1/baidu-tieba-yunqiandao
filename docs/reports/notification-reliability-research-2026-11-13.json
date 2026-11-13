@@ -1,0 +1,116 @@
+{
+  "date": "2026-11-13",
+  "method": "Read-only web browsing and raw primary-source README/core/license reads; no competitor source imported or executed. GitHub metadata API returned anonymous rate-limit 403; no maintenance timestamps asserted.",
+  "projects": [
+    {
+      "repository": "https://github.com/MoeNetwork/Tieba-Cloud-Sign",
+      "branch": "master",
+      "license_observed": "自定义最终用户协议，未移植代码",
+      "license_url": "https://github.com/MoeNetwork/Tieba-Cloud-Sign/blob/master/license.html",
+      "core_url": "https://github.com/MoeNetwork/Tieba-Cloud-Sign/blob/master/lib/class.cron.php",
+      "readme": {
+        "url": "https://raw.githubusercontent.com/MoeNetwork/Tieba-Cloud-Sign/master/README.md",
+        "bytes": 5029,
+        "sha256": "46e786d3106c1b762a835c08ec2cad1a3a7dfe7e0d8feeed05e9f0704f942b6c"
+      },
+      "core": {
+        "url": "https://raw.githubusercontent.com/MoeNetwork/Tieba-Cloud-Sign/master/lib/class.cron.php",
+        "bytes": 7748,
+        "sha256": "961416c879caf6b6b4080b5d28c9ffe6d9fd022856d36851dfb0e4534eea8e9f"
+      },
+      "license": {
+        "url": "https://raw.githubusercontent.com/MoeNetwork/Tieba-Cloud-Sign/master/license.html",
+        "bytes": 30839,
+        "sha256": "25f65085deed1db98f5f4a996a039146a19f3330268f4d30c8dc7ae019603ebd"
+      }
+    },
+    {
+      "repository": "https://github.com/qd-today/qd",
+      "branch": "master",
+      "license_observed": "MIT",
+      "license_url": "https://github.com/qd-today/qd/blob/master/LICENSE",
+      "core_url": "https://github.com/qd-today/qd/blob/master/web/handlers/task.py",
+      "readme": {
+        "url": "https://raw.githubusercontent.com/qd-today/qd/master/README.md",
+        "bytes": 14341,
+        "sha256": "471f88cf06068454bc6e994b7e426e86743b0560be49d52fe04903f965973ca5"
+      },
+      "core": {
+        "url": "https://raw.githubusercontent.com/qd-today/qd/master/web/handlers/task.py",
+        "bytes": 33070,
+        "sha256": "cb7f513370ed615e5b6381694e72f347b2459b87310e58d05d289591e54d9fa3"
+      },
+      "license": {
+        "url": "https://raw.githubusercontent.com/qd-today/qd/master/LICENSE",
+        "bytes": 1065,
+        "sha256": "5b5134c5d58e0a170060860e45c8463a3676a46cc63a0e1d2044aef88fcba303"
+      }
+    },
+    {
+      "repository": "https://github.com/healthchecks/healthchecks",
+      "branch": "master",
+      "license_observed": "BSD-3-Clause",
+      "license_url": "https://github.com/healthchecks/healthchecks/blob/master/LICENSE",
+      "core_url": "https://github.com/healthchecks/healthchecks/blob/master/hc/api/transports.py",
+      "readme": {
+        "url": "https://raw.githubusercontent.com/healthchecks/healthchecks/master/README.md",
+        "bytes": 25319,
+        "sha256": "54f17cf15f0faf08ca8296cbc9652d0d5e8656136aff17d13c3457e558bbefc6"
+      },
+      "core": {
+        "url": "https://raw.githubusercontent.com/healthchecks/healthchecks/master/hc/api/transports.py",
+        "bytes": 7043,
+        "sha256": "000c7ff6d6a23e2a909c86a9f436bf310a2d2f0c2eb4c297fb7d02f5a3379b4d"
+      },
+      "license": {
+        "url": "https://raw.githubusercontent.com/healthchecks/healthchecks/master/LICENSE",
+        "bytes": 1507,
+        "sha256": "2151fd0e0678bea30d9d16230713a470a127d7b8c34999c17dbebbb0a3485f18"
+      }
+    },
+    {
+      "repository": "https://github.com/caronc/apprise",
+      "branch": "master",
+      "license_observed": "BSD-2-Clause",
+      "license_url": "https://github.com/caronc/apprise/blob/master/LICENSE",
+      "core_url": "https://github.com/caronc/apprise/blob/master/apprise/plugins/custom_json.py",
+      "readme": {
+        "url": "https://raw.githubusercontent.com/caronc/apprise/master/README.md",
+        "bytes": 70260,
+        "sha256": "1a8832880f7ff2eac1be9eec2b8c860c44889631968d655e80651636e36c90e5"
+      },
+      "core": {
+        "url": "https://raw.githubusercontent.com/caronc/apprise/master/apprise/plugins/custom_json.py",
+        "bytes": 15270,
+        "sha256": "b85388be10135038597da14694b3a046a3bffb6143720d74dc3a513782f565c1"
+      },
+      "license": {
+        "url": "https://raw.githubusercontent.com/caronc/apprise/master/LICENSE",
+        "bytes": 1343,
+        "sha256": "9ac007e806bd7199cf3158adff83a16351ae85c46373c3533a98b961975103f2"
+      }
+    },
+    {
+      "repository": "https://github.com/binwiederhier/ntfy",
+      "branch": "main",
+      "license_observed": "Apache-2.0 或 GPL-2.0；本次未移植代码",
+      "license_url": "https://github.com/binwiederhier/ntfy/blob/main/LICENSE",
+      "core_url": "https://github.com/binwiederhier/ntfy/blob/main/client/client.go",
+      "readme": {
+        "url": "https://raw.githubusercontent.com/binwiederhier/ntfy/main/README.md",
+        "bytes": 34695,
+        "sha256": "21bf864495bb1ec5bd7c0bd6f48e95fb9f4f6dcbe2644e94197e53ab8ba4fc08"
+      },
+      "core": {
+        "url": "https://raw.githubusercontent.com/binwiederhier/ntfy/main/client/client.go",
+        "bytes": 9139,
+        "sha256": "048e7710f64703f5d42d8a57f3676bca6a2ded51bb392337765a002e52a630b7"
+      },
+      "license": {
+        "url": "https://raw.githubusercontent.com/binwiederhier/ntfy/main/LICENSE",
+        "bytes": 11347,
+        "sha256": "41c6b5205cdb17128b6d003732c48e1d1cdf1080160fc8ac8dc9d992dd8dc398"
+      }
+    }
+  ]
+}

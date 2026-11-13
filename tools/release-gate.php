@@ -7,7 +7,7 @@
  * 检查项：
  *   1. 全仓语法与安全扫描（tools/lint.php）
  *   2. PHPUnit 单元测试（vendor 缺失时跳过并提示）
- *   3. 版本元数据一致性（version.php / 安装模板 / Windows 脚本 / CHANGELOG 头部）
+ *   3. 版本元数据一致性（version.php / 安装模板 / CHANGELOG）
  *   4. 迁移文件规范（文件名与 version 键一致、无重复版本号）
  *   5. 入口 SQL 注入面守卫（ajax/setting/api 禁止插值 SQL）
  *   6. 数据库集成链路（迁移 / 调度 / API / 备份恢复演练；数据库不可达时跳过）
@@ -68,16 +68,12 @@ $versionOk = preg_match("/define\('SYSTEM_VER', '([^']+)'\)/", $versionFile, $vm
 $version = $versionOk ? $vm[1] : '';
 $template = file_get_contents($repoRoot . '/setup/install.template.sql');
 $changelog = (string) @file_get_contents($repoRoot . '/CHANGELOG.md');
-$ps1 = (string) @file_get_contents($repoRoot . '/windows/check-update.ps1');
 $consistency = array();
 if (!$versionOk) {
     $consistency[] = 'version.php 缺少 SYSTEM_VER';
 }
 if (strpos($template, "('core_version', '{$version}')") === false) {
     $consistency[] = '安装模板 core_version 与版本源不一致';
-}
-if (strpos($ps1, 'CurrentVersion = "' . $version . '"') === false) {
-    $consistency[] = 'check-update.ps1 默认版本与版本源不一致';
 }
 if (strpos($changelog, 'V' . $version) === false) {
     $consistency[] = 'CHANGELOG 未包含当前版本条目';
@@ -139,6 +135,7 @@ if ($dbReachable) {
         '数据库集成：调度' => 'scheduler-integration-test.php',
         '数据库集成：API 合同' => 'api-integration-test.php',
         '数据库集成：备份恢复演练' => 'backup-restore-drill.php',
+        '数据库集成：通知重试与批次确认' => 'notification-integration-test.php',
     ) as $name => $script) {
         list($code, $output) = runStep(__DIR__ . '/' . $script);
         preg_match('/(\d+) 通过，(\d+) 失败/', $output, $m);

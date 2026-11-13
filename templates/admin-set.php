@@ -348,7 +348,7 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
     };
     ?>
         <tr><td><b>通知设置</b>
-        <br/><br/><input type="button" class="cs-btn cs-btn-secondary" onclick="location = '<?php echo SYSTEM_URL; ?>setting.php?mod=admin:testnotify'" value="发送测试通知">
+        <br/><br/><input type="submit" class="cs-btn cs-btn-secondary" formaction="setting.php?mod=admin:testnotify" formmethod="post" formnovalidate value="发送测试通知">
         <br/><br/>测试前请先保存设置
         <br/><br/>支持在签到失败、百度账号 BDUSS 失效时主动推送提醒
         </td><td>

@@ -90,7 +90,7 @@ if (isset($_POST['ver4_monitor_test_notify'])) {
     csrf(true, true);
     require_once SYSTEM_ROOT . '/lib/class.notify.php';
     $testResult = Notify::sendForUser($uid, '帖子监控 · 通知测试', '这是一条来自帖子监控的测试推送，收到即表示你的个人通知渠道配置正确。', 'test');
-    echo '<div class="alert ' . ($testResult['ok'] ? 'alert-success">测试推送已提交：' . htmlspecialchars((string) $testResult['detail'], ENT_QUOTES, 'UTF-8') : 'alert-danger">测试推送失败：' . htmlspecialchars((string) $testResult['detail'], ENT_QUOTES, 'UTF-8')) . '</div>';
+    echo '<div class="alert ' . (Notify::wasDelivered($testResult) ? 'alert-success">服务已接受测试推送：' . htmlspecialchars((string) $testResult['detail'], ENT_QUOTES, 'UTF-8') : 'alert-warning">测试推送未发送：' . htmlspecialchars((string) $testResult['detail'], ENT_QUOTES, 'UTF-8')) . '</div>';
 }
 
 $g = function ($key, $default = '') use ($uid) {

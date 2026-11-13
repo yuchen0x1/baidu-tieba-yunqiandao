@@ -17,12 +17,12 @@ final class UpdaterTest extends TestCase
             'published_at' => '2026-08-29T00:00:00Z',
             'prerelease' => false,
             'assets' => array(array(
-                'name' => 'tieba-cloud-sign-windows-' . $tag . '.zip',
+                'name' => 'tieba-cloud-sign-web-' . $tag . '.zip',
                 'browser_download_url' => 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/' . $tag . '/package.zip',
                 'size' => 123,
                 'digest' => 'sha256:test'
             ), array(
-                'name' => 'tieba-cloud-sign-windows-' . $tag . '.zip.sha256',
+                'name' => 'tieba-cloud-sign-web-' . $tag . '.zip.sha256',
                 'browser_download_url' => 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/' . $tag . '/package.zip.sha256',
                 'size' => 100,
                 'digest' => ''
@@ -30,13 +30,62 @@ final class UpdaterTest extends TestCase
         );
     }
 
-    public function testReleaseIsParsedAndWindowsAssetIsSelected(): void
+    public function testReleaseIsParsedAndWebAssetIsSelected(): void
     {
         $release = ProjectUpdater::parseRelease($this->payload());
         $this->assertSame('5.08', $release['version']);
-        $this->assertSame('tieba-cloud-sign-windows-v5.08.zip', $release['asset_name']);
+        $this->assertSame('tieba-cloud-sign-web-v5.08.zip', $release['asset_name']);
         $this->assertSame(123, $release['asset_size']);
         $this->assertSame('sha256:test', $release['asset_digest']);
+    }
+
+    public function testWebPackageIsPreferredAndSidecarsMatchSelectedPackage(): void
+    {
+        $payload = $this->payload();
+        $base = 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/v5.08/';
+        $legacy = 'tieba-cloud-sign-windows-v5.08.zip';
+        array_unshift($payload['assets'], array('name' => $legacy, 'browser_download_url' => $base . $legacy),
+            array('name' => $legacy . '.sha256', 'browser_download_url' => $base . $legacy . '.sha256'),
+            array('name' => $legacy . '.sig', 'browser_download_url' => $base . $legacy . '.sig'));
+        $release = ProjectUpdater::parseRelease($payload);
+        $this->assertSame('tieba-cloud-sign-web-v5.08.zip', $release['asset_name']);
+        $this->assertSame($base . 'package.zip.sha256', $release['asset_checksum_url']);
+        $this->assertSame('', $release['asset_signature_url'], '不可串用其他附件的签名');
+    }
+
+    public function testHistoricalWebArchiveNameRemainsReadable(): void
+    {
+        $payload = $this->payload();
+        foreach ($payload['assets'] as &$asset) { $asset['name'] = str_replace('-web-', '-windows-', $asset['name']); }
+        unset($asset);
+        $release = ProjectUpdater::parseRelease($payload);
+        $this->assertSame('tieba-cloud-sign-windows-v5.08.zip', $release['asset_name']);
+        $this->assertNotEmpty($release['asset_checksum_url']);
+    }
+
+    public function testUnrelatedApplicationArchivesAreNotWebUpdates(): void
+    {
+        $payload = $this->payload();
+        $payload['assets'][0]['name'] = 'desktop-client.zip';
+        $release = ProjectUpdater::parseRelease($payload);
+        $this->assertSame('', $release['asset_download_url']);
+        $this->assertSame('', $release['asset_checksum_url']);
+    }
+
+    public function testPageAssetsAreLimitedToActualFilesInSameRepositoryAndTag(): void
+    {
+        $base = '/yuchen0x1/baidu-tieba-yunqiandao/releases/download/v7.6.0/';
+        $name = 'tieba-cloud-sign-web-v7.6.0.zip';
+        $html = '<a href="' . $base . $name . '">Web</a><a href="' . $base . $name . '.sha256">SHA</a>'
+            . '<a href="//evil.example/' . $name . '">bad</a>'
+            . '<a href="/attacker/repo/releases/download/v7.6.0/' . $name . '">bad</a>'
+            . '<a href="/yuchen0x1/baidu-tieba-yunqiandao/releases/download/v7.5.0/' . $name . '">bad</a>';
+        $assets = self::method('extractReleaseAssets')->invoke(null, $html, 'v7.6.0');
+        $this->assertCount(2, $assets);
+        $release = ProjectUpdater::parseRelease(array('tag_name' => 'v7.6.0', 'assets' => $assets));
+        $this->assertSame($name, $release['asset_name']);
+        $this->assertSame('https://github.com' . $base . $name . '.sha256', $release['asset_checksum_url']);
+        $this->assertSame('', $release['asset_signature_url'], '未发现附件时不得虚构签名可用');
     }
 
     public function testNewerReleaseIsDetected(): void
@@ -184,7 +233,7 @@ final class UpdaterTest extends TestCase
     {
         $payload = $this->payload();
         $payload['assets'][] = array(
-            'name' => 'package.zip.sig',
+            'name' => 'tieba-cloud-sign-web-v5.08.zip.sig',
             'browser_download_url' => 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/v5.08/package.zip.sig'
         );
         $release = ProjectUpdater::parseRelease($payload);
@@ -354,9 +403,9 @@ final class UpdaterTest extends TestCase
         )));
     }
 
-    public function testPageFallbackReleaseUsesFixedAssetNamesWithChecksum(): void
+    public function testWebReleaseKeepsMatchingChecksum(): void
     {
-        // 回退通道按发布脚本固定资产命名构造 Release；安装前仍强制校验 .sha256
+        // Web 包使用发布脚本命名，安装前仍强制校验配套 .sha256
         $release = ProjectUpdater::parseRelease(array(
             'tag_name' => 'v7.4.0',
             'name' => '百度贴吧云签到 V7.4.0',
@@ -366,13 +415,13 @@ final class UpdaterTest extends TestCase
             'published_at' => '',
             'prerelease' => false,
             'assets' => array(
-                array('name' => 'tieba-cloud-sign-windows-v7.4.0.zip', 'browser_download_url' => 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/v7.4.0/tieba-cloud-sign-windows-v7.4.0.zip'),
-                array('name' => 'tieba-cloud-sign-windows-v7.4.0.zip.sha256', 'browser_download_url' => 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/v7.4.0/tieba-cloud-sign-windows-v7.4.0.zip.sha256')
+                array('name' => 'tieba-cloud-sign-web-v7.4.0.zip', 'browser_download_url' => 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/v7.4.0/tieba-cloud-sign-web-v7.4.0.zip'),
+                array('name' => 'tieba-cloud-sign-web-v7.4.0.zip.sha256', 'browser_download_url' => 'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/v7.4.0/tieba-cloud-sign-web-v7.4.0.zip.sha256')
             )
         ));
-        $this->assertSame('tieba-cloud-sign-windows-v7.4.0.zip', $release['asset_name']);
+        $this->assertSame('tieba-cloud-sign-web-v7.4.0.zip', $release['asset_name']);
         $this->assertSame(
-            'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/v7.4.0/tieba-cloud-sign-windows-v7.4.0.zip.sha256',
+            'https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/download/v7.4.0/tieba-cloud-sign-web-v7.4.0.zip.sha256',
             $release['asset_checksum_url']
         );
         // 回退通道没有 API digest 字段，只能依赖 .sha256 附件；安装前仍强制校验

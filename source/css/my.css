@@ -13,3 +13,20 @@ small,
 small.text-muted {
   color: var(--color-muted) !important;
 }
+/* 个人设置：推送状态沿用现有语义色，移动端允许时间换行。 */
+.reminder-delivery h3 { margin: 0 0 8px; font-size: var(--fs-lg); }
+.reminder-delivery p { color: var(--color-muted); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.reminder-delivery-list { margin: 12px 0; }
+.reminder-delivery-list > div { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--color-line); }
+.reminder-delivery-list dt { font-weight: 500; }
+.reminder-delivery-list dd { margin: 0; display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 8px; }
+.reminder-delivery-list time { color: var(--color-muted); font-size: var(--fs-xs); }
+.reminder-delivery .cs-badge-danger { color: var(--color-danger-deep); background: var(--color-danger-soft); border-color: var(--color-danger); }
+.reminder-delivery .cs-badge-success { color: var(--color-success-deep); background: var(--color-success-soft); border-color: var(--color-success); }
+.personal-settings-form .panel-primary > .panel-heading .panel-title { color: var(--color-brand-contrast); }
+@media (max-width: 640px) {
+  .personal-settings-form .cs-table, .personal-settings-form .cs-table tbody,
+  .personal-settings-form .cs-table tr, .personal-settings-form .cs-table td { display: block; width: 100%; }
+  .personal-settings-form .cs-table td:first-child { padding-bottom: 6px; }
+  .personal-settings-form .cs-table td + td { border-top: 0; padding-top: 6px; }
+}

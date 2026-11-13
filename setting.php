@@ -5,10 +5,10 @@
  */
 
 require dirname(__FILE__) . '/init.php';
-if (SYSTEM_PAGE === 'admin:cron' && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+if (in_array(SYSTEM_PAGE, array('admin:cron', 'admin:testnotify'), true) && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     http_response_code(405);
     header('Allow: POST');
-    msg('计划任务操作需通过页面表单提交。请返回计划任务页重试。');
+    msg('此操作需通过页面表单提交。请返回管理页面重试。');
 }
 csrf();
 if (ROLE != 'user' && ROLE != 'admin' && ROLE != 'vip') {
@@ -1147,10 +1147,10 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
         break;
     case 'admin:testnotify':
         $r = Notify::send(SYSTEM_FN . ' V' . SYSTEM_VER . ' 通知测试', "这是一条来自 " . SYSTEM_FN . " 的测试通知，如果你收到了此消息，表示通知系统可以正常工作。\n\n站点地址：" . SYSTEM_URL, 'test');
-        if ($r['ok']) {
+        if (Notify::wasDelivered($r)) {
             Redirect('index.php?mod=admin:set&notifytestok');
         } else {
-            msg('通知发送失败：' . $r['detail']);
+            msg('测试通知未发送：' . htmlspecialchars($r['detail'], ENT_QUOTES, 'UTF-8'));
         }
         break;
     case 'admin:testmail':

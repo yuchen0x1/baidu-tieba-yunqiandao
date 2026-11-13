@@ -16,7 +16,7 @@
 | 业务框架 | `init.php`、`lib/`（除明确标注外）、入口 `index.php/ajax.php/setting.php/api.php/do.php` |
 | 插件 | `plugins/`（ver4_*、weltolk_*、wmzz_*），含 AI 插件的直连模式 |
 | 数据结构 | `setup/`（Schema 模板与迁移）、`lib/api-contract.php` 合同 |
-| 开发运维工具 | `tools/`（含 `secret-scan.php`、`official-keygen.php`）、`windows/`、`docker/`、CI 配置 |
+| 开发运维工具 | `tools/`（含 `secret-scan.php`、`official-keygen.php`）、`docker/`、CI 配置 |
 | 官方服务协议与参考实现 | `lib/official-config.php`、`lib/class.official.php`（客户端 SDK）、`official-service/`（**零密钥**参考网关） |
 
 ### B. 实例服务端（每个自建站点的运营者自有数据与凭据）

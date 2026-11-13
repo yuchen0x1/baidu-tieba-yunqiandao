@@ -1,0 +1,49 @@
+# Git 源码保留维护所需文档和测试；用户部署包仅带运行与升级所需文件。
+/.github export-ignore
+/.evolution export-ignore
+/.zcode export-ignore
+/.idea export-ignore
+/.vscode export-ignore
+/.reasonix export-ignore
+/.mimosa export-ignore
+/.trae export-ignore
+/.autonomous-upgrade export-ignore
+/dist export-ignore
+/artifacts export-ignore
+/.gitignore export-ignore
+/.gitattributes export-ignore
+/.dockerignore export-ignore
+/vendor export-ignore
+/tests export-ignore
+/docs export-ignore
+/release-notes export-ignore
+/upgrade-report export-ignore
+/PROJECT_AUDIT_REPORT.md export-ignore
+/phpunit.xml export-ignore
+/.phpunit.result.cache export-ignore
+/official-service export-ignore
+/windows export-ignore
+
+# 升级后仍需可在服务器运行统一迁移器；其他维护脚本不进部署包。
+/tools/* export-ignore
+/tools/.htaccess -export-ignore
+/tools/migrate.php -export-ignore
+
+# 发行包只携带不含凭据的 config.php 模板，禁止本地实例资料混入。
+/.env export-ignore
+/.env.* export-ignore
+/docker/.env export-ignore
+/key.php export-ignore
+*.pem export-ignore
+*.key export-ignore
+*.log export-ignore
+*.tmp export-ignore
+*.bak export-ignore
+/data/log export-ignore
+/data/cache export-ignore
+/data/backups/* export-ignore
+/data/backups/.htaccess -export-ignore
+/data/backups/index.html -export-ignore
+/setup/install.lock export-ignore
+/setup/update_cache export-ignore
+/plugins/.rollback export-ignore
