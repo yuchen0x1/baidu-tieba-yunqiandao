@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-16",
+  "method": "Official GitHub repository pages and raw primary source files; previous metadata snapshot retained for five projects. Fresh GitHub REST metadata was rate limited during this run, so unverified recency fields are intentionally omitted.",
+  "projects": [
+    {"name":"MoeNetwork/Tieba-Cloud-Sign","url":"https://github.com/MoeNetwork/Tieba-Cloud-Sign","evidence":["https://github.com/MoeNetwork/Tieba-Cloud-Sign/blob/master/lib/class.cron.php"],"depth":"metadata-baseline-and-source"},
+    {"name":"kookxiang/Tieba_Sign","url":"https://github.com/kookxiang/Tieba_Sign","evidence":["https://github.com/kookxiang/Tieba_Sign/blob/reborn/index.php"],"depth":"source"},
+    {"name":"qd-today/qd","url":"https://github.com/qd-today/qd","evidence":["https://github.com/qd-today/qd/blob/master/worker.py"],"depth":"metadata-baseline-and-source"},
+    {"name":"whyour/qinglong","url":"https://github.com/whyour/qinglong","evidence":["https://github.com/whyour/qinglong/blob/develop/back/services/cron.ts","https://github.com/whyour/qinglong/blob/develop/src/pages/crontab/index.tsx"],"depth":"metadata-baseline-and-source"},
+    {"name":"jhuckaby/Cronicle","url":"https://github.com/jhuckaby/Cronicle","evidence":["https://github.com/jhuckaby/Cronicle/blob/master/lib/scheduler.js"],"depth":"metadata-baseline-and-source"},
+    {"name":"healthchecks/healthchecks","url":"https://github.com/healthchecks/healthchecks","evidence":["https://github.com/healthchecks/healthchecks/blob/master/hc/api/models.py"],"depth":"metadata-baseline-and-source"},
+    {"name":"symfony/lock","url":"https://github.com/symfony/lock","evidence":["https://github.com/symfony/lock/blob/7.3/Lock.php"],"depth":"source"},
+    {"name":"symfony/messenger","url":"https://github.com/symfony/messenger","evidence":["https://github.com/symfony/messenger/blob/7.3/Worker.php"],"depth":"source"},
+    {"name":"laravel/horizon","url":"https://github.com/laravel/horizon","evidence":["https://github.com/laravel/horizon/blob/5.x/src/Repositories/RedisSupervisorRepository.php"],"depth":"source"},
+    {"name":"gotify/server","url":"https://github.com/gotify/server","evidence":["https://github.com/gotify/server/blob/master/LICENSE","https://github.com/gotify/server/tree/master/server"],"depth":"source"},
+    {"name":"binwiederhier/ntfy","url":"https://github.com/binwiederhier/ntfy","evidence":["https://github.com/binwiederhier/ntfy/blob/main/server/server.go"],"depth":"source"},
+    {"name":"louislam/uptime-kuma","url":"https://github.com/louislam/uptime-kuma","evidence":["https://github.com/louislam/uptime-kuma/blob/master/server/model/monitor.js"],"depth":"source"},
+    {"name":"dgtlmoon/changedetection.io","url":"https://github.com/dgtlmoon/changedetection.io","evidence":["https://github.com/dgtlmoon/changedetection.io/blob/master/README.md"],"depth":"source"},
+    {"name":"n8n-io/n8n","url":"https://github.com/n8n-io/n8n","evidence":["https://github.com/n8n-io/n8n/blob/master/packages/cli/src/workflow-runner.ts"],"depth":"source"},
+    {"name":"huginn/huginn","url":"https://github.com/huginn/huginn","evidence":["https://github.com/huginn/huginn/blob/master/app/models/agent.rb"],"depth":"source"}
+  ],
+  "limitations":[
+    "GitHub REST metadata calls returned HTTP 403 rate limit during the supplemental pass.",
+    "No competitor code was copied or imported.",
+    "License and current branch state must be rechecked before any future code reuse."
+  ]
+}

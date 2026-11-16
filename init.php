@@ -100,6 +100,13 @@ if (!file_exists(SYSTEM_ROOT . '/setup/install.lock') && file_exists(SYSTEM_ROOT
 }
 
 header("content-type:text/html; charset=utf-8");
+if (!headers_sent()) {
+    // 默认安全响应头：不依赖 Web 服务器配置，API/健康检查等独立入口仍可各自覆盖。
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: SAMEORIGIN');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+    header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+}
 date_default_timezone_set('Asia/Shanghai');
 // 为 CSRF 令牌提供一次性随机种子（HttpOnly + SameSite=Lax）
 if (!SYSTEM_ISCONSOLE && empty($_COOKIE['tc_csrf']) && !headers_sent()) {

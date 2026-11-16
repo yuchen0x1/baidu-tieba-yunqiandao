@@ -37,4 +37,29 @@ final class CronHistoryTest extends TestCase
             $this->assertStringContainsString('LIMIT 100 OFFSET 0', $db->calls[1][0]);
         } finally { $GLOBALS['m'] = $previous; }
     }
+
+    public function testLatestRunBindsTaskName(): void
+    {
+        require_once SYSTEM_ROOT . '/lib/class.cron.php';
+        $previous = $GLOBALS['m'] ?? null;
+        $db = new class {
+            public $calls = array();
+            public function query($sql) { return true; }
+            public function pquery($sql, $params = array()) {
+                $this->calls[] = array($sql, $params);
+                return new ArrayIterator(array(array('name' => 'safe_task', 'status' => 'success')));
+            }
+            public function fetch_array($rs) {
+                if (!$rs->valid()) { return false; }
+                $row = $rs->current(); $rs->next(); return $row;
+            }
+        };
+        $GLOBALS['m'] = $db;
+        try {
+            $row = cron::latestRun("safe_task' OR 1=1 --");
+            $this->assertSame('safe_task', $row['name']);
+            $this->assertSame(array("safe_task' OR 1=1 --"), $db->calls[0][1]);
+            $this->assertStringNotContainsString("safe_task' OR 1=1", $db->calls[0][0]);
+        } finally { $GLOBALS['m'] = $previous; }
+    }
 }

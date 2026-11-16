@@ -29,16 +29,14 @@
 
 ## 最新更新
 
-### V7.7.0 · 2026-11-13
+### V7.8.0 · 2026-11-16
 
-- 统一提供通用 Web 部署包，取消单独的 Windows 分发与启动器。
-- 补齐历史版本说明，按可核实记录区分发布日期与开发批次；部署包只保留网页运行及升级所需文件。
-- 推送失败或渠道未启用时，不再误报已发送；失败提醒、日报和周报保留下一轮重试机会。
-- 帖子监控摘要只确认本次接受的记录，超过 30 条的后续批次继续保留。
-- 个人设置显示最近推送结果和时间，手机端表单改为纵向排布，兼容深色模式。
-- 通知测试使用页面表单提交；机器人回调地址加强公开地址校验，错误提示不回显响应体和密钥。
+- API 限流在并发请求下保持窗口计数一致；达到额度时返回 `429` 和 `Retry-After: 60`，存储不可用时明确返回 `503`。
+- 计划任务锁绑定租约所有者令牌，旧进程不能释放新进程的锁；长任务可调用续租接口，新增 `007600` 迁移。
+- Web 与健康检查入口默认发送浏览器安全响应头，任务运行历史查询改用参数绑定。
+- 补充项目审计、15 个开源项目对标和 54 项升级路线图；部署包排除维护报告与研究资料。
 
-[完整更新历史](docs/releases/release-notes.md) · [本版更新与升级说明](release-notes/v7.7.0.md)
+[完整更新历史](docs/releases/release-notes.md) · [本版更新与升级说明](release-notes/v7.8.0.md)
 
 ## ✨ 功能特性
 
@@ -130,7 +128,7 @@ php /var/www/do.php --pw=你的密码 --loop=60     # 自定义间隔（秒，�
 
 后台「计划任务」可为每项任务设置最大重试次数（0–20，0 表示不自动重试）。失败等待时间为 `cron_retry_backoff × 2^(重试序号−1)`，单次最多一天；耗尽重试后恢复正常周期。一次性任务保留执行后删除的既有语义。
 
-「运行到期任务」遵守启用与到期状态；单项「运行」或「重试」是管理员主动操作，可执行未到期/已禁用的任务，但仍需取得运行锁。运行锁依赖 `cron_lock_timeout`：应大于任务的实际最长耗时，超时接管不保证外部副作用只发生一次。
+「运行到期任务」遵守启用与到期状态；单项「运行」或「重试」是管理员主动操作，可执行未到期/已禁用的任务，但仍需取得运行锁。运行锁依赖 `cron_lock_timeout`：应大于任务的实际最长耗时；锁带有所有者令牌，旧进程不能释放新进程的租约，长任务可在安全边界调用 `cron::renewLock()`。超时接管仍不保证外部副作用只发生一次。
 
 计划任务管理写操作使用管理员会话、POST 和 CSRF 令牌；旧的 `setting.php?mod=admin:cron&run=...` 等 GET 写链接需改用页面表单。`do.php` 与开放 API 的既有入口保留。
 
@@ -202,7 +200,7 @@ php /var/www/do.php --pw=你的密码 --loop=60     # 自定义间隔（秒，�
 | `/api.php?action=webhook_test` | `GET` | 仅全局 | 测试 Webhook 推送 |
 | `/api.php?action=openapi` | `GET` | 任意 | 接口文档（由权限矩阵自动生成） |
 
-「任意」= 全局 Token 与用户 Token（仅本人数据）皆可。方法不符返回 405（`method_not_allowed`），权限不符返回 403（`forbidden_user_token` / `forbidden_global_token`）；错误统一为 `{"error": "...", "code": "稳定错误码", "api_version": "v1"}`。未启用返回 503，未知 action 返回 400。
+「任意」= 全局 Token 与用户 Token（仅本人数据）皆可。方法不符返回 405（`method_not_allowed`），权限不符返回 403（`forbidden_user_token` / `forbidden_global_token`）；错误统一为 `{"error": "...", "code": "稳定错误码", "api_version": "v1"}`。未启用返回 503，未知 action 返回 400；限流存储不可用返回 503（`rate_limit_unavailable`），达到额度返回 429 并附 `Retry-After: 60`。
 
 ```bash
 curl -H "Authorization: Bearer your-api-token" "http://127.0.0.1:8080/api.php?action=status"
@@ -228,6 +226,7 @@ composer gate        # 一键发布门禁，发布前必须全绿
 
 - 集成测试只在系统临时目录与自建 `tcs_it_*` 临时数据库工作（用 `TCS_IT_DB_HOST/PORT/USER/PASS` 指定连接），数据库不可达时自动跳过。
 - 本轮升级的调查、5 个开源项目对比、修改清单、验证范围及限制见 [`docs/reports/evolution-2026-11-13.md`](docs/reports/evolution-2026-11-13.md)。新增 [`tests/browser/cron-smoke.cjs`](tests/browser/cron-smoke.cjs) 可在含 `it_ui_probe` 本地探针的隔离站点上验收任务页；需自行准备 Playwright、Edge 与专用管理员，通过文件注释中的环境变量连接。截图来自测试夹具，见报告。
+- 2026-11-16 的项目审计、15 个开源项目对标、54 项 EV 路线图和本轮代码验证见 [`PROJECT_AUDIT.md`](PROJECT_AUDIT.md)、[`COMPETITOR_ANALYSIS.md`](COMPETITOR_ANALYSIS.md)、[`UPGRADE_ROADMAP.md`](UPGRADE_ROADMAP.md) 与 [`UPGRADE_REPORT.md`](UPGRADE_REPORT.md)。本轮新增 `007600` 计划任务租约迁移；真实 MariaDB 并发、Docker、多 PHP 版本和生产外部链路仍需单独验收。
 - SQL 备份显式声明 utf8mb4，避免导入工具默认字符集不同造成中文、emoji 或序列化配置失真；备份演练包括以 latin1 连接回放及逐表比对。
 - CI 在 PHP 8.2/8.4 上执行 Composer 校验、依赖审计、语法检查与 PHPUnit，在 MariaDB 11.4 服务容器上运行迁移、调度、API、备份恢复与通知集成链路，构建 Docker 镜像验证健康检查与应用路由，并对临时 tag 做通用 Web 包打包演练。
 - 工作流：`ci.yml`（质量门禁）、`release.yml`（`v*` tag 触发发布）、`build.yml`（多架构 Docker 镜像，未配置 Docker Hub 凭据时仅构建不推送）。

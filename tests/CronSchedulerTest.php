@@ -61,8 +61,8 @@ final class FakeCronDB
             // 获取锁
             $this->affected = $this->lockResult;
             if (strpos($sql, '`nextrun` <= ?') !== false) {
-                $row = $this->cronRows[$params[1]] ?? array();
-                if (!cron::isEnabled($row) || ((int) ($row['freq'] ?? 0) !== -1 && (int) ($row['nextrun'] ?? 0) > $params[3])) {
+                $row = $this->cronRows[$params[2]] ?? array();
+                if (!cron::isEnabled($row) || ((int) ($row['freq'] ?? 0) !== -1 && (int) ($row['nextrun'] ?? 0) > $params[4])) {
                     $this->affected = 0;
                 }
             }
@@ -164,6 +164,20 @@ final class CronSchedulerTest extends TestCase
     {
         $this->db->lockResult = 0;
         $this->assertFalse(cron::acquireLock('system_health_check'));
+    }
+
+    public function testLeaseReleaseAndRenewalAreOwnerBound(): void
+    {
+        $this->db->cronRows['task'] = array('name' => 'task', 'enable' => 1, 'freq' => 0, 'nextrun' => 0);
+        $this->assertTrue(cron::acquireLock('task'));
+        $this->assertTrue(cron::renewLock('task'));
+        $this->assertTrue(cron::releaseLock('task'));
+        $leaseCalls = array_values(array_filter($this->db->calls, static function ($call) {
+            return strpos($call['sql'], 'running_owner') !== false;
+        }));
+        $this->assertNotEmpty($leaseCalls);
+        $this->assertStringContainsString('AND `running_owner` = ?', end($leaseCalls)['sql']);
+        $this->assertNotSame('', (string) end($leaseCalls)['params'][1]);
     }
 
     public function testScheduledClaimRejectsNewlyRescheduledAndDisabledTask(): void

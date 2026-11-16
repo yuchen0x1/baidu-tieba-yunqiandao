@@ -18,6 +18,9 @@ class cron
     /** 任务级运行历史表名 */
     const TASK_RUNS_TABLE = 'task_runs';
 
+    /** 当前 PHP 进程持有的任务租约令牌。令牌避免过期进程误释放新进程的锁。 */
+    private static $lockOwners = array();
+
     /**
      * 获取计划任务所有数据
      * @param string $name 计划任务名称
@@ -54,7 +57,7 @@ class cron
         global $m;
 
         //列名来自固定白名单，值全部经 bind_param 参数化绑定
-        $allowed = array('file', 'no', 'enable', 'desc', 'freq', 'lastdo', 'nextrun', 'orde', 'log', 'retry', 'max_retry', 'last_status', 'last_duration', 'running', 'running_at');
+        $allowed = array('file', 'no', 'enable', 'desc', 'freq', 'lastdo', 'nextrun', 'orde', 'log', 'retry', 'max_retry', 'last_status', 'last_duration', 'running', 'running_at', 'running_owner');
         $cols = array('`name`');
         $ph = array('?');
         $params = array((string) $name);
@@ -259,13 +262,17 @@ class cron
     {
         global $m;
         self::ensureTables();
-        $name = $m->real_escape_string((string) $name);
-        return $m->once_fetch_array("SELECT * FROM `" . DB_PREFIX . self::TASK_RUNS_TABLE . "` WHERE `name` = '{$name}' ORDER BY `id` DESC LIMIT 1");
+        $rs = $m->pquery(
+            "SELECT * FROM `" . DB_PREFIX . self::TASK_RUNS_TABLE . "` WHERE `name` = ? ORDER BY `id` DESC LIMIT 1",
+            array(substr((string) $name, 0, 40))
+        );
+        return $rs ? $m->fetch_array($rs) : false;
     }
 
     /**
-     * 任务防重入锁（基于 cron 表 running/running_at，跨 Web/CLI 进程有效）。
-     * 超时时间由选项 cron_lock_timeout 控制，进程异常退出后锁会自动过期。
+     * 任务防重入锁（基于 cron 表 running/running_at/running_owner，跨 Web/CLI 进程有效）。
+     * 超时时间由选项 cron_lock_timeout 控制，进程异常退出后锁会自动过期；
+     * 过期接管后，旧所有者不能清理新所有者的租约。
      * @param string $name 任务名
      * @return bool 是否成功获取锁
      */
@@ -274,29 +281,66 @@ class cron
         global $m;
         $timeout = max(60, (int) option::get('cron_lock_timeout'));
         $now = time();
+        try {
+            $owner = bin2hex(random_bytes(24));
+        } catch (Throwable $e) {
+            $owner = hash('sha256', uniqid((string) mt_rand(), true) . microtime(true));
+        }
         // 到期判断必须与领取同一条 UPDATE，防止多个调度器使用过时的列表快照。
         $due = $scheduled ? " AND `no` <> 1 AND `enable` <> 0 AND (`freq` = '-1' OR `nextrun` <= ?)" : '';
-        $params = array($now, (string) $name, $now - $timeout);
+        $params = array($now, $owner, (string) $name, $now - $timeout);
         if ($scheduled) {
             $params[] = $now;
         }
         $ok = $m->pquery(
-            "UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "cron` SET `running` = 1, `running_at` = ? WHERE `name` = ? AND (`running` = 0 OR `running_at` < ?)" . $due,
+            "UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "cron` SET `running` = 1, `running_at` = ?, `running_owner` = ? WHERE `name` = ? AND (`running` = 0 OR `running_at` < ?)" . $due,
             $params
         );
         if (!$ok) {
             return false;
         }
-        return $m->affected_rows() === 1;
+        if ($m->affected_rows() !== 1) {
+            return false;
+        }
+        self::$lockOwners[(string) $name] = $owner;
+        return true;
     }
 
     /**
-     * 释放任务防重入锁。
+     * 续租任务防重入锁。长任务可在安全边界主动调用，避免正常执行超过 TTL 被接管。
+     */
+    public static function renewLock($name)
+    {
+        global $m;
+        $name = (string) $name;
+        $owner = isset(self::$lockOwners[$name]) ? (string) self::$lockOwners[$name] : '';
+        if ($owner === '') {
+            return false;
+        }
+        $ok = $m->pquery(
+            "UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "cron` SET `running_at` = ? WHERE `name` = ? AND `running` = 1 AND `running_owner` = ?",
+            array(time(), $name, $owner)
+        );
+        return $ok && $m->affected_rows() === 1;
+    }
+
+    /**
+     * 释放任务防重入锁。只允许当前进程的租约令牌释放，避免过期进程清掉新租约。
      */
     public static function releaseLock($name)
     {
         global $m;
-        $m->pquery("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "cron` SET `running` = 0, `running_at` = 0 WHERE `name` = ?", array((string) $name));
+        $name = (string) $name;
+        $owner = isset(self::$lockOwners[$name]) ? (string) self::$lockOwners[$name] : '';
+        if ($owner === '') {
+            return false;
+        }
+        $ok = $m->pquery(
+            "UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "cron` SET `running` = 0, `running_at` = 0, `running_owner` = '' WHERE `name` = ? AND `running` = 1 AND `running_owner` = ?",
+            array($name, $owner)
+        );
+        unset(self::$lockOwners[$name]);
+        return $ok && $m->affected_rows() === 1;
     }
 
     /**

@@ -190,7 +190,7 @@ jobs:
             $entryCount = $zip.Entries.Count
             if ($zip.Entries.Count -lt 50) { throw "发布包条目异常：$($zip.Entries.Count)" }
             $relativeEntries = @($zip.Entries | Where-Object { -not $_.FullName.EndsWith('/') } | ForEach-Object { ($_.FullName -split '/', 2)[1] })
-            $forbidden = '^((windows|tests|docs|release-notes|upgrade-report|official-service|vendor|\.github|\.evolution|\.zcode)/|tools/(?!migrate\.php$|\.htaccess$)|PROJECT_AUDIT_REPORT\.md$|phpunit\.xml$|\.env($|\.)|key\.php$)'
+            $forbidden = '^((windows|tests|docs|release-notes|upgrade-report|official-service|vendor|\.github|\.evolution|\.zcode)/|tools/(?!migrate\.php$|\.htaccess$)|((PROJECT_AUDIT_REPORT|PROJECT_AUDIT|COMPETITOR_ANALYSIS|UPGRADE_ROADMAP|UPGRADE_REPORT)\.md$)|phpunit\.xml$|\.env($|\.)|key\.php$)'
             if (@($relativeEntries | Where-Object { $_ -match $forbidden }).Count -gt 0) { throw 'Web package includes development files or local instance data' }
             foreach ($required in @('tools/migrate.php', 'data/backups/.htaccess', 'setup/install.template.sql', 'config.php')) {
               if ($required -notin $relativeEntries) { throw "Missing deployment file: $required" }

@@ -21,6 +21,7 @@ define('SYSTEM_NO_UI', true);
 define('SYSTEM_NO_CHECK_LOGIN', true);
 require dirname(__FILE__) . '/init.php';
 require_once SYSTEM_ROOT . '/lib/api-contract.php';
+require_once SYSTEM_ROOT . '/lib/api-rate-limit.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 
@@ -84,16 +85,13 @@ if ($rateLimit > 0) {
         PRIMARY KEY (`token_hash`, `window_start`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
     $window = (int) floor(time() / 60) * 60;
-    $rateRs = $m->pquery("SELECT `count` FROM `" . DB_PREFIX . "api_rate_limits` WHERE `token_hash` = ? AND `window_start` = ?", array($tokenHash, $window));
-    $rateRow = $rateRs ? $m->fetch_array($rateRs) : false;
-    $rateCount = !empty($rateRow) ? (int) $rateRow['count'] : 0;
-    if ($rateCount >= $rateLimit) {
-        api_error('rate_limited', '请求过于频繁，请稍后再试', 429, array('limit' => $rateLimit, 'window' => 60));
+    $allowed = api_rate_limit_consume($m, $tokenHash, $window, $rateLimit);
+    if ($allowed === null) {
+        api_error('rate_limit_unavailable', '限流存储暂时不可用，请稍后重试', 503);
     }
-    if ($rateCount === 0) {
-        $m->pquery("INSERT INTO `" . DB_PREFIX . "api_rate_limits` (`token_hash`, `window_start`, `count`) VALUES (?, ?, 1) ON DUPLICATE KEY UPDATE `count` = `count` + 1", array($tokenHash, $window));
-    } else {
-        $m->pquery("UPDATE `" . DB_PREFIX . "api_rate_limits` SET `count` = `count` + 1 WHERE `token_hash` = ? AND `window_start` = ?", array($tokenHash, $window));
+    if (!$allowed) {
+        header('Retry-After: 60');
+        api_error('rate_limited', '请求过于频繁，请稍后再试', 429, array('limit' => $rateLimit, 'window' => 60));
     }
 }
 

@@ -19,6 +19,10 @@
 /release-notes export-ignore
 /upgrade-report export-ignore
 /PROJECT_AUDIT_REPORT.md export-ignore
+/PROJECT_AUDIT.md export-ignore
+/COMPETITOR_ANALYSIS.md export-ignore
+/UPGRADE_ROADMAP.md export-ignore
+/UPGRADE_REPORT.md export-ignore
 /phpunit.xml export-ignore
 /.phpunit.result.cache export-ignore
 /official-service export-ignore

@@ -233,6 +233,17 @@ final class SecurityHardeningTest extends TestCase
         }
     }
 
+    public function testDefaultSecurityHeadersAreDeclaredAtWebEntrypoints(): void
+    {
+        $init = file_get_contents(dirname(__DIR__) . '/init.php');
+        $healthz = file_get_contents(dirname(__DIR__) . '/healthz.php');
+        $this->assertStringContainsString("X-Content-Type-Options: nosniff", $init);
+        $this->assertStringContainsString("X-Frame-Options: SAMEORIGIN", $init);
+        $this->assertStringContainsString("Referrer-Policy: strict-origin-when-cross-origin", $init);
+        $this->assertStringContainsString("X-Content-Type-Options: nosniff", $healthz);
+        $this->assertStringContainsString("Referrer-Policy: no-referrer", $healthz);
+    }
+
     public function testApiTokenMatchesBothHashedAndLegacyPlaintext(): void
     {
         $storedHash = api_token_storable('my-secret-token');

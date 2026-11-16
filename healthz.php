@@ -6,6 +6,8 @@ require_once SYSTEM_ROOT . '/lib/health.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store');
+header('X-Content-Type-Options: nosniff');
+header('Referrer-Policy: no-referrer');
 // 仅接受枚举值，杜绝任意输入传入探针
 $modeMap = array('live' => 'live', 'ready' => 'ready', 'deep' => 'deep');
 $mode = isset($_GET['mode']) && isset($modeMap[(string) $_GET['mode']]) ? $modeMap[(string) $_GET['mode']] : 'ready';
