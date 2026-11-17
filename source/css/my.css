@@ -30,3 +30,7 @@ small.text-muted {
   .personal-settings-form .cs-table td:first-child { padding-bottom: 6px; }
   .personal-settings-form .cs-table td + td { border-top: 0; padding-top: 6px; }
 }
+/* UI locale selector: only controls interface chrome, never user/content fields. */
+.locale-picker { display: inline-flex; align-items: center; }
+.locale-picker select { min-height: 30px; max-width: 150px; border: 1px solid var(--border-subtle, #d8dee9); border-radius: 6px; background: var(--surface, #fff); color: inherit; padding: 3px 6px; font: inherit; font-size: 12px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }

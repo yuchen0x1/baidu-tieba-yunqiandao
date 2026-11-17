@@ -5,39 +5,39 @@ if (!defined('SYSTEM_ROOT')) {
 global $i;
 
 $pageLabels = array(
-    'default' => '工作台',
-    'set' => '个人设置',
-    'baiduid' => '百度账号',
-    'showtb' => '贴吧与签到',
-    'account' => '账号中心',
-    'calendar' => '签到记录',
-    'signlogs' => '签到记录（日志）',
-    'analysis' => '签到数据分析',
-    'messages' => '贴吧消息中心',
-    'ranking' => '签到排行',
-    'achievements' => '成就勋章',
-    'admin:tools' => '工具箱',
-    'admin:set' => '设置中心',
-    'admin:users' => '用户管理',
-    'admin:invite' => '邀请码管理',
-    'admin:stat' => '统计信息',
-    'admin:sign' => '签到看板',
-    'admin:cron' => '计划任务',
-    'admin:totp' => '双因素认证',
-    'admin:update' => '系统更新',
-    'admin:plugins' => '插件管理',
-    'thanks' => '开源致谢',
-    'login' => '登录',
-    'reg' => '注册'
+    'default' => 'nav.dashboard',
+    'set' => 'nav.settings',
+    'baiduid' => 'nav.baidu_account',
+    'showtb' => 'nav.tieba_sign',
+    'account' => 'nav.account_center',
+    'calendar' => 'nav.calendar',
+    'signlogs' => 'nav.calendar',
+    'analysis' => 'nav.analysis',
+    'messages' => 'nav.messages',
+    'ranking' => 'nav.ranking',
+    'achievements' => 'nav.achievements',
+    'admin:tools' => 'nav.admin.tools',
+    'admin:set' => 'nav.admin.settings',
+    'admin:users' => 'nav.admin.users',
+    'admin:invite' => 'nav.admin.invite',
+    'admin:stat' => 'nav.admin.stat',
+    'admin:sign' => 'nav.admin.sign',
+    'admin:cron' => 'nav.admin.cron',
+    'admin:totp' => 'nav.admin.totp',
+    'admin:update' => 'nav.admin.update',
+    'admin:plugins' => 'nav.admin.plugins',
+    'thanks' => 'nav.thanks',
+    'login' => 'login.title',
+    'reg' => 'reg.title'
 );
 $currentPage = defined('SYSTEM_PAGE') ? SYSTEM_PAGE : 'default';
-$currentLabel = isset($pageLabels[$currentPage]) ? $pageLabels[$currentPage] : '控制台';
+$currentLabel = I18N::t(isset($pageLabels[$currentPage]) ? $pageLabels[$currentPage] : 'nav.dashboard');
 $isMember = defined('ROLE') && ROLE != 'visitor' && ROLE != 'banned';
 $userName = $isMember && defined('NAME') ? NAME : '访客';
 $userInitial = function_exists('mb_substr') ? mb_substr($userName, 0, 1, 'UTF-8') : substr($userName, 0, 1);
 ?>
 <div class="app-shell" id="app-shell">
-    <aside class="app-sidebar" id="app-sidebar" aria-label="主导航">
+    <aside class="app-sidebar" id="app-sidebar" aria-label="<?php echo htmlspecialchars(I18N::t('nav.dashboard'), ENT_QUOTES, 'UTF-8'); ?>">
         <a class="app-brand" href="index.php">
             <span class="brand-mark">云</span>
             <span class="brand-copy">
@@ -51,13 +51,13 @@ $userInitial = function_exists('mb_substr') ? mb_substr($userName, 0, 1, 'UTF-8'
             <div class="sidebar-label">Workspace</div>
             <nav class="sidebar-nav">
                 <ul>
-                    <li class="<?php checkIfActive('default'); ?>"><a href="index.php"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-home"/></svg><span>工作台</span></a></li>
-                    <li class="<?php checkIfActive('baiduid'); ?>"><a href="index.php?mod=baiduid"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-link"/></svg><span>百度账号</span></a></li>
-                    <li class="<?php checkIfActive('account'); ?>"><a href="index.php?mod=account"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-user"/></svg><span>账号中心</span></a></li>
-                    <li class="<?php checkIfActive('showtb'); ?>"><a href="index.php?mod=showtb"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-calendar-grid"/></svg><span>贴吧与签到</span></a></li>
-                    <li class="<?php checkIfActive('calendar'); checkIfActive('signlogs'); ?>"><a href="index.php?mod=calendar"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-calendar"/></svg><span>签到记录</span></a></li>
-                    <li class="<?php checkIfActive('analysis'); ?>"><a href="index.php?mod=analysis"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-pulse"/></svg><span>数据分析</span></a></li>
-                    <li class="<?php checkIfActive('messages'); ?>"><a href="index.php?mod=messages" id="nav-messages-link"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-mail"/></svg><span>消息中心</span><?php
+                    <li class="<?php checkIfActive('default'); ?>"><a href="index.php"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-home"/></svg><span><?php echo I18N::t('nav.dashboard'); ?></span></a></li>
+                    <li class="<?php checkIfActive('baiduid'); ?>"><a href="index.php?mod=baiduid"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-link"/></svg><span><?php echo I18N::t('nav.baidu_account'); ?></span></a></li>
+                    <li class="<?php checkIfActive('account'); ?>"><a href="index.php?mod=account"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-user"/></svg><span><?php echo I18N::t('nav.account_center'); ?></span></a></li>
+                    <li class="<?php checkIfActive('showtb'); ?>"><a href="index.php?mod=showtb"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-calendar-grid"/></svg><span><?php echo I18N::t('nav.tieba_sign'); ?></span></a></li>
+                    <li class="<?php checkIfActive('calendar'); checkIfActive('signlogs'); ?>"><a href="index.php?mod=calendar"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-calendar"/></svg><span><?php echo I18N::t('nav.calendar'); ?></span></a></li>
+                    <li class="<?php checkIfActive('analysis'); ?>"><a href="index.php?mod=analysis"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-pulse"/></svg><span><?php echo I18N::t('nav.analysis'); ?></span></a></li>
+                    <li class="<?php checkIfActive('messages'); ?>"><a href="index.php?mod=messages" id="nav-messages-link"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-mail"/></svg><span><?php echo I18N::t('nav.messages'); ?></span><?php
                         // 服务端渲染消息未读徽章
                         $messageUnread = 0;
                         if (file_exists(SYSTEM_ROOT . '/lib/class.MessageCenter.php') && defined('UID') && UID > 0) {
@@ -68,9 +68,9 @@ $userInitial = function_exists('mb_substr') ? mb_substr($userName, 0, 1, 'UTF-8'
                             echo '<span class="nav-badge nav-badge-show">' . ($messageUnread > 99 ? '99+' : (int) $messageUnread) . '</span>';
                         }
                     ?></a></li>
-                    <li class="<?php checkIfActive('ranking'); ?>"><a href="index.php?mod=ranking"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-trophy"/></svg><span>签到排行</span></a></li>
-                    <li class="<?php checkIfActive('achievements'); ?>"><a href="index.php?mod=achievements"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-award"/></svg><span>成就勋章</span></a></li>
-                    <li class="<?php checkIfActive('notices'); ?>"><a href="index.php?mod=notices" id="nav-notices-link"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-bell"/></svg><span>站内通知</span><?php
+                    <li class="<?php checkIfActive('ranking'); ?>"><a href="index.php?mod=ranking"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-trophy"/></svg><span><?php echo I18N::t('nav.ranking'); ?></span></a></li>
+                    <li class="<?php checkIfActive('achievements'); ?>"><a href="index.php?mod=achievements"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-award"/></svg><span><?php echo I18N::t('nav.achievements'); ?></span></a></li>
+                    <li class="<?php checkIfActive('notices'); ?>"><a href="index.php?mod=notices" id="nav-notices-link"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-bell"/></svg><span><?php echo I18N::t('nav.notices'); ?></span><?php
                         // 服务端渲染未读徽章
                         $noticeUnread = 0;
                         if (file_exists(SYSTEM_ROOT . '/lib/class.Notice.php') && defined('UID') && UID > 0) {
@@ -103,8 +103,8 @@ $userInitial = function_exists('mb_substr') ? mb_substr($userName, 0, 1, 'UTF-8'
             <div class="sidebar-label">Preferences</div>
             <nav class="sidebar-nav">
                 <ul>
-                    <li class="<?php checkIfActive('set'); ?>"><a href="index.php?mod=set"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-settings"/></svg><span>个人设置</span></a></li>
-                    <li class="<?php checkIfActive('thanks'); ?>"><a href="index.php?mod=thanks"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-heart"/></svg><span>开源致谢</span></a></li>
+                    <li class="<?php checkIfActive('set'); ?>"><a href="index.php?mod=set"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-settings"/></svg><span><?php echo I18N::t('nav.settings'); ?></span></a></li>
+                    <li class="<?php checkIfActive('thanks'); ?>"><a href="index.php?mod=thanks"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-heart"/></svg><span><?php echo I18N::t('nav.thanks'); ?></span></a></li>
                 </ul>
             </nav>
         </section>
@@ -114,14 +114,14 @@ $userInitial = function_exists('mb_substr') ? mb_substr($userName, 0, 1, 'UTF-8'
             <div class="sidebar-label">Operations</div>
             <nav class="sidebar-nav">
                 <ul>
-                    <li class="<?php checkIfActive('admin:stat'); ?>"><a href="index.php?mod=admin:stat"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-bar-chart"/></svg><span>统计信息</span></a></li>
-                    <li class="<?php checkIfActive('admin:sign'); ?>"><a href="index.php?mod=admin:sign"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-pulse"/></svg><span>签到看板</span></a></li>
-                    <li class="<?php checkIfActive('admin:users'); ?>"><a href="index.php?mod=admin:users"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-users"/></svg><span>用户管理</span></a></li>
-                    <li class="<?php checkIfActive('admin:invite'); ?>"><a href="index.php?mod=admin:invite"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-mail"/></svg><span>邀请码管理</span></a></li>
-                    <li class="<?php checkIfActive('admin:cron'); ?>"><a href="index.php?mod=admin:cron"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-clock"/></svg><span>计划任务</span></a></li>
-                    <li class="<?php checkIfActive('admin:totp'); ?>"><a href="index.php?mod=admin:totp"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-lock"/></svg><span>双因素认证</span></a></li>
-                    <li class="<?php checkIfActive('admin:tools'); ?>"><a href="index.php?mod=admin:tools"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-tool"/></svg><span>工具箱</span></a></li>
-                    <li class="<?php checkIfActive('admin:set'); ?>"><a href="index.php?mod=admin:set"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-settings-circle"/></svg><span>设置中心</span></a></li>
+                    <li class="<?php checkIfActive('admin:stat'); ?>"><a href="index.php?mod=admin:stat"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-bar-chart"/></svg><span><?php echo I18N::t('nav.admin.stat'); ?></span></a></li>
+                    <li class="<?php checkIfActive('admin:sign'); ?>"><a href="index.php?mod=admin:sign"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-pulse"/></svg><span><?php echo I18N::t('nav.admin.sign'); ?></span></a></li>
+                    <li class="<?php checkIfActive('admin:users'); ?>"><a href="index.php?mod=admin:users"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-users"/></svg><span><?php echo I18N::t('nav.admin.users'); ?></span></a></li>
+                    <li class="<?php checkIfActive('admin:invite'); ?>"><a href="index.php?mod=admin:invite"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-mail"/></svg><span><?php echo I18N::t('nav.admin.invite'); ?></span></a></li>
+                    <li class="<?php checkIfActive('admin:cron'); ?>"><a href="index.php?mod=admin:cron"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-clock"/></svg><span><?php echo I18N::t('nav.admin.cron'); ?></span></a></li>
+                    <li class="<?php checkIfActive('admin:totp'); ?>"><a href="index.php?mod=admin:totp"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-lock"/></svg><span><?php echo I18N::t('nav.admin.totp'); ?></span></a></li>
+                    <li class="<?php checkIfActive('admin:tools'); ?>"><a href="index.php?mod=admin:tools"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-tool"/></svg><span><?php echo I18N::t('nav.admin.tools'); ?></span></a></li>
+                    <li class="<?php checkIfActive('admin:set'); ?>"><a href="index.php?mod=admin:set"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-settings-circle"/></svg><span><?php echo I18N::t('nav.admin.settings'); ?></span></a></li>
                     <?php doAction('navi_2'); ?>
                 </ul>
             </nav>
@@ -133,9 +133,9 @@ $userInitial = function_exists('mb_substr') ? mb_substr($userName, 0, 1, 'UTF-8'
             <div class="sidebar-label">Extensions</div>
             <nav class="sidebar-nav">
                 <ul>
-                    <li class="<?php checkIfActive('admin:plugins'); ?>"><a href="index.php?mod=admin:plugins"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-grid"/></svg><span>插件管理</span></a></li>
-                    <li><a href="<?php echo htmlspecialchars(PROJECT_WIKI_URL, ENT_QUOTES, 'UTF-8'); ?>/%E8%B4%B4%E5%90%A7%E4%BA%91%E7%AD%BE%E5%88%B0%E6%8F%92%E4%BB%B6%E5%BA%93" target="_blank"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-download"/></svg><span>插件资源</span></a></li>
-                    <li class="<?php checkIfActive('admin:update'); ?>"><a href="index.php?mod=admin:update"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-refresh"/></svg><span>系统更新</span></a></li>
+                    <li class="<?php checkIfActive('admin:plugins'); ?>"><a href="index.php?mod=admin:plugins"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-grid"/></svg><span><?php echo I18N::t('nav.admin.plugins'); ?></span></a></li>
+                    <li><a href="<?php echo htmlspecialchars(PROJECT_WIKI_URL, ENT_QUOTES, 'UTF-8'); ?>/%E8%B4%B4%E5%90%A7%E4%BA%91%E7%AD%BE%E5%88%B0%E6%8F%92%E4%BB%B6%E5%BA%93" target="_blank"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-download"/></svg><span><?php echo I18N::t('nav.admin.plugins'); ?></span></a></li>
+                    <li class="<?php checkIfActive('admin:update'); ?>"><a href="index.php?mod=admin:update"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-refresh"/></svg><span><?php echo I18N::t('nav.admin.update'); ?></span></a></li>
                     <?php doAction('navi_3'); doAction('navi_4'); ?>
                 </ul>
             </nav>
@@ -146,8 +146,8 @@ $userInitial = function_exists('mb_substr') ? mb_substr($userName, 0, 1, 'UTF-8'
             <div class="sidebar-label">Get Started</div>
             <nav class="sidebar-nav">
                 <ul>
-                    <li class="<?php checkIfActive('login'); ?>"><a href="index.php?mod=login"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-log-in"/></svg><span>登录</span></a></li>
-                    <li class="<?php checkIfActive('reg'); ?>"><a href="index.php?mod=reg"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-user-plus"/></svg><span>注册</span></a></li>
+                    <li class="<?php checkIfActive('login'); ?>"><a href="index.php?mod=login"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-log-in"/></svg><span><?php echo I18N::t('login.title'); ?></span></a></li>
+                    <li class="<?php checkIfActive('reg'); ?>"><a href="index.php?mod=reg"><svg class="sidebar-icon" aria-hidden="true"><use href="#i-user-plus"/></svg><span><?php echo I18N::t('reg.title'); ?></span></a></li>
                     <?php doAction('navi_10'); doAction('navi_11'); ?>
                 </ul>
             </nav>
@@ -172,6 +172,7 @@ $userInitial = function_exists('mb_substr') ? mb_substr($userName, 0, 1, 'UTF-8'
                 </div>
             </div>
             <div class="topbar-right">
+                <label class="topbar-action locale-picker" title="<?php echo htmlspecialchars(I18N::t('language.label'), ENT_QUOTES, 'UTF-8'); ?>"><span class="sr-only"><?php echo htmlspecialchars(I18N::t('language.label'), ENT_QUOTES, 'UTF-8'); ?></span><select data-locale-select aria-label="<?php echo htmlspecialchars(I18N::t('language.label'), ENT_QUOTES, 'UTF-8'); ?>"><option value="auto" <?php echo I18N::setting() === 'auto' ? 'selected' : ''; ?>><?php echo I18N::t('language.auto'); ?></option><option value="zh-CN" <?php echo I18N::setting() === 'zh-CN' ? 'selected' : ''; ?>><?php echo I18N::t('language.zh'); ?></option><option value="en-US" <?php echo I18N::setting() === 'en-US' ? 'selected' : ''; ?>><?php echo I18N::t('language.en'); ?></option></select></label>
                 <button type="button" class="topbar-action topbar-theme-toggle" data-theme-toggle aria-label="切换深色模式" title="切换深色模式"><svg class="icon-inline icon-sun" aria-hidden="true"><use href="#i-sun"/></svg><svg class="icon-inline icon-moon" aria-hidden="true"><use href="#i-moon"/></svg><span class="action-text">主题</span></button>
                 <?php if (defined('CON_UID')) { ?>
                     <a class="topbar-action" href="index.php?mod=usercontrolback" title="返回 <?php echo htmlspecialchars(CON_NAME, ENT_QUOTES, 'UTF-8'); ?>"><svg class="icon-inline" aria-hidden="true"><use href="#i-back"/></svg><span class="action-text">返回 <?php echo htmlspecialchars(CON_NAME, ENT_QUOTES, 'UTF-8'); ?></span></a>

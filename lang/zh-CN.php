@@ -32,6 +32,7 @@ return array(
     'nav.account_center' => '账号中心',
     'nav.tieba_sign'     => '贴吧与签到',
     'nav.calendar'       => '签到日历',
+    'nav.analysis'       => '数据分析',
     'nav.settings'       => '个人设置',
     'nav.thanks'         => '开源致谢',
     'nav.admin.tools'    => '工具箱',
@@ -44,6 +45,10 @@ return array(
     'nav.admin.totp'     => '双因素认证',
     'nav.admin.plugins'  => '插件管理',
     'nav.admin.update'   => '系统更新',
+    'nav.messages'        => '消息中心',
+    'nav.ranking'        => '签到排行',
+    'nav.achievements'   => '成就勋章',
+    'nav.notices'        => '站内通知',
 
     // 登录 / 注册
     'login.title'        => '登录',
@@ -85,4 +90,10 @@ return array(
     'totp.disabled'      => '未开启',
     'totp.verify_code'   => '6 位验证码',
     'totp.verify_submit' => '验证并登录',
+
+    'language.label'     => '界面语言',
+    'language.auto'      => '自动（浏览器/系统）',
+    'language.zh'        => '简体中文',
+    'language.en'        => 'English',
+    'language.hint'      => '自动模式跟随浏览器语言，无法识别时回退到中文。',
 );

@@ -40,6 +40,17 @@ $hasApiTokenHero = !empty($tokenRow0['api_token_hash']);
     <div class="table-responsive">
     <table class="cs-table">
         <tbody>
+        <tr>
+            <td><?php echo I18N::t('language.label'); ?><br/><small><?php echo I18N::t('language.hint'); ?></small></td>
+            <td>
+                <?php $savedLocale = option::uget('i18n_lang'); $savedLocale = in_array($savedLocale, array('zh-CN', 'en-US'), true) ? $savedLocale : 'auto'; ?>
+                <select name="i18n_lang" class="form-control" style="max-width:240px">
+                    <option value="auto" <?php echo $savedLocale === 'auto' ? 'selected' : ''; ?>><?php echo I18N::t('language.auto'); ?></option>
+                    <option value="zh-CN" <?php echo $savedLocale === 'zh-CN' ? 'selected' : ''; ?>><?php echo I18N::t('language.zh'); ?></option>
+                    <option value="en-US" <?php echo $savedLocale === 'en-US' ? 'selected' : ''; ?>><?php echo I18N::t('language.en'); ?></option>
+                </select>
+            </td>
+        </tr>
         <?php doAction('set_3'); ?>
         <tr>
             <td>头像设置<br/>使用Gravatar头像或贴吧头像</td>

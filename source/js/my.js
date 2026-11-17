@@ -32,6 +32,20 @@
         }
     });
 
+    document.addEventListener('change', function (event) {
+        var select = closest(event.target, '[data-locale-select]');
+        if (!select) {
+            return;
+        }
+        var value = select.value === 'zh-CN' || select.value === 'en-US' ? select.value : 'auto';
+        try {
+            document.cookie = 'tc_locale=' + encodeURIComponent(value) + '; path=/; max-age=31536000; samesite=lax';
+        } catch (e) {
+            // Private browsing may reject cookies; the current page can still continue.
+        }
+        window.location.reload();
+    });
+
     document.addEventListener('keydown', function (event) {
         if (event.key === 'Escape') {
             toggleSidebar(false);

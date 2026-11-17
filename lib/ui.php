@@ -17,7 +17,7 @@ function loadhead($title = '')
     $pageHeading = empty($title) ? '' : strip_tags($title);
     $title = empty($title) ? strip_tags(SYSTEM_NAME) : $title . ' - ' . strip_tags(SYSTEM_NAME);
     doAction('top');
-    echo '<!DOCTYPE html><html lang="zh-CN"><head>';
+    echo '<!DOCTYPE html><html lang="' . htmlspecialchars(I18N::lang(), ENT_QUOTES, 'UTF-8') . '"><head>';
     echo '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />';
     echo '<meta http-equiv="charset" content="utf-8">';
     echo '<meta name="viewport" content="width=device-width, initial-scale=1.0">';

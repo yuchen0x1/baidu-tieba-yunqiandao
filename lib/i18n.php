@@ -18,6 +18,75 @@ class I18N
 {
     private static $dict = null;
     private static $lang = null;
+    private static $setting = null;
+
+    /** Supported UI locales. User content and notification payloads are not translated here. */
+    public static function locales()
+    {
+        return array('zh-CN', 'en-US');
+    }
+
+    /**
+     * User preference: auto follows the browser/server language; explicit values pin a catalog.
+     */
+    public static function setting()
+    {
+        if (self::$setting !== null) {
+            return self::$setting;
+        }
+        $value = '';
+        if (isset($_COOKIE['tc_locale']) && is_string($_COOKIE['tc_locale'])) {
+            $value = trim($_COOKIE['tc_locale']);
+        }
+        // Per-user setting wins over the browser cookie after login.
+        if (class_exists('option', false) && defined('UID') && (int) UID > 0 && method_exists('option', 'uget')) {
+            $userValue = (string) option::uget('i18n_lang');
+            if ($userValue !== '') {
+                $value = $userValue;
+            }
+        }
+        if ($value === '' && class_exists('option', false)) {
+            $globalValue = (string) option::get('i18n_lang');
+            if ($globalValue !== '') {
+                $value = $globalValue;
+            }
+        }
+        if ($value !== 'zh-CN' && $value !== 'en-US') {
+            $value = 'auto';
+        }
+        self::$setting = $value;
+        return $value;
+    }
+
+    /** Resolve auto from the browser/server preference without using IP geolocation. */
+    public static function resolve($setting = null, $candidates = null)
+    {
+        $setting = $setting === null ? self::setting() : (string) $setting;
+        if ($setting === 'zh-CN' || $setting === 'en-US') {
+            return $setting;
+        }
+        if (!is_array($candidates)) {
+            $candidates = array();
+            if (!empty($_SERVER['HTTP_ACCEPT_LANGUAGE'])) {
+                foreach (explode(',', (string) $_SERVER['HTTP_ACCEPT_LANGUAGE']) as $candidate) {
+                    $candidate = trim((string) preg_replace('/;.*$/', '', $candidate));
+                    if ($candidate !== '') {
+                        $candidates[] = $candidate;
+                    }
+                }
+            }
+        }
+        foreach ($candidates as $candidate) {
+            $candidate = strtolower((string) $candidate);
+            if ($candidate === 'en' || strpos($candidate, 'en-') === 0) {
+                return 'en-US';
+            }
+            if ($candidate === 'zh' || strpos($candidate, 'zh-') === 0) {
+                return 'zh-CN';
+            }
+        }
+        return 'zh-CN';
+    }
 
     /**
      * 当前语言代码（安全白名单：仅字母数字下划线连字符）
@@ -27,15 +96,15 @@ class I18N
         if (self::$lang !== null) {
             return self::$lang;
         }
-        $lang = 'zh-CN';
-        if (class_exists('option', false)) {
+        $setting = self::setting();
+        if ($setting === 'auto' && class_exists('option', false)) {
             $opt = (string) option::get('i18n_lang');
-            if ($opt !== '' && preg_match('/^[A-Za-z0-9_\-]+$/', $opt)) {
-                $lang = $opt;
+            if ($opt === 'zh-CN' || $opt === 'en-US') {
+                $setting = $opt;
             }
         }
-        self::$lang = $lang;
-        return $lang;
+        self::$lang = self::resolve($setting);
+        return self::$lang;
     }
 
     /**
@@ -75,7 +144,14 @@ class I18N
     public static function t($key, $params = array())
     {
         $dict = self::dict();
-        $text = isset($dict[$key]) ? (string) $dict[$key] : (string) $key;
+        if (isset($dict[$key])) {
+            $text = (string) $dict[$key];
+        } elseif (self::lang() !== 'zh-CN') {
+            $fallback = self::load('zh-CN');
+            $text = isset($fallback[$key]) ? (string) $fallback[$key] : (string) $key;
+        } else {
+            $text = (string) $key;
+        }
         if ($params) {
             foreach ($params as $k => $v) {
                 $text = str_replace('{' . $k . '}', (string) $v, $text);

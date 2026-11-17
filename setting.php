@@ -1061,6 +1061,7 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
         为了兼容旧版本，可以global以后检查一下是不是空变量，为空则为旧版本
         */
         $PostArray = array(
+            'i18n_lang',
             'face_img',
             'face_baiduid',
             'face_url',
@@ -1119,6 +1120,12 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
         if ($signDelay > 60) { $signDelay = 60; }
         $_POST['sign_delay_minutes'] = (string) $signDelay;
         $i['post']['sign_delay_minutes'] = (string) $signDelay;
+        $localeSetting = isset($_POST['i18n_lang']) ? (string) $_POST['i18n_lang'] : 'auto';
+        if (!in_array($localeSetting, array('auto', 'zh-CN', 'en-US'), true)) {
+            $localeSetting = 'auto';
+        }
+        $_POST['i18n_lang'] = $localeSetting;
+        $i['post']['i18n_lang'] = $localeSetting;
         doAction('set_save1');
     //更改邮箱
         if ($_POST['mail'] != $i['user']['email'] && !empty($_POST['mail'])) {
