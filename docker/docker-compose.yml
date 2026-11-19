@@ -45,7 +45,7 @@ services:
       start_period: 10s
 
   db:
-    image: mariadb:11.4
+    image: mariadb:13.0
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: ${DB_NAME:-tiebacloud}
