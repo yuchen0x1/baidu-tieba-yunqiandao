@@ -31,15 +31,15 @@
 
 <!-- github-release:start -->
 
-**[v7.8.1](https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/tag/v7.8.1)** · 2026-11-17
+**[v7.8.2](https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/tag/v7.8.2)** · 2026-11-18
 
-v7.8.1 是 PHP 网页管理台的多语言维护版本。本次新增英文界面语言包、自动语言检测与用户语言偏好；核心界面即时切换，贴吧内容、账号数据和接口字段保持原样。
+升级前会保存数据库备份，备份失败时停止迁移。Docker Compose 使用卷保留站点配置、安装锁与 data 目录。正式 Web 部署包附 GitHub Release 证明，可独立核验来源。
 
 [全部发行记录](https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases)
 
 <!-- github-release:end -->
 
-[完整更新日志](docs/releases/release-notes.md)
+[完整更新日志](docs/releases/release-notes.md) · [平台与兼容性](docs/PLATFORMS.md) · [升级与恢复](docs/AUTO_UPDATE.md) · [参与开发](CONTRIBUTING.md)
 
 ## ✨ 功能特性
 
@@ -232,7 +232,7 @@ composer gate        # 一键发布门禁，发布前必须全绿
 - 2026-11-16 的项目审计、15 个开源项目对标、54 项 EV 路线图和本轮代码验证见 [`PROJECT_AUDIT.md`](PROJECT_AUDIT.md)、[`COMPETITOR_ANALYSIS.md`](COMPETITOR_ANALYSIS.md)、[`UPGRADE_ROADMAP.md`](UPGRADE_ROADMAP.md) 与 [`UPGRADE_REPORT.md`](UPGRADE_REPORT.md)。本轮新增 `007600` 计划任务租约迁移；真实 MariaDB 并发、Docker、多 PHP 版本和生产外部链路仍需单独验收。
 - SQL 备份显式声明 utf8mb4，避免导入工具默认字符集不同造成中文、emoji 或序列化配置失真；备份演练包括以 latin1 连接回放及逐表比对。
 - CI 在 PHP 8.2/8.4 上执行 Composer 校验、依赖审计、语法检查与 PHPUnit，在 MariaDB 11.4 服务容器上运行迁移、调度、API、备份恢复与通知集成链路，构建 Docker 镜像验证健康检查与应用路由，并对临时 tag 做通用 Web 包打包演练。
-- 工作流：`ci.yml`（质量门禁）、`release.yml`（`v*` tag 触发发布）、`build.yml`（多架构 Docker 镜像，未配置 Docker Hub 凭据时仅构建不推送）。
+- 工作流：`ci.yml`（质量门禁）、`release.yml`（`v*` tag 触发发布）、`build.yml`（多架构 Docker 构建；Docker Hub 推送须显式启用并匹配已正式发布的源码）。
 - 分支约定：产品更新只合并到 `main`；Release 标签必须指向 `main` 已包含的提交，避免从临时分支发布漂移版本。
 
 **项目结构**

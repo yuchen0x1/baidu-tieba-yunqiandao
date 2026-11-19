@@ -741,9 +741,38 @@ class ProjectUpdater
         if (!is_dir(UPDATE_CACHE) && !mkdir(UPDATE_CACHE, 0777, true) && !is_dir(UPDATE_CACHE)) {
             throw new RuntimeException('无法创建更新缓存目录');
         }
+        $lock = fopen(rtrim(UPDATE_CACHE, '/\\') . '/install-release.lock', 'c');
+        if ($lock === false) {
+            throw new RuntimeException('无法打开更新锁');
+        }
+        try {
+            if (!flock($lock, LOCK_EX | LOCK_NB)) {
+                throw new RuntimeException('另一个更新正在运行，请稍后检查版本');
+            }
+            if (version_compare(self::readPackagedVersion(SYSTEM_ROOT), $release['version'], '>=')) {
+                throw new RuntimeException('站点文件已是当前或更高版本，请重新检查');
+            }
+            return self::installVerifiedRelease($release);
+        } finally {
+            fclose($lock);
+        }
+    }
+
+    private static function readPackagedVersion($root)
+    {
+        $source = @file_get_contents($root . '/version.php', false, null, 0, 65536);
+        if ($source === false || !preg_match("/define\\('SYSTEM_VER', '([0-9]+(?:\\.[0-9]+){1,3})'\\)/", $source, $matches)) {
+            throw new RuntimeException('无法识别部署包版本');
+        }
+        return $matches[1];
+    }
+
+    private static function installVerifiedRelease(array $release)
+    {
         self::writeUpdateStatus('starting', 0, 0, '正在准备更新');
         $backupPath = '';
         $backupFiles = array();
+        $writing = false;
         try {
             $suffix = bin2hex(random_bytes(8));
         } catch (Throwable $e) {
@@ -811,6 +840,14 @@ class ProjectUpdater
             if ($root === false) {
                 throw new RuntimeException('更新包目录结构无效');
             }
+            foreach (array('index.php', 'init.php', 'upgrade.php') as $entry) {
+                if (!is_file($root . '/' . $entry)) {
+                    throw new RuntimeException('部署包缺少核心入口文件');
+                }
+            }
+            if (self::readPackagedVersion($root) !== $release['version']) {
+                throw new RuntimeException('部署包内的版本号与 Release 不一致');
+            }
             $backupPath = self::createApplicationBackup();
             $backupFiles = self::listArchiveFiles($backupPath);
             foreach (array('config.php', 'key.php', 'app.conf', 'config.yaml', '.env', 'docker/.env', 'setup/install.lock') as $relative) {
@@ -821,20 +858,24 @@ class ProjectUpdater
             }
             $packageFiles = self::collectRelativeFiles($root);
             self::writeUpdateStatus('installing', 0, 0, '正在覆盖应用文件');
+            $writing = true;
             if (!function_exists('CopyAll') || CopyAll($root, SYSTEM_ROOT) !== true) {
                 throw new RuntimeException('无法写入更新文件，已尝试恢复旧版本');
             }
             self::writeUpdateStatus('completed', 1, 1, '文件更新完成，等待数据库迁移');
             return true;
         } catch (Throwable $e) {
-            if ($backupPath !== '') {
+            if ($writing) {
                 try {
                     self::removeNewPackageFiles($packageFiles ?? array(), $backupFiles);
                     self::restoreApplicationBackup($backupPath);
                     self::writeUpdateStatus('rolled_back', 0, 0, '更新失败，已恢复旧版本');
                 } catch (Throwable $rollbackError) {
-                    throw new RuntimeException($e->getMessage() . '；自动回滚失败：' . $rollbackError->getMessage(), 0, $e);
+                    $message = $e->getMessage() . '；自动回滚失败：' . $rollbackError->getMessage();
+                    self::writeUpdateStatus('failed', 0, 0, $message);
+                    throw new RuntimeException($message, 0, $e);
                 }
+                throw $e;
             }
             self::writeUpdateStatus('failed', 0, 0, '更新失败：' . $e->getMessage());
             throw $e;

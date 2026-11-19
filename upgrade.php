@@ -19,7 +19,8 @@ if (empty($_COOKIE['uid']) || empty($_COOKIE['pwd'])) {
 }
 define('SYSTEM_DEV', true);
 define('SYSTEM_NO_CHECK_VER', true);
-require dirname(__FILE__) . '/init.php';
+require __DIR__ . '/init.php';
+require __DIR__ . '/lib/upgrade-backup.php';
 if (ROLE != 'admin') {
     msg('您需要先登录云签到管理员账号，才能继续升级', 'index.php');
 }
@@ -40,41 +41,6 @@ function upgrade_page_head($dbVersion)
 function upgrade_page_foot()
 {
     echo '</body></html>';
-}
-
-/** 升级前自动备份（尽力而为）：与前缀定时备份同一 dataBak 通道，独立于定时任务开关 */
-function upgrade_auto_backup()
-{
-    global $m;
-    $dir = SYSTEM_ROOT . '/data/backups';
-    if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
-        return '创建备份目录失败，已跳过自动备份';
-    }
-    $tables = array();
-    $rs = $m->query("SHOW TABLES FROM `" . DB_NAME . "` LIKE '" . str_replace('_', '\\_', DB_PREFIX) . "%'");
-    while ($row = $m->fetch_row($rs)) {
-        $tables[] = $row[0];
-    }
-    if (empty($tables)) {
-        return '未找到数据表，已跳过自动备份';
-    }
-    $dump = '#Tieba-Cloud-Sign Pre-Upgrade Backup' . "\n#Version:" . SYSTEM_VER . "\n#Date:" . date('Y-m-d H:i:s') . "\n";
-    foreach ($tables as $table) {
-        $dump .= dataBak($table);
-    }
-    $file = $dir . '/pre-upgrade_' . date('Y-m-d_His') . '.sql';
-    if (file_put_contents($file, $dump) === false) {
-        return '备份写入失败，已跳过自动备份';
-    }
-    //自动备份额外保留最近 3 份，不占用定时备份的保留额度
-    $files = glob($dir . '/pre-upgrade_*.sql');
-    if (is_array($files) && count($files) > 3) {
-        sort($files);
-        foreach (array_slice($files, 0, count($files) - 3) as $old) {
-            @unlink($old);
-        }
-    }
-    return '已自动备份：' . basename($file) . '（' . count($tables) . ' 张表，' . round(strlen($dump) / 1024, 1) . ' KB）';
 }
 
 /**
@@ -130,10 +96,6 @@ if (!$isRun) {
 csrf(true, true);
 echo '<div class="alert alert-info">正在升级，请勿关闭页面……</div><pre>';
 flush();
-$backupMsg = upgrade_auto_backup();
-echo htmlspecialchars($backupMsg, ENT_QUOTES, 'UTF-8') . PHP_EOL;
-@ob_flush();
-flush();
 try {
     Migrator::runUp(function ($message) {
         echo htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . PHP_EOL;
@@ -141,6 +103,8 @@ try {
             @ob_flush();
         }
         flush();
+    }, null, static function () {
+        echo htmlspecialchars(upgrade_auto_backup(), ENT_QUOTES, 'UTF-8') . PHP_EOL;
     });
     if (function_exists('opcache_reset')) {
         @opcache_reset(); //迁移结束即重置字节码缓存，后续请求全部加载新代码
@@ -151,6 +115,6 @@ try {
         . '<span class="text-muted">' . htmlspecialchars(upgrade_loop_reload_note(), ENT_QUOTES, 'UTF-8') . '</span></div>';
     echo '<script>setTimeout(function(){location.href="index.php";},3000);</script>';
 } catch (Throwable $e) {
-    echo '</pre><div class="alert alert-danger">升级失败：' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8') . '<br/>失败状态已记录到 schema_migrations，修复问题后刷新本页可继续；也可以在服务器上运行 <code>php tools/migrate.php up</code>。</div>';
+    echo '</pre><div class="alert alert-danger">升级失败：' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8') . '<br/>请确认备份可用，修复错误原因后重新提交。备份失败时数据库迁移会暂停。</div>';
 }
 upgrade_page_foot();

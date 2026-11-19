@@ -258,6 +258,24 @@ final class MigratorTest extends TestCase
         $this->assertSame('7.0', $this->db->options['core_version']);
     }
 
+    public function testBackupFailureLeavesDatabaseVersionUnchangedAndReleasesLock(): void
+    {
+        $this->writeMigration('002000', "    'up' => function (\$m, \$prefix) { },");
+        $previousVersion = $this->db->options['core_version'];
+        try {
+            Migrator::runUp(null, $this->migrationDir, function () {
+                $this->assertTrue($this->db->lockHeld);
+                throw new RuntimeException('backup failed');
+            });
+            $this->fail('Expected the backup failure to stop migration');
+        } catch (RuntimeException $error) {
+            $this->assertSame('backup failed', $error->getMessage());
+        }
+        $this->assertSame($previousVersion, $this->db->options['core_version']);
+        $this->assertSame(array(), $this->db->migrationRows);
+        $this->assertFalse($this->db->lockHeld);
+    }
+
     public function testLegacyRowIsTreatedAsAppliedWithoutRerunning(): void
     {
         $marker = $this->migrationDir . '/marker.txt';

@@ -110,6 +110,11 @@ define('SYSTEM_DO_NOT_LOGIN', true);
 require dirname(__DIR__) . '/init.php';
 require_once dirname(__DIR__) . '/lib/cron_system_dbbackup.php';
 while (ob_get_level() > 0) { @ob_end_clean(); }
+if (basename(__FILE__) === 'it_upgrade_backup.php') {
+    require dirname(__DIR__) . '/lib/upgrade-backup.php';
+    echo upgrade_auto_backup();
+    exit;
+}
 option::set('db_backup_enable', '1');
 option::set('db_backup_keep', '3');
 echo json_encode(array('result' => cron_system_dbbackup()), JSON_UNESCAPED_UNICODE);
@@ -127,10 +132,24 @@ PHP;
     $dump = file_get_contents($backupFiles[0]);
     check('备份包含建表与数据语句', $dump !== false && strpos($dump, 'CREATE TABLE') !== false && strpos($dump, 'INSERT INTO') !== false);
 
+    $conn->query('CREATE TABLE tbkOtherSite (id INT PRIMARY KEY)');
+    file_put_contents($workRoot . '/tools/it_upgrade_backup.php', $runner);
+    list($code, $output) = it_run_php($workRoot . '/tools/it_upgrade_backup.php');
+    $upgradeFiles = glob($workRoot . '/data/backups/pre-upgrade_*.sql');
+    $upgradeDump = count($upgradeFiles) === 1 ? file_get_contents($upgradeFiles[0]) : false;
+    check('升级备份完整落盘且排除其他实例表', $code === 0 && is_string($upgradeDump)
+        && strpos($upgradeDump, 'CREATE TABLE `tbk_users`') !== false
+        && strpos($upgradeDump, 'tbkOtherSite') === false);
+    if (!is_string($upgradeDump)) {
+        echo '诊断[upgrade-backup] ' . substr($output, 0, 280) . "\n";
+    }
+    $conn->query('DROP TABLE tbkOtherSite');
+
     // ---------- 恢复到全新空库 ----------
     $conn->query("CREATE DATABASE `{$dbRestore}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
     $conn->set_charset('latin1'); // 模拟导入工具使用不同默认连接编码。
     check('备份可完整重放恢复', it_import_sql($conn, $dbRestore, $dump, ''));
+    check('升级备份可完整重放恢复', is_string($upgradeDump) && it_import_sql($conn, $dbRestore, $upgradeDump, ''));
     $conn->set_charset('utf8mb4');
 
     // ---------- 逐表指纹比对 ----------

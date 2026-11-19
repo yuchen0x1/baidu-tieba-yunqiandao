@@ -62,7 +62,7 @@ try {
     $manifest = Join-Path $outputRoot ("tieba-cloud-sign-update-{0}.json" -f $Tag)
     $signature = "$package.sig"
     # 旧标签可能仍含已停用的启动器；Web 发布包一律排除这些文件。
-    & git archive --worktree-attributes --format=zip --prefix="$Repository-$Tag/" --output="$package" "$Tag" -- . ':(exclude)windows' ':(exclude)windows/**'
+    & git archive --format=zip --prefix="$Repository-$Tag/" --output="$package" "$Tag" -- . ':(exclude)windows' ':(exclude)windows/**'
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $package)) {
         throw "Failed to create GitHub release package."
     }
@@ -93,10 +93,13 @@ try {
         channel = 'stable'
         releaseDate = [DateTime]::UtcNow.ToString('o')
         mandatory = $false
-        minSupportedVersion = $normalizedVersion
-        releaseNotes = "GitHub Release $Tag"
+        releaseNotes = "https://github.com/$githubRepository/releases/tag/$Tag"
         assets = @([ordered]@{
             name = [IO.Path]::GetFileName($package)
+            platform = 'web'
+            architecture = 'any'
+            minPhpVersion = '8.2'
+            url = "https://github.com/$githubRepository/releases/download/$Tag/$([IO.Path]::GetFileName($package))"
             sha256 = $hash
             size = (Get-Item -LiteralPath $package).Length
         })
@@ -121,20 +124,29 @@ try {
     }
     Invoke-Gh -Arguments @('auth', 'status', '--hostname', 'github.com') | Out-Null
 
-    $releaseListJson = Invoke-Gh -Arguments @('release', 'list', '--repo', $githubRepository, '--limit', '1000', '--json', 'tagName,publishedAt')
-    $releases = @($releaseListJson -join "`n" | ConvertFrom-Json)
-    $existingRelease = @($releases | Where-Object { [string]$_.tagName -eq $Tag }).Count -gt 0
+    $remoteTag = @(& git ls-remote --tags "https://github.com/$githubRepository.git" "refs/tags/$Tag" "refs/tags/$Tag^{}")
+    if ($LASTEXITCODE -ne 0 -or $remoteTag.Count -eq 0) {
+        throw "Unable to verify that $Tag exists on GitHub."
+    }
+    $tagRef = $remoteTag[-1] -split '\s+', 2
+    $localCommit = & git rev-parse "$Tag^{commit}"
+    if ($tagRef[0] -ne $localCommit) {
+        throw "GitHub tag $Tag points to a different commit."
+    }
+    $tagVersion = & git show "${Tag}:version.php"
+    if ($LASTEXITCODE -ne 0 -or $Tag -cnotmatch '^v\d+\.\d+\.\d+$' -or ($tagVersion -join "`n") -notmatch "define\('SYSTEM_VER', '$([regex]::Escape($normalizedVersion))'\)") {
+        throw "Release tag must match SYSTEM_VER in the tagged source."
+    }
 
     $description = "Publish GitHub Release $Tag for $githubRepository"
     if ($PSCmdlet.ShouldProcess($githubRepository, $description)) {
-        if ($existingRelease) {
-            $uploadArgs = @('release', 'upload', $Tag, $package, $checksum, $manifest, '--repo', $githubRepository, '--clobber')
-            if ($signatureMetadata) { $uploadArgs = @('release', 'upload', $Tag, $package, $checksum, $manifest, $signature, '--repo', $githubRepository, '--clobber') }
-            Invoke-Gh -Arguments $uploadArgs | Out-Null
-        } else {
+        # The draft stays private until GitHub confirms every uploaded asset.
+        $assets = @($package, $checksum, $manifest)
+        if ($signatureMetadata) { $assets += $signature }
             # 标题取发布说明首个一级标题并从正文剔除，避免 Release 页标题与目录重复；
             # 说明文件未带一级标题时回退为通用标题。
             $notesContent = $null
+            $notesPath = $null
             if (-not [string]::IsNullOrWhiteSpace($ReleaseNotesFile)) {
                 if (-not (Test-Path -LiteralPath $ReleaseNotesFile)) {
                     throw "ReleaseNotesFile not found: $ReleaseNotesFile"
@@ -150,15 +162,28 @@ try {
                 [IO.File]::WriteAllText($trimmedNotes, $notesContent, [Text.UTF8Encoding]::new($false))
                 $notesPath = $trimmedNotes
             }
-            $createArgs = @('release', 'create', $Tag, $package, $checksum, $manifest, '--repo', $githubRepository, '--verify-tag', '--title', $releaseTitle)
-            if ($signatureMetadata) { $createArgs = @('release', 'create', $Tag, $package, $checksum, $manifest, $signature, '--repo', $githubRepository, '--verify-tag', '--title', $releaseTitle) }
+            $createArgs = @('release', 'create', $Tag) + $assets + @('--draft', '--repo', $githubRepository, '--verify-tag', '--title', $releaseTitle)
             if ($null -ne $notesPath) {
                 $createArgs += @('--notes-file', $notesPath)
             } else {
                 $createArgs += '--generate-notes'
             }
             Invoke-Gh -Arguments $createArgs | Out-Null
+        $draftJson = Invoke-Gh -Arguments @('release', 'view', $Tag, '--repo', $githubRepository, '--json', 'isDraft,assets')
+        $draft = $draftJson -join "`n" | ConvertFrom-Json
+        if (-not $draft.isDraft -or $draft.assets.Count -ne $assets.Count) {
+            throw "Draft $Tag does not contain the expected release assets."
         }
+        foreach ($assetPath in $assets) {
+            $localAsset = Get-Item -LiteralPath $assetPath
+            $expectedHash = (Get-FileHash -LiteralPath $assetPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            $remoteAsset = @($draft.assets | Where-Object name -CEQ $localAsset.Name)
+            if ($remoteAsset.Count -ne 1 -or $remoteAsset[0].state -ne 'uploaded' -or
+                $remoteAsset[0].size -ne $localAsset.Length -or $remoteAsset[0].digest -ne "sha256:$expectedHash") {
+                throw "GitHub did not confirm the complete upload of $($localAsset.Name). Release remains a draft."
+            }
+        }
+        Invoke-Gh -Arguments @('release', 'edit', $Tag, '--repo', $githubRepository, '--draft=false', '--latest') | Out-Null
         Write-Host "GitHub Release: https://github.com/$githubRepository/releases/tag/$Tag"
 
         if ($CleanOldReleases -gt 0) {

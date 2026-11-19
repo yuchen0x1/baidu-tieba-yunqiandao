@@ -111,10 +111,14 @@ switch (SYSTEM_PAGE) {
             }
             $tip .= '<div class="text-right"><a href="' . htmlspecialchars($release['release_url'], ENT_QUOTES, 'UTF-8') . '" target="_blank" class="btn btn-default">查看 Release</a> ';
             if ($release['asset_download_url'] !== '') {
-                $tip .= '<a href="' . htmlspecialchars($release['asset_download_url'], ENT_QUOTES, 'UTF-8') . '" target="_blank" class="btn btn-default">下载 Windows 包</a> ';
+                $tip .= '<a href="' . htmlspecialchars($release['asset_download_url'], ENT_QUOTES, 'UTF-8') . '" target="_blank" class="btn btn-default">下载 Web 部署包</a> ';
             }
-            if ($status['update_available']) {
+            $signatureReady = (!$verification['signature_configured'] && !ProjectUpdater::signatureRequired())
+                || ($verification['signature_configured'] && $verification['signature_available']);
+            if ($status['update_available'] && $verification['sha256_available'] && $signatureReady && is_writable(SYSTEM_ROOT . '/setup')) {
                 $tip .= '<form action="ajax.php?mod=admin:update:updnow" method="post" style="display:inline;"><input type="hidden" name="csrf_token" value="' . htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') . '"><input type="hidden" name="tag" value="' . htmlspecialchars($release['tag_name'], ENT_QUOTES, 'UTF-8') . '"><button type="submit" class="btn btn-primary" onclick="waitup();">立即更新到 V' . htmlspecialchars($release['version'], ENT_QUOTES, 'UTF-8') . '</button></form>';
+            } elseif ($status['update_available']) {
+                $tip .= '<span class="label label-warning" style="display:inline-block;padding:8px;">请检查部署包、签名策略和服务器写入权限</span>';
             } else {
                 $tip .= '<span class="label label-success" style="display:inline-block;padding:8px;">当前已是最新版本</span>';
             }
@@ -123,7 +127,7 @@ switch (SYSTEM_PAGE) {
                 $tip .= '<hr/><div><b>版本说明：</b><br/>' . nl2br(htmlspecialchars($release['body'], ENT_QUOTES, 'UTF-8')) . '</div>';
             }
             if ($release['asset_digest'] !== '') {
-                $tip .= '<hr/><small>Windows 包校验值：' . htmlspecialchars($release['asset_digest'], ENT_QUOTES, 'UTF-8') . '</small>';
+                $tip .= '<hr/><small>Web 部署包校验值：' . htmlspecialchars($release['asset_digest'], ENT_QUOTES, 'UTF-8') . '</small>';
             }
             $tip .= '<hr/><small>完整性策略：SHA-256 ' . ($verification['sha256_available'] ? '可用并强制校验' : '缺失，无法在线覆盖安装') . '；数字签名 ';
             if ($verification['signature_configured']) {

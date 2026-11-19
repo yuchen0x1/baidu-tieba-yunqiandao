@@ -11,7 +11,7 @@ on:
     - cron: '24 3 * * *'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: sync-release-readme
@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Update the release section on the default branch
+      - name: Check the release section on the default branch
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           retries: 3
@@ -91,9 +91,6 @@ jobs:
             const nl = before.includes('\r\n') ? '\r\n' : '\n'
             const after = before.slice(0, first + start.length) + nl + nl + lines.join(nl + nl) + nl + nl + before.slice(last)
             if (after !== before) {
-              await github.rest.repos.createOrUpdateFileContents({
-                owner, repo, branch, path, sha: file.sha,
-                message: 'docs: sync README with GitHub Releases',
-                content: Buffer.from(after).toString('base64')
-              })
+              core.notice('README 的版本摘要与 GitHub Releases 有差异，请通过 PR 更新。')
+              await core.summary.addHeading('README 版本摘要').addCodeBlock(lines.join(nl + nl), 'markdown').write()
             }

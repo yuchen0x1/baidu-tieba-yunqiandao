@@ -49,3 +49,8 @@ official-service/keys/
 official-service/data/
 *.pem
 *.key
+
+# AI 会话工作目录
+.superpowers/
+__pycache__/
+*.pyc

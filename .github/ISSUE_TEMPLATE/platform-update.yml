@@ -1,0 +1,22 @@
+name: 部署兼容性或更新失败
+description: 报告 PHP、Docker、NAS、浏览器兼容性以及升级失败
+body:
+  - type: input
+    id: version
+    attributes:
+      label: 当前版本与目标版本
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: 部署方式、系统架构及 PHP / MariaDB 版本
+    validations:
+      required: true
+  - type: textarea
+    id: failure
+    attributes:
+      label: 失败阶段、操作步骤与错误信息
+      description: 请先移除密码、Cookie、BDUSS、Token 和私人地址。恢复失败时请说明手头有哪些备份。
+    validations:
+      required: true

@@ -6,28 +6,25 @@ on:
       - 'v*'
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   release:
+    needs: ci
+    permissions:
+      contents: write
     name: 构建并发布 Web 部署包
     runs-on: ubuntu-latest
-    services:
-      mariadb:
-        image: mariadb:11.4
-        env:
-          MARIADB_ROOT_PASSWORD: root
-          MARIADB_DATABASE: tcs_it_bootstrap
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="healthcheck.sh --connect --innodb_initialized"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=20
     steps:
       - name: Checkout tagged source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 
@@ -40,27 +37,6 @@ jobs:
             echo "Release tags must point to a commit already merged into main." >&2
             exit 1
           fi
-
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.2'
-          extensions: curl, mbstring, mysqli, zip
-          tools: composer
-
-      - name: Validate release source
-        run: |
-          composer install --prefer-dist --no-interaction --no-progress
-          composer validate --strict
-          composer check
-
-      - name: Run database integration checks
-        env:
-          TCS_IT_DB_HOST: 127.0.0.1
-          TCS_IT_DB_PORT: '3306'
-          TCS_IT_DB_USER: root
-          TCS_IT_DB_PASS: root
-        run: composer integration
 
       - name: Validate tag and publish GitHub Release
         env:
@@ -78,7 +54,25 @@ jobs:
             Confirm = $false
           }
           $notes = "release-notes/$env:RELEASE_TAG.md"
-          if (Test-Path -LiteralPath $notes) {
-            $arguments.ReleaseNotesFile = $notes
-          }
+          if (-not (Test-Path -LiteralPath $notes)) { throw "Missing release notes $notes" }
+          $arguments.ReleaseNotesFile = $notes
           tools/publish-github.ps1 @arguments
+
+      - name: Verify public downloads and release attestation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/release-check"
+          cd "$RUNNER_TEMP/release-check"
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY"
+          sha256sum --check ./*.sha256
+          for attempt in 1 2 3 4 5; do
+            if gh release verify "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY"; then
+              gh release verify-asset "$RELEASE_TAG" ./*.zip --repo "$GITHUB_REPOSITORY"
+              exit 0
+            fi
+            sleep 5
+          done
+          exit 1

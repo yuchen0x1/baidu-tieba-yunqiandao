@@ -27,7 +27,7 @@ git tag "$tag"
 git push origin "$tag"
 ```
 
-推送 `v*` tag 会触发 `.github/workflows/release.yml`：先运行语法/安全扫描、Secret 扫描、PHPUnit 以及基于 MariaDB 的迁移、调度、API、备份恢复与通知集成检查；全部通过后，再将 tag 中的源码打包为通用 Web ZIP（`tieba-cloud-sign-web-vX.Y.Z.zip`）、生成 SHA-256 校验文件和更新清单 JSON，并创建 GitHub Release。工作流还会确认 tag 的提交已经位于 `origin/main` 历史中。工作流使用仓库 `GITHUB_TOKEN` 及 `contents: write` 权限，无需个人访问令牌或仓库变量。
+推送 `v*` tag 会触发 `.github/workflows/release.yml`：先运行语法/安全扫描、Secret 扫描、PHPUnit 以及基于 MariaDB 的迁移、调度、API、备份恢复与通知集成检查；全部通过后，再将 tag 中的源码打包为通用 Web ZIP（`tieba-cloud-sign-web-vX.Y.Z.zip`），生成 SHA-256 与更新清单 JSON。资产上传至草稿，逐一确认 GitHub 返回的大小、摘要和状态后再发布。工作流还会确认 tag 的提交已经位于 `origin/main` 历史中。工作流使用仓库 `GITHUB_TOKEN` 及 `contents: write` 权限，无需个人访问令牌或仓库变量。
 
 如需本地打包或手动发布，请安装并登录有目标仓库 Release 写权限的 [GitHub CLI](https://cli.github.com/)，然后运行：
 
@@ -69,4 +69,12 @@ tools/publish-github.ps1 @arguments
 
 - **打包脚本提示存在已跟踪文件改动**：提交或还原这些改动，然后从 tag 对应的干净 clone 打包。未跟踪文件不会进入包，脚本使用 `git archive` 从 tag 树取文件。
 - **GitHub CLI 未登录或权限不足**：运行 `gh auth status --hostname github.com`，并确认本地账户或工作流令牌对目标仓库具有 Release 写权限。
-- **回滚**：发现问题后，将有问题的 GitHub Release 删除或标记为预发布；修正并审核项目元数据后，使用新的版本 tag 重新发布。不要复用已发布的版本号。
+- **回滚**：保留 Release 和标签，发布勘误和修复版本。已部署站点按[恢复指南](AUTO_UPDATE.md)回到已验证的代码、配置和数据库。草稿上传失败时检查资产并恢复草稿发布流程，正式版本始终使用新标签。
+
+
+## 发布与维护状态
+
+- 安全设置启用不可变 Release 后，GitHub 为新版本生成证明。发布流水线用 `gh release verify`、`gh release verify-asset` 与实际下载的 SHA-256 复核。
+- PR 检查包含多 PHP 版本、MariaDB、Docker、Web ZIP 与依赖差异。每周重跑默认分支 CI，Dependabot 每周检查锁文件、Action、Dockerfile 和 Compose。README 版本校验在 GitHub Actions 摘要中输出差异，版本准备 PR 更新首页。
+- 生产发布只接受合入 main 的稳定标签。签名强制部署仍需维护者提供受控的站点公钥和 Release detached 签名。发布和升级问题请通过部署兼容性与更新模板报告。
+- 每次主要版本评审重查[竞品调研](reports/ecosystem-2026-11-18.md)中的活跃项目与候选清单，按平台矩阵更新兼容性和验证结果。

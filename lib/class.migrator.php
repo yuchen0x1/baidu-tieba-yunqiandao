@@ -172,18 +172,22 @@ class Migrator
      * 失败时记录 failed 状态并抛出异常；全部成功后同步 core_version。
      * @param callable|null $notify 每步回调 function(string $message)
      * @param string|null $migrationDir 迁移目录，默认 setup/migrations
+     * @param callable|null $beforeUpgrade 在迁移锁内、修改数据库前执行
      * @return array 已应用版本
      */
-    public static function runUp($notify = null, $migrationDir = null)
+    public static function runUp($notify = null, $migrationDir = null, $beforeUpgrade = null)
     {
         global $m;
-        self::ensureTable();
-        $currentVersion = self::precheck();
         if (!self::acquireLock()) {
             throw new RuntimeException('无法取得数据库迁移锁，可能已有另一个迁移进程在运行，请稍后重试');
         }
         $appliedVersions = array();
         try {
+            $currentVersion = self::precheck();
+            if ($beforeUpgrade !== null && $currentVersion !== SYSTEM_VER) {
+                $beforeUpgrade();
+            }
+            self::ensureTable();
             $all = self::scan($migrationDir);
             $records = self::records();
             $batch = time();

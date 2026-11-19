@@ -22,7 +22,8 @@
 4. 在线覆盖前强制校验 SHA-256：优先使用 GitHub `digest`，否则读取同一 Release 的 `.sha256` 资产。源码归档没有可信摘要时拒绝安装。
 5. 如配置 `UPDATE_RELEASE_PUBLIC_KEY`，再校验同一 Release 的 detached `.sig`（RSA/ECDSA + SHA-256）；配置 `UPDATE_REQUIRE_SIGNATURE=true` 时没有签名或签名失败会拒绝安装。
 6. 覆盖前将当前代码（不含 `data/`、配置、锁文件、`vendor/` 和更新缓存）保存为 `data/backups/pre-update-files-*.zip`，保留最近 3 份。写入失败会自动移除本次新增文件并恢复旧代码。
-7. 文件成功覆盖后跳转 `upgrade.php`：先备份数据库，再执行统一迁移器和 opcache 清理。迁移失败会保留失败状态和数据库备份，不会伪报成功。
+7. 文件覆盖后跳转 `upgrade.php`。新版在数据库迁移锁内先完整写入备份，再运行迁移器和清理 opcache。备份出错时停止迁移并显示原因。迁移失败时保留代码和数据库备份，维护者可修复后重试，或按下文恢复。
+8. GitHub 不可变 Release 的证明可以用 `gh release verify vX.Y.Z` 和 `gh release verify-asset vX.Y.Z tieba-cloud-sign-web-vX.Y.Z.zip` 独立验证。在 PHP 后台有现成公钥的部署仍按 detached `.sig` 策略验证。
 
 发布包名称统一使用 `tieba-cloud-sign-web-<tag>.zip`。更新器优先选择 Web 包，校验文件与签名必须匹配同一包名。历史 `windows` 命名的 ZIP 实际也是 PHP 网页源码，只保留读取兼容；不再生成这类发行包。API 限流回退通过同一仓库的 Release 页面和附件列表读取真实名称，不猜测资产或签名存在。
 
@@ -75,3 +76,34 @@ git push origin v<版本号>
 - PHP Web 请求无法像桌面安装器一样在浏览器中静默重启 PHP-FPM；更新期间页面会等待服务器完成下载和校验，常驻 `do.php --loop` 仅通过 `LOOP_RELOAD_FILE` 通知进程管理器重启。
 - 没有配置签名公钥时，系统仍强制 SHA-256，但不会声称完成数字签名验证。
 - GitHub Release、仓库写权限和 CI Secret属于外部资源；本地代码和工作流可以验证，实际线上发布需在拥有权限的仓库中运行。
+
+
+## Docker Compose 升级与回滚
+
+升级前暂停外部调度和站点写入。保留数据库导出、当前源代码或镜像、`docker/.env`、整个 `data/`、原始 `config.php` 和 `setup/install.lock`。配置可能保存站点加密盐，恢复时需和数据库配套。
+
+从 v7.8.1 及更早的 Compose 版本首次迁移时，先从旧 Web 容器复制文件。以下命令假定在仓库根目录，且一直使用默认 Compose 项目名。如部署使用 `-p`，每条命令都传入同一项目名。
+
+```bash
+docker compose -f docker/docker-compose.yml stop web
+umask 077
+mkdir -p ../tieba-instance-backup/data
+docker compose -f docker/docker-compose.yml cp web:/var/www/data/. ../tieba-instance-backup/data/
+docker compose -f docker/docker-compose.yml cp -L web:/var/www/config.php ../tieba-instance-backup/data/config.php
+docker compose -f docker/docker-compose.yml cp -L web:/var/www/setup/install.lock ../tieba-instance-backup/data/install.lock
+docker compose -f docker/docker-compose.yml exec -T db sh -ec 'exec mariadb-dump --single-transaction -uroot --password="$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' > ../tieba-instance-backup/database.sql
+```
+
+安装锁若不存在，请先确认旧站点是否完成了安装。下载并核验新发布版本、切到对应源码，保留原 `docker/.env`。旧容器状态导出完成后，创建新版 Web 容器并导入备份目录，再启动。使用卷后直接通过同项目名执行 `up -d --build`，即可延续 Web 和数据库卷。
+
+```bash
+docker compose -f docker/docker-compose.yml create --build web
+docker compose -f docker/docker-compose.yml cp ../tieba-instance-backup/data/. web:/var/www/data/
+docker compose -f docker/docker-compose.yml up -d --wait
+```
+
+管理员登录后访问 `upgrade.php`，确认迁移成功。检查 `healthz.php?mode=ready`、登录、账号数量和计划任务，再恢复正常写入。备份应存放于站点目录之外，确认升级正常后由维护者按保留策略整理。
+
+回滚时，暂停写入，将旧代码或镜像、配置和运行文件一起恢复到上一个已知版本。若迁移已执行，先将升级前数据库备份导入隔离数据库并验证，再切换应用连接。期间发生的新写入需要单独保留。升级失败时避免清除卷，优先保全旧数据与失败现场。
+
+传统 PHP 部署同样适用上述恢复原则。文件覆盖失败时更新器会尝试自动恢复旧代码。数据库回滚由维护者显式执行。

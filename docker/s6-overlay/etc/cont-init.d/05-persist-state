@@ -1,0 +1,26 @@
+#!/usr/bin/with-contenv bash
+set -euo pipefail
+
+if [[ "${TC_PERSIST_DOCKER_STATE:-false}" != true ]]; then
+    exit 0
+fi
+
+state="$WORKDIR/data"
+mkdir -p "$state"
+
+persist_file() {
+    local source="$1" target="$2"
+    if [[ -L "$source" ]] && [[ "$(readlink "$source")" == "$target" ]]; then
+        return
+    fi
+    if mountpoint -q "$source"; then
+        return
+    fi
+    if [[ -f "$source" && ! -e "$target" ]]; then
+        cp -p "$source" "$target"
+    fi
+    ln -sfn "$target" "$source"
+}
+
+persist_file "$WORKDIR/config.php" "$state/config.php"
+persist_file "$WORKDIR/setup/install.lock" "$state/install.lock"

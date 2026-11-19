@@ -34,7 +34,7 @@ function it_connect_db()
 {
     if (!class_exists('mysqli')) {
         echo "SKIP: 缺少 mysqli 扩展\n";
-        exit(0);
+        exit(getenv('TCS_IT_REQUIRED') === '1' ? 1 : 0);
     }
     $host = getenv('TCS_IT_DB_HOST') ?: '127.0.0.1';
     $port = (int) (getenv('TCS_IT_DB_PORT') ?: '3306');
@@ -46,7 +46,7 @@ function it_connect_db()
         $conn->set_charset('utf8mb4');
     } catch (mysqli_sql_exception $e) {
         echo "SKIP: 数据库不可达（{$host}:{$port}）：{$e->getMessage()}\n";
-        exit(0);
+        exit(getenv('TCS_IT_REQUIRED') === '1' ? 1 : 0);
     }
     return array($conn, $port);
 }

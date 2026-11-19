@@ -8,8 +8,8 @@ if (!defined('SYSTEM_FN')) {
     define('SYSTEM_FN', '百度贴吧云签到');
 }
 if (!defined('SYSTEM_VER')) {
-    define('SYSTEM_VER', '7.8.1');
+    define('SYSTEM_VER', '7.8.2');
 }
 if (!defined('SYSTEM_VER_NOTE')) {
-    define('SYSTEM_VER_NOTE', 'V7.8.1：多语言管理台');
+    define('SYSTEM_VER_NOTE', 'V7.8.2：更新保护与容器数据持久化');
 }

@@ -4,6 +4,10 @@ on:
   push:
     branches: [ main ]
   pull_request:
+  workflow_call:
+  workflow_dispatch:
+  schedule:
+    - cron: '16 2 * * 2'
 
 permissions:
   contents: read
@@ -18,13 +22,13 @@ jobs:
         php: ['8.2', '8.4']
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: ${{ matrix.php }}
-          extensions: curl, mbstring, mysqli, zip
+          extensions: curl, mbstring, mysqli, pcntl, zip
           tools: composer
 
       - name: Install dependencies
@@ -39,12 +43,14 @@ jobs:
       - name: Run project checks
         run: composer check
 
-      - name: Secret scan
-        run: php tools/secret-scan.php
+      - name: List dependency licenses
+        run: composer licenses --locked
 
   migration-integration:
     name: MariaDB 11.4 migration integration
     runs-on: ubuntu-latest
+    env:
+      TCS_IT_REQUIRED: '1'
     services:
       mariadb:
         image: mariadb:11.4
@@ -60,10 +66,10 @@ jobs:
           --health-retries=20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.2'
           extensions: curl, mbstring, mysqli, zip
@@ -114,7 +120,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Build and start stack
         env:
@@ -135,9 +141,28 @@ jobs:
           code=$(curl -s -o /dev/null -w '%{http_code}' 'http://127.0.0.1:8080/setup/install.php')
           echo "install.php HTTP $code"
           [ "$code" = "200" ]
+          curl -fsSI 'http://127.0.0.1:8080/source/css/ui.css' | grep -i '^cache-control:.*no-cache'
+          code=$(curl -s -o /dev/null -w '%{http_code}' 'http://127.0.0.1:8080/setup/update_cache/update-status.json')
+          [ "$code" = "404" ]
           code=$(curl -s -o /dev/null -w '%{http_code}' 'http://127.0.0.1:8080/index.php')
           echo "index.php HTTP $code"
           [ "$code" = "200" ]
+
+      - name: Verify instance files survive container replacement
+        env:
+          DB_PASSWD: ci-only
+        run: |
+          set -eu
+          docker compose -f docker/docker-compose.yml exec -T web sh -ec '
+            test -L /var/www/config.php
+            echo "# ci-persistence-probe" >> /var/www/config.php
+            printf "1" > /var/www/setup/install.lock
+          '
+          docker compose -f docker/docker-compose.yml up -d --no-deps --force-recreate --wait web
+          docker compose -f docker/docker-compose.yml exec -T web sh -ec '
+            grep -q ci-persistence-probe /var/www/config.php
+            test "$(cat /var/www/setup/install.lock)" = 1
+          '
 
       - name: Teardown
         if: always()
@@ -151,7 +176,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Create temporary release tag
         run: git tag v0.0.0
@@ -207,7 +232,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Validate compose file
         env:
