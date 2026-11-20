@@ -119,7 +119,31 @@ final class ReleaseConfigTest extends TestCase
         foreach (array('/tools/migrate.php', '/tools/.htaccess', '/data/backups/.htaccess', '/data/backups/index.html') as $path) {
             $this->assertStringContainsString($path . ' -export-ignore', $attributes);
         }
-        $this->assertStringContainsString('--worktree-attributes', $this->read('tools/publish-github.ps1'));
+        $publisher = $this->read('tools/publish-github.ps1');
+        $this->assertStringNotContainsString('--worktree-attributes', $publisher);
+        $this->assertStringContainsString('"$Tag" -- .', $publisher);
+
+        $archivePath = tempnam(sys_get_temp_dir(), 'tieba-release-');
+        $this->assertNotFalse($archivePath);
+        try {
+            exec('git -C ' . escapeshellarg(dirname(__DIR__)) . ' archive --format=zip --output='
+                . escapeshellarg($archivePath) . ' HEAD', $output, $status);
+            $this->assertSame(0, $status, '无法生成已提交源码的部署包');
+            $archive = new ZipArchive();
+            $this->assertTrue($archive->open($archivePath));
+            try {
+                foreach (array('tools/migrate.php', 'tools/.htaccess', 'data/backups/.htaccess', 'data/backups/index.html') as $path) {
+                    $this->assertNotFalse($archive->locateName($path), '部署包缺少 ' . $path);
+                }
+                foreach (array('tests/', 'docs/', '.github/', 'windows/') as $path) {
+                    $this->assertFalse($archive->locateName($path), '部署包不应包含 ' . $path);
+                }
+            } finally {
+                $archive->close();
+            }
+        } finally {
+            unlink($archivePath);
+        }
     }
 
     public function testComposerPlatformContractCoversRealDependencies(): void

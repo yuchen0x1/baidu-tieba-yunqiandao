@@ -91,7 +91,7 @@ mkdir -p ../tieba-instance-backup/data
 docker compose -f docker/docker-compose.yml cp web:/var/www/data/. ../tieba-instance-backup/data/
 docker compose -f docker/docker-compose.yml cp -L web:/var/www/config.php ../tieba-instance-backup/data/config.php
 docker compose -f docker/docker-compose.yml cp -L web:/var/www/setup/install.lock ../tieba-instance-backup/data/install.lock
-docker compose -f docker/docker-compose.yml exec -T db sh -ec 'exec mariadb-dump --single-transaction -uroot --password="$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' > ../tieba-instance-backup/database.sql
+docker compose -f docker/docker-compose.yml exec -T db sh -ec 'exec mariadb-dump --single-transaction -uroot --password="$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' > ../tieba-instance-backup/database.sql # secret-scan:allow 仅引用容器环境变量，不含凭据字面量
 ```
 
 安装锁若不存在，请先确认旧站点是否完成了安装。下载并核验新发布版本、切到对应源码，保留原 `docker/.env`。旧容器状态导出完成后，创建新版 Web 容器并导入备份目录，再启动。使用卷后直接通过同项目名执行 `up -d --build`，即可延续 Web 和数据库卷。
