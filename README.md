@@ -33,7 +33,7 @@
 
 **[v7.8.3](https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/tag/v7.8.3)** · 2026-11-20
 
-升级前会保存数据库备份，备份失败时停止迁移。Docker Compose 使用卷保留站点配置、安装锁和 data 目录。正式 Web 部署包附 GitHub Release 证明，可独立核验来源。当前开发中的 v7.9.0 增加 Webhook 事件中心与调度中断台账收敛，待 CI 通过后发布。
+升级前会保存数据库备份，备份失败时停止迁移。Docker Compose 使用卷保留站点配置、安装锁和 data 目录。正式 Web 部署包附 GitHub Release 证明，可独立核验来源。v7.9.0 已发布 Webhook 事件中心与调度中断台账收敛。
 
 [全部发行记录](https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases)
 
