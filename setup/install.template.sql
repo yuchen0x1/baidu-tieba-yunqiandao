@@ -119,7 +119,7 @@ INSERT INTO `{VAR-PREFIX}options` VALUES ('cron_sign_again', 'a:2:{s:3:\"num\";i
 INSERT INTO `{VAR-PREFIX}options` VALUES ('sign_hour', '0');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('mail_secure', 'none');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('freetable', 'tieba');
-INSERT INTO `{VAR-PREFIX}options` VALUES ('core_version', '7.8.3');
+INSERT INTO `{VAR-PREFIX}options` VALUES ('core_version', '7.9.0');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('core_revision', '');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('vid', '10000');
 INSERT INTO `{VAR-PREFIX}options` VALUES ('update_server', '0');
@@ -375,4 +375,5 @@ INSERT INTO `{VAR-PREFIX}schema_migrations` (`version`, `applied_at`, `descripti
   ('007302', UNIX_TIMESTAMP(), 'V7.5：敏感配置选项（通知凭据/SMTP/代理/计划任务密码等）加密落库', 'success', UNIX_TIMESTAMP(), UNIX_TIMESTAMP()),
   ('007303', UNIX_TIMESTAMP(), 'V7.5：补 tieba/users_options/sign_history/login_audit 缺失索引', 'success', UNIX_TIMESTAMP(), UNIX_TIMESTAMP()),
   ('007500', UNIX_TIMESTAMP(), 'V7.5：签到行增加短期 claim，防止并发重复签到', 'success', UNIX_TIMESTAMP(), UNIX_TIMESTAMP()),
-  ('007600', UNIX_TIMESTAMP(), 'V7.8：计划任务锁增加租约所有者令牌，防止过期进程误释放新锁', 'success', UNIX_TIMESTAMP(), UNIX_TIMESTAMP());
+  ('007600', UNIX_TIMESTAMP(), 'V7.8：计划任务锁增加租约所有者令牌，防止过期进程误释放新锁', 'success', UNIX_TIMESTAMP(), UNIX_TIMESTAMP()),
+  ('007901', UNIX_TIMESTAMP(), 'V7.9：Webhook 回调地址加密落库', 'success', UNIX_TIMESTAMP(), UNIX_TIMESTAMP());

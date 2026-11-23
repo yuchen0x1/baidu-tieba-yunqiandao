@@ -8,8 +8,8 @@ if (!defined('SYSTEM_FN')) {
     define('SYSTEM_FN', '百度贴吧云签到');
 }
 if (!defined('SYSTEM_VER')) {
-    define('SYSTEM_VER', '7.8.3');
+    define('SYSTEM_VER', '7.9.0');
 }
 if (!defined('SYSTEM_VER_NOTE')) {
-    define('SYSTEM_VER_NOTE', 'V7.8.3：归档校验与发布说明修正');
+    define('SYSTEM_VER_NOTE', 'V7.9.0：Webhook 事件中心与调度可靠性升级');
 }

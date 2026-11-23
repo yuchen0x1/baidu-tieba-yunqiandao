@@ -414,6 +414,80 @@ final class CronSchedulerTest extends TestCase
         $this->assertGreaterThan($first, (int) $GLOBALS['i']['opt']['cron_notify_last_task'], 'interval=0 时每次耗尽都应告警');
     }
 
+    /**
+     * 独立 FakeDB：用于验证异常退出遗留的 running 台账收敛。
+     * 只模拟 settleInterruptedRuns() 需要的查询与更新，不引入真实数据库。
+     */
+    private function makeInterruptedRunDb(array $rows, array $locks)
+    {
+        return new class($rows, $locks) {
+            public array $updates = array();
+            private array $rows;
+            private array $locks;
+            public int $affected = 0;
+
+            public function __construct(array $rows, array $locks)
+            {
+                $this->rows = $rows;
+                $this->locks = $locks;
+            }
+
+            public function query($sql)
+            {
+                if (stripos($sql, 'SELECT DISTINCT') === 0) {
+                    return new ArrayIterator($this->rows);
+                }
+                return true;
+            }
+
+            public function pquery($sql, $params = array())
+            {
+                if (stripos($sql, 'SELECT DISTINCT') === 0) {
+                    return new ArrayIterator($this->rows);
+                }
+                if (stripos($sql, 'SELECT `running`') === 0) {
+                    $name = $params[0] ?? '';
+                    return new ArrayIterator(isset($this->locks[$name]) ? array($this->locks[$name]) : array());
+                }
+                if (stripos($sql, 'UPDATE') === 0) {
+                    $this->updates[] = array($sql, $params);
+                    $this->affected = 1;
+                }
+                return true;
+            }
+
+            public function fetch_array($rs)
+            {
+                if (!$rs->valid()) { return false; }
+                $row = $rs->current(); $rs->next(); return $row;
+            }
+
+            public function affected_rows() { return $this->affected; }
+        };
+    }
+
+    public function testInterruptedRunsAreSettledOnlyWithoutLiveLock(): void
+    {
+        $previous = $GLOBALS['m'];
+        $db = $this->makeInterruptedRunDb(
+            array(array('name' => 'crashed_task'), array('name' => 'running_task')),
+            array(
+                'crashed_task' => array('running' => 0, 'running_at' => 0),
+                'running_task' => array('running' => 1, 'running_at' => time()),
+            )
+        );
+        $GLOBALS['m'] = $db;
+        try {
+            $settled = cron::settleInterruptedRuns();
+            $this->assertSame(1, $settled);
+            $this->assertCount(1, $db->updates);
+            $this->assertSame('crashed_task', $db->updates[0][1][2]);
+            $this->assertStringContainsString("status` = 'error'", $db->updates[0][0]);
+        } finally {
+            $GLOBALS['m'] = $previous;
+        }
+    }
+
     public function testSuccessPathKeepsMarkerHistory(): void
     {
         $this->exhaustOnce('task');

@@ -115,8 +115,14 @@ class option
         if (empty($uid)) {
             return isset($i['user']['opt'][$name]) ? $i['user']['opt'][$name] : null;
         } else {
-            $name = sqladds($name);
-            $q = $m->once_fetch_array("SELECT `value` FROM `" . DB_PREFIX . "users_options` WHERE `uid` = '{$uid}' AND `name` = '{$name}' LIMIT 1");
+            // uid 强制为整数、name 参数绑定：旧实现把两者都拼进 SQL 字符串，
+            // 任何调用方传入非数字 uid 都可能在 MySQL 的宽松转型下变成恒真条件。
+            $uid = (int) $uid;
+            $q = $m->pquery(
+                "SELECT `value` FROM `" . DB_PREFIX . "users_options` WHERE `uid` = ? AND `name` = ? LIMIT 1",
+                array($uid, (string) $name)
+            );
+            $q = $q ? $m->fetch_array($q) : false;
             return isset($q['value']) ? $q['value'] : null;
         }
     }
@@ -135,16 +141,28 @@ class option
             $uid = $i['user']['uid'];
         }
         $uid = (int) $uid;
-
-        $name = sqladds($name);
-        $value = sqladds($value);
-        if ($m->once_fetch_array("SELECT uid FROM `" . DB_PREFIX . "users_options` WHERE `uid` = {$uid} AND `name` = '{$name}'")) {
-            $q = $m->query("UPDATE `" . DB_NAME . "`.`" . DB_PREFIX . "users_options` SET `value` =  '{$value}' WHERE `name` = '{$name}' AND `uid` = " . $uid);
+        $name = (string) $name;
+        $value = (string) $value;
+        // 存在性判断与写入都走参数绑定；INSERT 用唯一键 upsert 收敛并发写同一键。
+        $existing = $m->pquery(
+            "SELECT `uid` FROM `" . DB_PREFIX . "users_options` WHERE `uid` = ? AND `name` = ? LIMIT 1",
+            array($uid, $name)
+        );
+        $hasRow = $existing ? (bool) $m->fetch_array($existing) : false;
+        if ($hasRow) {
+            $q = $m->pquery(
+                "UPDATE `" . DB_PREFIX . "users_options` SET `value` = ? WHERE `uid` = ? AND `name` = ?",
+                array($value, $uid, $name)
+            );
         } else {
-            $q = $m->query("INSERT INTO `" . DB_PREFIX . "users_options` (`uid`, `name`, `value`) VALUES ({$uid},'{$name}','{$value}')");
+            $q = $m->pquery(
+                "INSERT INTO `" . DB_PREFIX . "users_options` (`uid`, `name`, `value`) VALUES (?, ?, ?)",
+                array($uid, $name, $value)
+            );
         }
         if ($q) {
             if ($uid == $i['user']['uid']) {
+                // 缓存原始值：旧实现缓存转义后的值，同请求内读回会变形。
                 $i['user']['opt'][$name] = $value;
             }
             return true;

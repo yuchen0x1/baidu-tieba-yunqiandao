@@ -217,6 +217,53 @@ class cron
         return $rows;
     }
 
+    /**
+     * 结束所有仍停留在“开始执行”的历史行。
+     *
+     * 每次执行都会先写一条 running 事件；若进程在写结束事件前被杀死，
+     * 该行会永久停留在 running，管理页会把已经结束的任务继续显示为运行中。
+     * 本方法在下一次调度开始时按锁状态收敛：任务当前没有存活锁，说明
+     * 旧的 running 事件已经中断；当前持锁的进程保持原样，由它自己写结果。
+     *
+     * @return int 被收敛的记录数
+     */
+    public static function settleInterruptedRuns()
+    {
+        global $m;
+        self::ensureTables();
+        $table = '`' . DB_PREFIX . self::TASK_RUNS_TABLE . '`';
+        $result = $m->query("SELECT DISTINCT `name` FROM " . $table . " WHERE `status` = 'running' LIMIT 200");
+        $names = array();
+        while ($result && ($row = $m->fetch_array($result))) {
+            $names[] = (string) $row['name'];
+        }
+        if (!$names) {
+            return 0;
+        }
+        $settled = 0;
+        $now = time();
+        $lockTimeout = max(60, (int) option::get('cron_lock_timeout'));
+        foreach ($names as $name) {
+            $cronRow = $m->pquery("SELECT `running`, `running_at` FROM `" . DB_PREFIX . "cron` WHERE `name` = ? LIMIT 1", array($name));
+            $cronRow = $cronRow ? $m->fetch_array($cronRow) : false;
+            // 当前仍有未过期的锁：交给持锁进程写结束事件。过期的锁说明进程已中断。
+            $lockLive = $cronRow
+                && (int) $cronRow['running'] === 1
+                && (int) $cronRow['running_at'] > $now - $lockTimeout;
+            if ($lockLive) {
+                continue;
+            }
+            $ok = $m->pquery(
+                "UPDATE " . $table . " SET `status` = 'error', `message` = ?, `finished_at` = ? WHERE `name` = ? AND `status` = 'running'",
+                array('执行进程未写入结束记录（可能异常退出或被重启）；已按任务锁状态标记为中断', $now, $name)
+            );
+            if ($ok && $m->affected_rows() > 0) {
+                $settled += (int) $m->affected_rows();
+            }
+        }
+        return $settled;
+    }
+
     /** 按任务、状态和时间窗口查询历史；只读取一页，兼容已卸载任务的记录。 */
     public static function runHistory($filters = array(), $page = 1, $pageSize = 20)
     {
@@ -562,6 +609,7 @@ class cron
     public static function runall()
     {
         global $m;
+        self::settleInterruptedRuns();
         $cron = $m->query("SELECT *  FROM `" . DB_NAME . "`.`" . DB_PREFIX . "cron` ORDER BY  `orde` ASC ");
         while ($cs = $m->fetch_array($cron)) {
             if (!self::isEnabled($cs)) {
