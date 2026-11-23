@@ -273,11 +273,13 @@ final class SecurityHardeningTest extends TestCase
 
         try {
             option::uset('some_key', 'some_value', '3 OR 1=1');
-            // 第 1 条是存在性 SELECT，第 2 条是 UPDATE
-            $this->assertCount(2, $db->queries);
-            $updateSql = $db->queries[1];
-            $this->assertStringNotContainsString('OR 1=1', $updateSql);
-            $this->assertStringContainsString('`uid` = 3', $updateSql);
+            // 存在性与写入均使用参数绑定；恶意 UID 只能被强制转成整数 3。
+            $this->assertCount(2, $db->prepared);
+            $this->assertSame(array(3, 'some_key'), $db->prepared[0][1]);
+            $this->assertSame(array('some_value', 3, 'some_key'), $db->prepared[1][1]);
+            $this->assertStringNotContainsString('OR 1=1', implode(' ', array_map(static function ($call) {
+                return $call[0];
+            }, $db->prepared)));
         } finally {
             $m = $previousM;
             $i = $previousI;

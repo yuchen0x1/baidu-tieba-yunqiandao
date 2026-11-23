@@ -52,6 +52,7 @@ if ($isCli && is_array($cmd_pw) && array_key_exists('loop', $cmd_pw)) {
                 $m->close();
                 $GLOBALS['m'] = new S(DB_HOST, DB_USER, DB_PASSWD, DB_NAME, LONGSQL, DB_SSL);
             }
+            option::set('cron_last_do', (string) time());
             cron::runall();
         } catch (Throwable $loopError) {
             error_log('do.php loop 调度异常：' . $loopError->getMessage());
@@ -91,8 +92,10 @@ if (SYSTEM_PAGE == 'runcron') {
         $return = '';
     if (option::get('cron_last_do_time') != $today) {
         option::set('cron_last_do_time', $today);
-        option::set('cron_last_do', '0');
     }
+    // 该选项供 metrics/health 判读“上次实际调度时间”，必须是递增时间戳；
+    // 历史实现每天清零，导致 Prometheus 指标永远显示 0。
+    option::set('cron_last_do', (string) time());
         cron::runall();
 }
 doAction('cron_2');

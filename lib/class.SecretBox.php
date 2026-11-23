@@ -47,6 +47,7 @@ class SecretBox
             'notify_feishu_webhook',
             'notify_wxpusher_token',
             'notify_webhook_url',
+            'webhook_url',
             'webhook_secret',
             'proxy_pass',
             'bbs_pw',

@@ -31,9 +31,9 @@
 
 <!-- github-release:start -->
 
-**[v7.8.2](https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/tag/v7.8.2)** · 2026-11-18
+**[v7.8.3](https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases/tag/v7.8.3)** · 2026-11-20
 
-升级前会保存数据库备份，备份失败时停止迁移。Docker Compose 使用卷保留站点配置、安装锁与 data 目录。正式 Web 部署包附 GitHub Release 证明，可独立核验来源。
+升级前会保存数据库备份，备份失败时停止迁移。Docker Compose 使用卷保留站点配置、安装锁和 data 目录。正式 Web 部署包附 GitHub Release 证明，可独立核验来源。当前开发中的 v7.9.0 增加 Webhook 事件中心与调度中断台账收敛，待 CI 通过后发布。
 
 [全部发行记录](https://github.com/yuchen0x1/baidu-tieba-yunqiandao/releases)
 
@@ -58,6 +58,10 @@
 ### 多账号与安全
 - 多用户 + 多百度账号 + 分组管理，账号级代理（HTTP/SOCKS5）与统一代理批量下发。
 - 敏感凭据（BDUSS/STOKEN）AES-256-GCM 加密落库；CSRF、2FA、登录审计、邀请码注册一应俱全。
+
+### Webhook 事件中心
+- 管理员可在“全局设置 → Webhook 事件推送”启停并选择 `task_fail`、`sign_fail` 等事件，发送测试事件并查看最近结果。
+- URL 与签名 Secret 加密保存，保存时拒绝内网/回环地址；事件带 `X-Webhook-Id`、时间戳和 HMAC-SHA256 签名，接收方应拒绝过期或重复事件。
 
 ### 扩展生态
 - 通知渠道：Server 酱、Telegram Bot、通用 Webhook、Bark、PushPlus、邮件；每日签到日报优先走个人渠道，未送达回退邮箱。

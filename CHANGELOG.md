@@ -2,6 +2,15 @@
 
 > 日期说明：有已核实 GitHub Release 的近期版本采用 Asia/Shanghai 发布日期；较早条目保留开发记录日期，两者不可混用。完整版本索引见 [更新历史](docs/releases/release-notes.md)。
 
+## V7.9.0（待发布）：Webhook 事件中心与调度可靠性升级
+
+- 新增可配置 Webhook 事件中心：后台可启停、选择事件、发送测试事件并查看最近结果；URL/Secret 加密落库，保存时拒绝内网与回环地址。
+- Webhook 载荷增加稳定 `id`、`X-Webhook-Timestamp` 与 `X-Webhook-Signature-V2`（`HMAC-SHA256(timestamp.body)`），同时保留旧版 body 签名，接收方可按时间窗与事件 ID 防重放。
+- 调度台账在下一轮调度时收敛异常退出留下的 `running` 记录，避免任务永久显示“开始执行”；`cron_last_do` 改为真实时间戳，修复 Prometheus 指标恒为 0。
+- 用户级设置读写统一参数绑定并强制整数 UID，消除旧版字符串拼接查询；新增 Webhook 事件与签名回归测试。
+
+本版本尚未发布；发布前仍需完成 CI、Web 包归档与真实 Release 下载复核。
+
 ## V7.8.3（待发布）：发布校验修复
 
 - 修正文档化 Docker 命令中的环境变量扫描标记，避免将容器环境变量误报为凭据；不放宽凭据扫描规则。

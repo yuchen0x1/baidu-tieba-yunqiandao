@@ -7,6 +7,8 @@ global $m,$i;
 
 if (isset($_GET['ok'])) {
     echo '<div class="alert alert-success">设置保存成功</div>';
+} elseif (isset($_GET['webhooktestok'])) {
+    echo '<div class="alert alert-success">Webhook 测试推送成功：回调服务已返回 2xx，可在接收端核对 X-Webhook-Id 与签名。</div>';
 } elseif (isset($_GET['mailtestok'])) {
     echo '<div class="alert alert-success">一封邮件已经发送到您的邮箱 ' . $i['user']['email'] . '，请查收</div>';
 } elseif (isset($_GET['bbstestok'])) {
@@ -439,6 +441,61 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
     <?php
     $notifyhtml = ob_get_clean();
     $content1['notify'] = array('html' => $notifyhtml,'type' => 'else');
+    /*Webhook 事件推送（与上面的单渠道通知独立，用于 n8n/自建服务等事件消费）*/
+    ob_start();
+    require_once SYSTEM_ROOT . '/lib/class.webhook.php';
+    $whEnabled = option::get('webhook_enable') === '1';
+    $whEventsRaw = trim((string) option::get('webhook_events'));
+    $whEvents = $whEventsRaw === '' ? array() : array_values(array_filter(array_map('trim', explode(',', $whEventsRaw))));
+    $whRecent = json_decode((string) option::get('webhook_recent_results'), true);
+    if (!is_array($whRecent)) {
+        $whRecent = array();
+    }
+    ?>
+        <tr><td><b>Webhook 事件推送</b>
+        <br/><br/>把任务失败、签到结果等事件以 JSON POST 推送到你自己的自动化服务（n8n、Home Assistant、内部告警等）。
+        <br/><br/><span class="text-muted">接收方校验方式：<code>X-Webhook-Signature-V2 = HMAC-SHA256(Secret, timestamp + "." + body)</code>，并拒绝超过 5 分钟的 timestamp 与重复的 X-Webhook-Id。保留旧版 body 签名以兼容已有接收方。</span>
+        <br/><br/><button type="submit" class="cs-btn cs-btn-secondary" formaction="setting.php?mod=admin:webhooktest" formmethod="post" formnovalidate>发送测试事件</button>
+        <span class="text-muted">测试前请先保存设置</span>
+        </td><td>
+        <div class="input-group">
+            <span class="input-group-addon">总开关</span>
+            <select name="webhook_enable" class="form-control">
+                <option value="1"<?php echo $whEnabled ? ' selected' : ''; ?>>启用</option>
+                <option value="0"<?php echo $whEnabled ? '' : ' selected'; ?>>关闭</option>
+            </select>
+        </div><br/>
+        <div class="input-group">
+            <span class="input-group-addon">回调 URL</span>
+            <input type="password" name="webhook_url" class="form-control" value="" placeholder="<?php echo htmlspecialchars(SecretBox::masked('webhook_url') ?: '未配置，留空保持不变（必须是公网 http/https 地址）', ENT_QUOTES, 'UTF-8'); ?>" autocomplete="off">
+            <?php if (SecretBox::has('webhook_url')) { ?><input type="hidden" name="clear_webhook_url" value="0"><button type="button" class="btn btn-xs btn-default secret-clear-btn" onclick="var f=this.previousElementSibling;f.value=f.value==='1'?'0':'1';this.textContent=f.value==='1'?'已标记清空':'清空'">清空</button><?php } ?>
+        </div><br/>
+        <div class="input-group">
+            <span class="input-group-addon">签名 Secret</span>
+            <input type="password" name="webhook_secret" class="form-control" value="" placeholder="<?php echo htmlspecialchars(SecretBox::masked('webhook_secret') ?: '可选，留空则不签名', ENT_QUOTES, 'UTF-8'); ?>" autocomplete="off">
+            <?php if (SecretBox::has('webhook_secret')) { ?><input type="hidden" name="clear_webhook_secret" value="0"><button type="button" class="btn btn-xs btn-default secret-clear-btn" onclick="var f=this.previousElementSibling;f.value=f.value==='1'?'0':'1';this.textContent=f.value==='1'?'已标记清空':'清空'">清空</button><?php } ?>
+        </div><br/>
+        <fieldset class="webhook-events">
+            <legend class="cs-label">订阅事件</legend>
+            <label><input type="checkbox" name="webhook_events_all" value="1"<?php echo $whEvents ? '' : ' checked'; ?>> 全部事件（默认）</label><br/>
+            <?php foreach (Webhook::eventLabels() as $whKey => $whLabel) { ?>
+            <label><input type="checkbox" name="webhook_events[]" value="<?php echo htmlspecialchars($whKey, ENT_QUOTES, 'UTF-8'); ?>"<?php echo in_array($whKey, $whEvents, true) ? ' checked' : ''; ?>> <?php echo htmlspecialchars($whLabel, ENT_QUOTES, 'UTF-8'); ?> <code><?php echo htmlspecialchars($whKey, ENT_QUOTES, 'UTF-8'); ?></code></label><br/>
+            <?php } ?>
+            <p class="text-muted">勾选「全部事件」时忽略下方单项；不勾选全部时仅推送选中的事件。</p>
+        </fieldset>
+        <?php if ($whRecent) { ?>
+        <details><summary>最近推送结果（<?php echo count($whRecent); ?> 条）</summary>
+        <ul class="cs-list">
+            <?php foreach ($whRecent as $whItem) { ?>
+            <li class="cs-list-item"><strong><?php echo date('Y-m-d H:i:s', (int) ($whItem['ts'] ?? 0)); ?> · <?php echo htmlspecialchars((string) ($whItem['event'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></strong><span class="<?php echo !empty($whItem['ok']) ? 'text-success' : 'text-danger'; ?>"><?php echo htmlspecialchars((string) ($whItem['detail'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></span></li>
+            <?php } ?>
+        </ul></details>
+        <?php } ?>
+        </td>
+        </tr>
+    <?php
+    $webhookhtml = ob_get_clean();
+    $content1['webhook'] = array('html' => $webhookhtml,'type' => 'else');
     $content1['api_token'] = array('html' => '<tr><td><b>开放 API Token</b><br/>留空为禁用 API。设置后可通过 <code>api.php?action=status</code> 等接口访问（需带 Bearer Token 头）<br/><span class="text-muted">Token 只存哈希不存明文，此处不回显已配置值</span></td><td><input type="password" class="form-control" name="api_token" value="" placeholder="' . ((option::get('api_token') !== '' && option::get('api_token') !== null) ? '已配置，留空保持不变' : '未配置，输入随机字符串') . '" autocomplete="off"><input type="hidden" name="clear_api_token" value="0"><button type="button" class="btn btn-xs btn-default secret-clear-btn" onclick="var f=this.previousElementSibling;f.value=f.value==\'1\'?\'0\':\'1\';this.textContent=f.value==\'1\'?\'已标记清空\':\'清空\'">清空</button></td></tr>', 'type' => 'else');
     $content1['metrics_token'] = array('html' => '<tr><td><b>监控指标 Token</b><br/>供 Prometheus / Uptime Kuma 抓取 <code>/metrics.php</code> 使用<br/>留空则回退到上方 API Token；同样只存哈希不回显</td><td><input type="password" class="form-control" name="metrics_token" value="" placeholder="' . ((option::get('metrics_token') !== '' && option::get('metrics_token') !== null) ? '已配置，留空保持不变' : '未配置，输入随机字符串') . '" autocomplete="off"><input type="hidden" name="clear_metrics_token" value="0"><button type="button" class="btn btn-xs btn-default secret-clear-btn" onclick="var f=this.previousElementSibling;f.value=f.value==\'1\'?\'0\':\'1\';this.textContent=f.value==\'1\'?\'已标记清空\':\'清空\'">清空</button></td></tr>', 'type' => 'else');
     echo former::create($set1, $content1);

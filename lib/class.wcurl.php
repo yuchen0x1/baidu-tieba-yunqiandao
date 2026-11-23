@@ -727,6 +727,17 @@ class wcurl
     }
 
     /**
+     * 仅校验 URL 是否只解析到公网地址（不发起请求）。
+     * 供没有 cURL 句柄或需要预检的调用方复用同一套 SSRF 规则。
+     * @param string $url
+     * @return bool
+     */
+    public static function isPublicUrl($url)
+    {
+        return static::resolvePublicUrl($url) !== false;
+    }
+
+    /**
      * Validate that an HTTP(S) URL resolves only to public IPv4/IPv6 addresses.
      * @param string $url
      * @return bool

@@ -5,7 +5,7 @@
  */
 
 require dirname(__FILE__) . '/init.php';
-if (in_array(SYSTEM_PAGE, array('admin:cron', 'admin:testnotify'), true) && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+if (in_array(SYSTEM_PAGE, array('admin:cron', 'admin:testnotify', 'admin:webhooktest'), true) && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     http_response_code(405);
     header('Allow: POST');
     msg('此操作需通过页面表单提交。请返回管理页面重试。');
@@ -172,6 +172,32 @@ switch (SYSTEM_PAGE) {
             @option::set('notify_wxpusher_uid', isset($sou['notify_wxpusher_uid']) ? trim($sou['notify_wxpusher_uid']) : '');
             @option::set('notify_ntfy_server', isset($sou['notify_ntfy_server']) ? trim($sou['notify_ntfy_server']) : 'https://ntfy.sh');
             @option::set('notify_ntfy_topic', isset($sou['notify_ntfy_topic']) ? trim($sou['notify_ntfy_topic']) : '');
+
+            // Webhook 事件推送：URL 与 Secret 属敏感配置，与通知凭据同样加密落库。
+            // URL 在保存时先做公网校验，避免管理员误把内网地址留成探测入口。
+            $webhookUrl = isset($sou['webhook_url']) ? trim((string) $sou['webhook_url']) : '';
+            $webhookClear = isset($sou['clear_webhook_url']) && (string) $sou['clear_webhook_url'] === '1';
+            if ($webhookClear) {
+                SecretBox::clear('webhook_url');
+            } elseif ($webhookUrl !== '') {
+                if (!preg_match('~^https?://~i', $webhookUrl)) {
+                    msg('Webhook 地址必须是 http:// 或 https:// 开头的完整 URL');
+                }
+                require_once SYSTEM_ROOT . '/lib/class.wcurl.php';
+                if (!wcurl::isPublicUrl($webhookUrl)) {
+                    msg('Webhook 地址不能指向本机、内网或保留地址（SSRF 防御）。请填写公网可访问的回调地址。');
+                }
+                SecretBox::put('webhook_url', $webhookUrl);
+            }
+            SecretBox::saveFromForm($sou, 'webhook_secret');
+            $webhookEventInput = isset($sou['webhook_events']) && is_array($sou['webhook_events']) ? $sou['webhook_events'] : array();
+            require_once SYSTEM_ROOT . '/lib/class.webhook.php';
+            $webhookEventInput = array_values(array_intersect(Webhook::events(), array_map('strval', $webhookEventInput)));
+            if (isset($sou['webhook_events_all']) && (string) $sou['webhook_events_all'] === '1') {
+                $webhookEventInput = array();
+            }
+            @option::set('webhook_events', implode(',', $webhookEventInput));
+            @option::set('webhook_enable', isset($sou['webhook_enable']) && (string) $sou['webhook_enable'] === '1' ? '1' : '0');
             require_once SYSTEM_ROOT . '/lib/security.php';
             //全局 API Token 只存哈希，防止拖库后直接拿到可用凭据
             //空提交=保持不变，clear_api_token=1 才清空
@@ -1159,6 +1185,18 @@ msg('<meta http-equiv="refresh" content="0; url=setting.php?mod=updatefid&step='
         } else {
             msg('测试通知未发送：' . htmlspecialchars($r['detail'], ENT_QUOTES, 'UTF-8'));
         }
+        break;
+    case 'admin:webhooktest':
+        require_once SYSTEM_ROOT . '/lib/class.webhook.php';
+        $webhookResult = Webhook::push('test', array(
+            'version' => SYSTEM_VER,
+            'site'    => SYSTEM_URL,
+            'message' => '这是一条 Webhook 测试事件；收到即表示地址、签名与网络均可用。',
+        ));
+        if (!empty($webhookResult['ok'])) {
+            Redirect('index.php?mod=admin:set&webhooktestok');
+        }
+        msg('Webhook 测试未成功：' . htmlspecialchars((string) $webhookResult['detail'], ENT_QUOTES, 'UTF-8') . '<br/><br/><a href="index.php?mod=admin:set">返回设置</a>');
         break;
     case 'admin:testmail':
         global $i;
