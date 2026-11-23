@@ -8,6 +8,7 @@
 - Webhook 载荷增加稳定 `id`、`X-Webhook-Timestamp` 与 `X-Webhook-Signature-V2`（`HMAC-SHA256(timestamp.body)`），同时保留旧版 body 签名，接收方可按时间窗与事件 ID 防重放。
 - 调度台账在下一轮调度时收敛异常退出留下的 `running` 记录，避免任务永久显示“开始执行”；`cron_last_do` 改为真实时间戳，修复 Prometheus 指标恒为 0。
 - 用户级设置读写统一参数绑定并强制整数 UID，消除旧版字符串拼接查询；新增 Webhook 事件与签名回归测试。
+- 新增迁移 `007901`（Webhook 地址明文加密，幂等），并同步修正全新安装模板的迁移基线登记，避免新装后反复提示待应用迁移。
 
 本版本尚未发布；发布前仍需完成 CI、Web 包归档与真实 Release 下载复核。
 
